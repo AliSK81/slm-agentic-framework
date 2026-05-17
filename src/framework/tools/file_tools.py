@@ -59,6 +59,15 @@ def write_file(file_path: str, content: str, workspace: Path) -> FileResult:
                 f'new_string="<updated text>")'
             ),
         )
+    if target.suffix in (".py", ".pyw"):
+        try:
+            ast.parse(content, filename=str(target))
+        except SyntaxError as exc:
+            return FileResult(
+                ok=False,
+                message=f"AST gate rejected write: line {exc.lineno}: {exc.msg}",
+            )
+
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(content, encoding="utf-8")
     return FileResult(ok=True, message="created")

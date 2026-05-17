@@ -14,6 +14,7 @@ from eval.datasets.humaneval_adapter import load_humaneval, task_to_session
 from eval.datasets.mbpp_adapter import load_mbpp, task_to_session as mbpp_task_to_session
 from eval.datasets.swebench_adapter import load_swebench
 from eval.metrics import RunResult, compute_cer, compute_sr
+from eval.paths import safe_task_slug
 
 logger = logging.getLogger(__name__)
 
@@ -86,8 +87,9 @@ def _run_single_task(
 ) -> RunResult:
     """Execute one task and return a typed result row."""
     _ = flags  # ablation flags wired in Phase 11
-    workspace = traces_root / "workspaces" / f"{config_name}_{dataset_name}_{task_id}"
-    trace_path = traces_root / f"{config_name}_{dataset_name}_{task_id}.json"
+    slug = safe_task_slug(task_id)
+    workspace = traces_root / "workspaces" / config_name / dataset_name / slug
+    trace_path = traces_root / "per_task" / config_name / dataset_name / f"{slug}.json"
 
     if dry_run:
         return RunResult(
@@ -115,19 +117,24 @@ def _run_single_task(
         max_retries=max_retries,
         checkpoint_dir=traces_root / "checkpoints",
     )
+    solved = session.test_passed and session.outcome == "solved"
     row = RunResult(
         task_id=task_id,
-        solved=session.test_passed and session.outcome == "solved",
+        solved=solved,
         outcome=session.outcome,
         interaction_count=session.decision_count,
         step_count=session.step_count,
         retry_count=session.retry_count,
         trace_path=str(trace_path),
     )
-    trace_path.write_text(
-        json.dumps(row.model_dump(), default=str) + "\n",
-        encoding="utf-8",
-    )
+    try:
+        trace_path.parent.mkdir(parents=True, exist_ok=True)
+        trace_path.write_text(
+            json.dumps(row.model_dump(), default=str) + "\n",
+            encoding="utf-8",
+        )
+    except OSError as exc:
+        logger.warning("Could not write per-task trace %s: %s", trace_path, exc)
     return row
 
 
@@ -183,12 +190,19 @@ def run_eval(
             )
         except Exception as exc:  # noqa: BLE001 — eval must continue across tasks
             logger.exception("Task %s failed: %s", task_id, exc)
+            slug = safe_task_slug(task_id)
             row = RunResult(
                 task_id=task_id,
                 solved=False,
                 outcome="unresolvable",
                 interaction_count=0,
-                trace_path=str(traces_root / f"{config_name}_{dataset_name}_{task_id}.json"),
+                trace_path=str(
+                    traces_root
+                    / "per_task"
+                    / config_name
+                    / dataset_name
+                    / f"{slug}.json"
+                ),
             )
         results.append(row)
 

@@ -16,8 +16,9 @@ from framework.orchestration.messages import (
     save_handback,
     save_report,
 )
-from framework.tools.compile_check import py_compile_check
-from framework.tools.file_tools import edit_file, write_file
+from framework.tools.code_sanitize import sanitize_python_source
+from framework.tools.compile_check import CompileResult, py_compile_check
+from framework.tools.file_tools import FileResult, edit_file, write_file
 from framework.tools.test_runner import run_tests
 
 logger = logging.getLogger(__name__)
@@ -28,8 +29,28 @@ def _payload_text(payload: dict) -> str:
     for key in ("new_string", "content", "code"):
         value = payload.get(key)
         if isinstance(value, str) and value.strip():
-            return value
+            return sanitize_python_source(value)
     return ""
+
+
+def _resolve_file_path(payload: dict, default: str = "solution.py") -> str:
+    """Resolve target path from alternate SLM payload keys."""
+    for key in ("file_path", "file", "path"):
+        value = payload.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return default
+
+
+def _verify_python_file(file_path: str, workspace: Path) -> FileResult:
+    """Run compile check on a workspace file; return FileResult for executor."""
+    target = (workspace / file_path).resolve()
+    if not target.is_file():
+        return FileResult(ok=False, message=f"file not found after write: {file_path}")
+    compile_result: CompileResult = py_compile_check(str(target))
+    if compile_result.ok:
+        return FileResult(ok=True, message="ok")
+    return FileResult(ok=False, message="; ".join(compile_result.errors))
 
 
 class ExecutorAgent:
@@ -47,7 +68,39 @@ class ExecutorAgent:
         self._workspace.mkdir(parents=True, exist_ok=True)
         self.last_handback: HandbackMessage | None = None
         self.last_tool_result: Any = None
-        self.last_edit_result: Any = None
+        self.last_edit_result: FileResult | None = None
+
+    def _apply_code_edit(self, decision: DecisionEntry) -> FileResult:
+        """Write or edit a Python file from a code_edit decision."""
+        payload = decision.payload
+        file_path = _resolve_file_path(payload)
+        target = (self._workspace / file_path).resolve()
+        body = _payload_text(payload)
+        old_string = payload.get("old_string", "")
+
+        if not body and not old_string:
+            return FileResult(ok=False, message="empty code_edit payload")
+
+        if not target.is_file():
+            result = write_file(file_path, body, self._workspace)
+        elif old_string:
+            new_body = sanitize_python_source(str(payload.get("new_string", body)))
+            result = edit_file(file_path, old_string, new_body, self._workspace)
+        elif body:
+            original = target.read_text(encoding="utf-8")
+            if not original.strip():
+                target.unlink(missing_ok=True)
+                result = write_file(file_path, body, self._workspace)
+            else:
+                result = edit_file(file_path, original, body, self._workspace)
+        else:
+            result = edit_file(file_path, old_string, "", self._workspace)
+
+        if not result.ok:
+            return result
+        if file_path.endswith(".py") or file_path.endswith(".pyw"):
+            return _verify_python_file(file_path, self._workspace)
+        return result
 
     def execute_node(self, state: WorkflowState) -> WorkflowState:
         """Run one executor cycle for the active dispatch."""
@@ -73,47 +126,26 @@ class ExecutorAgent:
                     )
                     return self.last_tool_result
                 if tool in ("py_compile", "py_compile_check"):
-                    target = decision.payload.get("path", decision.payload.get("code", ""))
+                    target = decision.payload.get(
+                        "path", decision.payload.get("code", "")
+                    )
                     self.last_tool_result = py_compile_check(str(target))
                     return self.last_tool_result
                 if tool == "write_file":
-                    self.last_edit_result = write_file(
-                        decision.payload.get("file_path", "solution.py"),
-                        decision.payload.get("content", ""),
-                        self._workspace,
+                    file_path = _resolve_file_path(decision.payload)
+                    content = sanitize_python_source(
+                        str(decision.payload.get("content", ""))
                     )
+                    self.last_edit_result = write_file(
+                        file_path, content, self._workspace
+                    )
+                    if self.last_edit_result.ok:
+                        self.last_edit_result = _verify_python_file(
+                            file_path, self._workspace
+                        )
                     return self.last_edit_result
             if decision.kind == "code_edit":
-                file_path = decision.payload.get("file_path", "solution.py")
-                target = (self._workspace / file_path).resolve()
-                body = _payload_text(decision.payload)
-                old_string = decision.payload.get("old_string", "")
-                if not target.is_file():
-                    self.last_edit_result = write_file(
-                        file_path, body, self._workspace
-                    )
-                elif old_string:
-                    self.last_edit_result = edit_file(
-                        file_path,
-                        old_string,
-                        decision.payload.get("new_string", body),
-                        self._workspace,
-                    )
-                elif body:
-                    original = target.read_text(encoding="utf-8")
-                    if not original.strip():
-                        target.unlink(missing_ok=True)
-                        self.last_edit_result = write_file(
-                            file_path, body, self._workspace
-                        )
-                    else:
-                        self.last_edit_result = edit_file(
-                            file_path, original, body, self._workspace
-                        )
-                else:
-                    self.last_edit_result = edit_file(
-                        file_path, old_string, "", self._workspace
-                    )
+                self.last_edit_result = self._apply_code_edit(decision)
                 return self.last_edit_result
             if decision.kind == "handoff":
                 handback = HandbackMessage(
@@ -127,12 +159,19 @@ class ExecutorAgent:
                 return handback
             return None
 
+        last_error: str | None = None
+        if int(state.get("retry_count", 0)) > 0:
+            evaluation = state.get("last_evaluation") or {}
+            last_error = evaluation.get("error_message") or evaluation.get("error")
+
         result = self._cycle.run(
             session_id,
             "executor",
             description,
             subtask_id,
             action_fn=action_fn,
+            last_error=last_error,
+            session_retry_count=int(state.get("retry_count", 0)),
         )
 
         passed = False
@@ -140,7 +179,7 @@ class ExecutorAgent:
             passed = False
         elif self.last_tool_result is not None and hasattr(self.last_tool_result, "passed"):
             passed = bool(self.last_tool_result.passed)
-        elif self.last_edit_result is not None and hasattr(self.last_edit_result, "ok"):
+        elif self.last_edit_result is not None:
             passed = bool(self.last_edit_result.ok)
         elif result.decision is not None and not result.exhausted:
             passed = True
@@ -159,9 +198,13 @@ class ExecutorAgent:
             if existing is not None and existing.status == "in_progress":
                 self._memory.subtasks.set_status(subtask_id, "done")
 
+        evaluation: dict[str, Any] = {"passed": passed}
+        if not passed and self.last_edit_result is not None and not self.last_edit_result.ok:
+            evaluation["error_message"] = self.last_edit_result.message
+
         return {
             **state,
             "current_state": STATE_EXECUTE,
             "step_count": int(state.get("step_count", 0)) + 1,
-            "last_evaluation": {"passed": passed},
+            "last_evaluation": evaluation,
         }

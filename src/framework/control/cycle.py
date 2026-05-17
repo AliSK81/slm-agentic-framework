@@ -13,7 +13,11 @@ from framework.control.models import CycleResult, ErrorControlBundle, SLMProposa
 from framework.control.self_check import self_check
 from framework.error_control.parser import parse_decision
 from framework.memory.stores import DecisionEntry, Issue, MemoryStores, SelfCheckRecord
-from framework.memory.working_memory import WorkingMemory, WorkingMemoryBuilder
+from framework.memory.working_memory import (
+    WorkingMemory,
+    WorkingMemoryBudgetError,
+    WorkingMemoryBuilder,
+)
 from framework.slm.client import ModelProfile, SLMClient
 
 logger = logging.getLogger(__name__)
@@ -111,6 +115,8 @@ class DecisionCycle:
         *,
         step_count: int = 0,
         max_steps: int | None = None,
+        last_error: str | None = None,
+        session_retry_count: int = 0,
     ) -> CycleResult:
         """Execute the full decision cycle; never raises on SLM failure."""
         limiter = StepBudgetLimiter(
@@ -121,13 +127,19 @@ class DecisionCycle:
             return CycleResult(budget_exceeded=True)
 
         retry_count = 0
-        wm = self._wm_builder.build(
-            session_id=session_id,
-            agent_role=agent_role,
-            current_subtask=current_subtask,
-            subtask_id=subtask_id,
-            retry_count=0,
-        )
+        wm_retry = max(int(session_retry_count), 0)
+        try:
+            wm = self._wm_builder.build(
+                session_id=session_id,
+                agent_role=agent_role,
+                current_subtask=current_subtask,
+                subtask_id=subtask_id,
+                last_error=last_error,
+                retry_count=wm_retry,
+            )
+        except WorkingMemoryBudgetError as exc:
+            logger.warning("Working memory budget exceeded: %s", exc)
+            return CycleResult(exhausted=True, retry_count=retry_count)
         messages: list[dict[str, str]] = [
             {
                 "role": "user",

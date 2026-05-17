@@ -9,7 +9,7 @@ import pytest
 
 from framework.memory.backend import SQLiteBackend
 from framework.memory.stores import MemoryStores, RetrievalItem, SubTask, WorkingMemory
-from framework.memory.working_memory import WorkingMemoryBudgetError, WorkingMemoryBuilder
+from framework.memory.working_memory import WorkingMemoryBuilder
 from framework.slm.client import ModelProfile
 from framework.slm.skills import load_skill_cards, select_skill_card
 
@@ -51,21 +51,21 @@ def _register_session(
 
 
 def test_working_memory_stays_under_token_ceiling(memory: MemoryStores) -> None:
-    """Builder raises if assembled WM exceeds profile.max_working_memory_tokens."""
+    """Builder truncates assembled WM to fit profile.max_working_memory_tokens."""
     _register_session(
         memory,
         "sess-budget",
         goal="x" * 5000,
         constraints=["y" * 2000],
     )
-    builder = WorkingMemoryBuilder(memory, _profile(max_wm=50))
-    with pytest.raises(WorkingMemoryBudgetError):
-        builder.build(
-            session_id="sess-budget",
-            agent_role="executor",
-            current_subtask="do work",
-            subtask_id="root:sess-budget",
-        )
+    builder = WorkingMemoryBuilder(memory, _profile(max_wm=120))
+    wm = builder.build(
+        session_id="sess-budget",
+        agent_role="executor",
+        current_subtask="do work " * 400,
+        subtask_id="root:sess-budget",
+    )
+    assert wm.token_count() <= 120
 
 
 def test_anchor_always_present(memory: MemoryStores) -> None:

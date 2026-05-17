@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from framework.error_control.truncation import CAPS
+from framework.tools.code_sanitize import sanitize_python_source
 from framework.tools.compile_check import py_compile_check
 from framework.tools.file_tools import edit_file, read_file, write_file
 from framework.tools.search import build_keyword_index, search_codebase
@@ -144,3 +145,19 @@ def test_search_codebase_bigram_scores_higher(tmp_path: Path) -> None:
         assert bigram_hits[0].file == "pkg/alpha.py" or bigram_hits[0].file.endswith(
             "alpha.py"
         )
+
+
+def test_sanitize_python_source_strips_trailing_json_line() -> None:
+    """Trailing JSON closure lines from SLM payloads are removed."""
+    raw = "def f():\n    return 1\n  },\n"
+    cleaned = sanitize_python_source(raw)
+    assert cleaned.endswith("return 1\n")
+    assert "}," not in cleaned
+
+
+def test_write_file_rejects_invalid_python(tmp_path: Path) -> None:
+    """write_file AST-gates Python sources before creating the file."""
+    result = write_file("bad.py", "def broken(:\n  pass\n  },\n", tmp_path)
+    assert not result.ok
+    assert "AST gate" in result.message
+    assert not (tmp_path / "bad.py").exists()

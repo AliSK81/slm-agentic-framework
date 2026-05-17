@@ -66,10 +66,10 @@ phases:
 
   6:
     name: "Decision Cycle"
-    status: NOT_STARTED
+    status: DONE
     test_gate: "pytest tests/unit/test_self_check.py tests/integration/test_decision_cycle.py"
-    commit: null
-    notes: null
+    commit: "72d8844"
+    notes: "13/13 tests. Cycle, self_check, budget limiter, mocked SLM integration."
 
   7:
     name: "Workflow State Machine"

@@ -9,7 +9,7 @@
 ## CURRENT STATE
 
 ```yaml
-current_phase: 10
+current_phase: 11
 phase_status: NOT_STARTED
 last_updated: "2026-05-17"
 last_commit: "d4b531b"
@@ -89,15 +89,15 @@ phases:
     name: "Integration: Full Session E2E"
     status: DONE
     test_gate: "pytest tests/e2e/test_full_session.py -m e2e"
-    commit: null
+    commit: "d4b531b"
     notes: "6/6 e2e pass. load_project_env(override=True), session runner, smoke_test. Fixed model ID, JSON format prompt, executor payload.code, pytest wrapper."
 
   10:
     name: "Evaluation Harness"
-    status: NOT_STARTED
+    status: DONE
     test_gate: "pytest tests/unit/"
     commit: null
-    notes: null
+    notes: "69 unit tests. HumanEval/MBPP/SWE adapters, SR/CER metrics, run_eval JSONL harness."
 
   11:
     name: "Ablation Runner"

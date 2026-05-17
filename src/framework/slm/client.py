@@ -16,10 +16,11 @@ from typing import Any, Literal
 
 import httpx
 import yaml
-from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 
-load_dotenv()
+from framework.env import load_project_env
+
+load_project_env()
 
 logger = logging.getLogger(__name__)
 

@@ -9,10 +9,10 @@
 ## CURRENT STATE
 
 ```yaml
-current_phase: 9
+current_phase: 10
 phase_status: NOT_STARTED
 last_updated: "2026-05-17"
-last_commit: "26a5355"
+last_commit: null
 blocker: null
 ```
 
@@ -80,17 +80,17 @@ phases:
 
   8:
     name: "Agent Implementations"
-    status: NOT_STARTED
+    status: DONE
     test_gate: "pytest tests/integration/"
-    commit: null
-    notes: null
+    commit: "26a5355"
+    notes: "24 integration tests. Planner/Executor + Dispatch/Report/Handback messages."
 
   9:
     name: "Integration: Full Session E2E"
-    status: NOT_STARTED
+    status: DONE
     test_gate: "pytest tests/e2e/test_full_session.py -m e2e"
     commit: null
-    notes: "[REQUIRES_USER_INPUT: OPENROUTER_API_KEY must be set in .env]"
+    notes: "6/6 e2e pass. load_project_env(override=True), session runner, smoke_test. Fixed model ID, JSON format prompt, executor payload.code, pytest wrapper."
 
   10:
     name: "Evaluation Harness"

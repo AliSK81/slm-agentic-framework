@@ -18,6 +18,25 @@ from framework.slm.client import ModelProfile, SLMClient
 
 logger = logging.getLogger(__name__)
 
+_FORMAT_BY_ROLE: dict[str, str] = {
+    "planner": "plan_step, terminate, handoff",
+    "executor": "code_edit, tool_call, terminate, handoff",
+}
+
+
+def _json_format_block(agent_role: str) -> str:
+    """Append strict JSON instructions so SLMs emit parseable decisions."""
+    kinds = _FORMAT_BY_ROLE.get(agent_role, "terminate")
+    return (
+        "\n[FORMAT]: Respond with a single JSON object only. "
+        "Do not use markdown fences or prose outside the JSON.\n"
+        f'Required keys: "kind" (one of: {kinds}), '
+        '"rationale" (non-empty string), "payload" (object), '
+        '"references" (array of strings, optional).\n'
+        'Example: {"kind":"plan_step","rationale":"because ...",'
+        '"payload":{"subtasks":[]},"references":[]}'
+    )
+
 
 class DecisionCycle:
     """Per-LLM-call control loop for planner and executor agents."""
@@ -110,7 +129,10 @@ class DecisionCycle:
             retry_count=0,
         )
         messages: list[dict[str, str]] = [
-            {"role": "user", "content": wm.to_prompt_prefix()}
+            {
+                "role": "user",
+                "content": wm.to_prompt_prefix() + _json_format_block(agent_role),
+            }
         ]
 
         while retry_count <= max_retries:

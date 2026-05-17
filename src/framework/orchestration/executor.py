@@ -23,6 +23,15 @@ from framework.tools.test_runner import run_tests
 logger = logging.getLogger(__name__)
 
 
+def _payload_text(payload: dict) -> str:
+    """Extract file body text from common SLM payload shapes."""
+    for key in ("new_string", "content", "code"):
+        value = payload.get(key)
+        if isinstance(value, str) and value.strip():
+            return value
+    return ""
+
+
 class ExecutorAgent:
     """Wraps Decision Cycle for code edits and tool calls."""
 
@@ -67,13 +76,44 @@ class ExecutorAgent:
                     target = decision.payload.get("path", decision.payload.get("code", ""))
                     self.last_tool_result = py_compile_check(str(target))
                     return self.last_tool_result
+                if tool == "write_file":
+                    self.last_edit_result = write_file(
+                        decision.payload.get("file_path", "solution.py"),
+                        decision.payload.get("content", ""),
+                        self._workspace,
+                    )
+                    return self.last_edit_result
             if decision.kind == "code_edit":
-                self.last_edit_result = edit_file(
-                    decision.payload.get("file_path", ""),
-                    decision.payload.get("old_string", ""),
-                    decision.payload.get("new_string", ""),
-                    self._workspace,
-                )
+                file_path = decision.payload.get("file_path", "solution.py")
+                target = (self._workspace / file_path).resolve()
+                body = _payload_text(decision.payload)
+                old_string = decision.payload.get("old_string", "")
+                if not target.is_file():
+                    self.last_edit_result = write_file(
+                        file_path, body, self._workspace
+                    )
+                elif old_string:
+                    self.last_edit_result = edit_file(
+                        file_path,
+                        old_string,
+                        decision.payload.get("new_string", body),
+                        self._workspace,
+                    )
+                elif body:
+                    original = target.read_text(encoding="utf-8")
+                    if not original.strip():
+                        target.unlink(missing_ok=True)
+                        self.last_edit_result = write_file(
+                            file_path, body, self._workspace
+                        )
+                    else:
+                        self.last_edit_result = edit_file(
+                            file_path, original, body, self._workspace
+                        )
+                else:
+                    self.last_edit_result = edit_file(
+                        file_path, old_string, "", self._workspace
+                    )
                 return self.last_edit_result
             if decision.kind == "handoff":
                 handback = HandbackMessage(

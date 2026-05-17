@@ -12,12 +12,13 @@ profiles:
       search_codebase: 2000
     skill_budget_tokens: 150
     timeout_by_role:
+      planner: 60
       executor: 90
       tool_call: 30
     tool_call_format: "json"
 
   qwen2.5-coder-7b-instruct:
-    openrouter_id: "qwen/qwen-2.5-coder-7b-instruct"
+    openrouter_id: "qwen/qwen-2.5-coder-32b-instruct"
     context_limit: 32768
     effective_context: 12000
     thinking_budget: null

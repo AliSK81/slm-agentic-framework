@@ -38,7 +38,7 @@ def test_client_loads_profile() -> None:
     """Client reads model profile from configs/models.yaml correctly."""
     client = _make_client()
     profile = client.profile
-    assert profile.openrouter_id == "qwen/qwen-2.5-coder-7b-instruct"
+    assert profile.openrouter_id == "qwen/qwen-2.5-coder-32b-instruct"
     assert profile.timeout_by_role["planner"] == 60
     assert profile.tool_call_format == "json"
     client.close()

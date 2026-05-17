@@ -4,6 +4,7 @@ trigger_keywords:
   - old_string
   - patch
 content: |
-  For edit_file, old_string must match the file exactly including whitespace and quotes.
+  For new files, use tool_call with tool write_file (file_path, content).
+  For existing files, use code_edit / edit_file; old_string must match exactly.
   Prefer minimal diffs. After editing, run py_compile or pytest before reporting success.
   Never invent file paths outside WORKSPACE_ROOT. One logical change per edit decision.

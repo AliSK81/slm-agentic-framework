@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 
-from eval.config import EvalConfig, load_eval_config
+from eval.config import AblationFlags, EvalConfig, load_eval_config
 from eval.datasets.humaneval_adapter import load_humaneval, task_to_session
 from eval.datasets.mbpp_adapter import load_mbpp, task_to_session as mbpp_task_to_session
 from eval.datasets.swebench_adapter import load_swebench
@@ -79,14 +79,14 @@ def _run_single_task(
     *,
     config_name: str,
     dataset_name: str,
-    flags: Any,
+    flags: AblationFlags,
     max_steps: int,
     max_retries: int,
     traces_root: Path,
     dry_run: bool,
+    planner_enabled: bool = True,
 ) -> RunResult:
     """Execute one task and return a typed result row."""
-    _ = flags  # ablation flags wired in Phase 11
     slug = safe_task_slug(task_id)
     workspace = traces_root / "workspaces" / config_name / dataset_name / slug
     trace_path = traces_root / "per_task" / config_name / dataset_name / f"{slug}.json"
@@ -104,10 +104,12 @@ def _run_single_task(
 
     _ensure_import_paths()
     from framework.env import load_project_env
+    from framework.control.ablation import AblationSettings
     from framework.orchestration.session import run_full_session
 
     load_project_env()
     workspace.mkdir(parents=True, exist_ok=True)
+    ablation = AblationSettings(**flags.model_dump())
     session = run_full_session(
         goal,
         constraints,
@@ -116,6 +118,8 @@ def _run_single_task(
         max_steps=max_steps,
         max_retries=max_retries,
         checkpoint_dir=traces_root / "checkpoints",
+        ablation=ablation,
+        planner_enabled=planner_enabled,
     )
     solved = session.test_passed and session.outcome == "solved"
     row = RunResult(
@@ -145,6 +149,7 @@ def run_eval(
     seed: int = 42,
     *,
     dry_run: bool = False,
+    planner_enabled: bool = True,
 ) -> dict[str, Any]:
     """Run evaluation for one ablation config on one dataset.
 
@@ -187,6 +192,7 @@ def run_eval(
                 max_retries=max_retries,
                 traces_root=traces_root,
                 dry_run=dry_run,
+                planner_enabled=planner_enabled,
             )
         except Exception as exc:  # noqa: BLE001 — eval must continue across tasks
             logger.exception("Task %s failed: %s", task_id, exc)

@@ -34,9 +34,16 @@ class WorkingMemoryBudgetError(ValueError):
 class WorkingMemoryBuilder:
     """Builds L1 WorkingMemory from L2 stores and model profile."""
 
-    def __init__(self, memory: MemoryStores, profile: ModelProfile) -> None:
+    def __init__(
+        self,
+        memory: MemoryStores,
+        profile: ModelProfile,
+        *,
+        enable_memory: bool = True,
+    ) -> None:
         self._memory = memory
         self._profile = profile
+        self._enable_memory = enable_memory
 
     def _fit_to_budget(self, wm: WorkingMemory) -> WorkingMemory:
         """Truncate fields until ``wm`` is within the profile token ceiling."""
@@ -137,20 +144,23 @@ class WorkingMemoryBuilder:
                 goal = task.original_goal
                 constraints = list(task.hard_constraints)
 
-        index = self._memory.retrieval.list_items()
-        top_items = retrieve_top_k(index, current_subtask, k=3)
-        retrieved = [item.text_summary for item in top_items]
+        retrieved: list[str] = []
+        skill_card: str | None = None
+        if self._enable_memory:
+            index = self._memory.retrieval.list_items()
+            top_items = retrieve_top_k(index, current_subtask, k=3)
+            retrieved = [item.text_summary for item in top_items]
 
-        skill_raw = select_skill_card(
-            agent_role=agent_role,
-            last_error=last_error,
-            current_subtask=current_subtask,
-        )
-        skill_card = (
-            _cap_tokens(skill_raw, self._profile.skill_budget_tokens)
-            if skill_raw
-            else None
-        )
+            skill_raw = select_skill_card(
+                agent_role=agent_role,
+                last_error=last_error,
+                current_subtask=current_subtask,
+            )
+            skill_card = (
+                _cap_tokens(skill_raw, self._profile.skill_budget_tokens)
+                if skill_raw
+                else None
+            )
 
         wm = WorkingMemory(
             original_goal=goal,

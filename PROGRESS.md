@@ -9,10 +9,10 @@
 ## CURRENT STATE
 
 ```yaml
-current_phase: 11
+current_phase: 12
 phase_status: NOT_STARTED
-last_updated: "2026-05-17"
-last_commit: "b4472ab"
+last_updated: "2026-05-18"
+last_commit: null
 blocker: null
 ```
 
@@ -101,10 +101,10 @@ phases:
 
   11:
     name: "Ablation Runner"
-    status: NOT_STARTED
+    status: DONE
     test_gate: "python eval/scenarios/ablation.py --dry-run"
     commit: null
-    notes: null
+    notes: "76 unit + 24 integration pass. run_ablation A–D, comparison table, agent_count.py. Ablation flags wired: memory→WM retrieval, control→self_check+FSM revise, error_control→quality gate."
 
   12:
     name: "Qualitative Trace Analysis"

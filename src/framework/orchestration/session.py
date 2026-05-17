@@ -30,6 +30,7 @@ from framework.control.workflow import (
 from framework.memory.checkpoint import save_checkpoint
 from framework.memory.stores import MemoryStores, StateEntry, SubTask
 from framework.memory.working_memory import WorkingMemoryBuilder
+from framework.control.ablation import AblationSettings
 from framework.orchestration.executor import ExecutorAgent
 from framework.orchestration.planner import PlannerAgent
 from framework.slm.client import SLMClient
@@ -129,6 +130,7 @@ def _profile_name_for_role(role: str) -> str:
 def _build_agents(
     memory: MemoryStores,
     workspace: Path,
+    ablation: AblationSettings,
 ) -> tuple[PlannerAgent, ExecutorAgent]:
     planner_slm = SLMClient(_profile_name_for_role("planner"))
     executor_slm = SLMClient(_profile_name_for_role("executor"))
@@ -137,9 +139,12 @@ def _build_agents(
         DecisionCycle(
             planner_slm,
             memory,
-            WorkingMemoryBuilder(memory, planner_slm.profile),
+            WorkingMemoryBuilder(
+                memory, planner_slm.profile, enable_memory=ablation.memory
+            ),
             bundle,
             planner_slm.profile,
+            ablation=ablation,
         ),
         memory,
     )
@@ -147,9 +152,12 @@ def _build_agents(
         DecisionCycle(
             executor_slm,
             memory,
-            WorkingMemoryBuilder(memory, executor_slm.profile),
+            WorkingMemoryBuilder(
+                memory, executor_slm.profile, enable_memory=ablation.memory
+            ),
             bundle,
             executor_slm.profile,
+            ablation=ablation,
         ),
         memory,
         workspace,
@@ -211,6 +219,8 @@ def run_full_session(
     max_retries: int = 3,
     session_id: str | None = None,
     checkpoint_dir: Path | None = None,
+    ablation: AblationSettings | None = None,
+    planner_enabled: bool = True,
 ) -> SessionOutcome:
     """Run PLAN → DISPATCH → EXECUTE loop until DONE, ESCALATE, or budget exhausted."""
     validate_openrouter_key()
@@ -234,7 +244,8 @@ def run_full_session(
         )
     )
 
-    planner, executor = _build_agents(memory, workspace)
+    settings = ablation or AblationSettings()
+    planner, executor = _build_agents(memory, workspace, settings)
     state: WorkflowState = {
         "session_id": session_id,
         "goal": goal,
@@ -266,7 +277,8 @@ def run_full_session(
     try:
         while int(state.get("step_count", 0)) < max_steps:
             if not planned:
-                planner.plan_node(state)
+                if planner_enabled:
+                    planner.plan_node(state)
                 _ensure_work_subtasks(memory, session_id, goal)
                 planned = True
                 state["step_count"] = int(state.get("step_count", 0)) + 1
@@ -295,8 +307,13 @@ def run_full_session(
                 break
 
             state["current_state"] = STATE_EVALUATE
-            build_progress_ledger(state, memory)
-            transition = next_state(state, memory)
+            if settings.control:
+                build_progress_ledger(state, memory)
+                transition = next_state(state, memory)
+            elif evaluation.get("passed"):
+                transition = STATE_DONE
+            else:
+                transition = STATE_ESCALATE
             state["step_count"] = int(state.get("step_count", 0)) + 1
 
             if transition == STATE_DONE:

@@ -18,6 +18,8 @@ from framework.memory.working_memory import (
     WorkingMemoryBudgetError,
     WorkingMemoryBuilder,
 )
+from framework.control.ablation import AblationSettings
+from framework.error_control.quality import QualityResult
 from framework.slm.client import ModelProfile, SLMClient
 
 logger = logging.getLogger(__name__)
@@ -54,6 +56,7 @@ class DecisionCycle:
         profile: ModelProfile,
         *,
         max_steps: int = 20,
+        ablation: AblationSettings | None = None,
     ) -> None:
         self._slm = slm
         self._memory = memory
@@ -61,6 +64,7 @@ class DecisionCycle:
         self._error_control = error_control
         self._profile = profile
         self._max_steps = max_steps
+        self._ablation = ablation or AblationSettings()
 
     def _build_corrective_prompt(
         self,
@@ -159,7 +163,13 @@ class DecisionCycle:
             raw = response.content
             parsed = parse_decision(raw, SLMProposal)
             recent = self._memory.decisions.get_last_n(session_id, 10)
-            quality = self._error_control.quality_gate.check(raw, parsed, recent)
+            if self._ablation.error_control:
+                quality = self._error_control.quality_gate.check(raw, parsed, recent)
+            else:
+                quality = QualityResult(
+                    passed=parsed is not None and bool(raw.strip()),
+                    failure_mode=None if parsed is not None else "unparseable",
+                )
 
             if not quality.passed or parsed is None:
                 retry_count += 1
@@ -186,7 +196,10 @@ class DecisionCycle:
                 step_index=step_index,
                 check=SelfCheckRecord(verdict="fail", issues=[]),
             )
-            check = self_check(draft, self._memory, session_id)
+            if self._ablation.control:
+                check = self_check(draft, self._memory, session_id)
+            else:
+                check = SelfCheckRecord(verdict="pass", issues=[])
             draft = draft.model_copy(update={"self_check": check})
 
             if check.verdict != "pass":

@@ -1,0 +1,9 @@
+name: executor_code_edit
+trigger_keywords:
+  - edit_file
+  - old_string
+  - patch
+content: |
+  For edit_file, old_string must match the file exactly including whitespace and quotes.
+  Prefer minimal diffs. After editing, run py_compile or pytest before reporting success.
+  Never invent file paths outside WORKSPACE_ROOT. One logical change per edit decision.

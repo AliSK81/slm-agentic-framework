@@ -90,6 +90,8 @@ class SubTask(BaseModel):
     depends_on: list[str] = Field(default_factory=list)
     result_ref: str | None = None
     attempt_count: int = 0
+    original_goal: str | None = None
+    hard_constraints: list[str] = Field(default_factory=list)
 
 
 class InteractionResult(BaseModel):
@@ -257,6 +259,15 @@ class SubTaskRegistry:
             return None
         return SubTask.model_validate(row)
 
+    def get_session_anchor(self, session_id: str) -> tuple[str, list[str]]:
+        """Return goal and constraints from the session root subtask, if any."""
+        rows = self._backend.query(STORE_SUBTASKS, {"parent_session_id": session_id})
+        for row in rows:
+            task = SubTask.model_validate(row)
+            if task.original_goal:
+                return task.original_goal, list(task.hard_constraints)
+        return "", []
+
     def set_status(
         self,
         task_id: str,
@@ -317,6 +328,46 @@ class ResultStore:
     def list_for_subtask(self, linked_subtask: str) -> list[InteractionResult]:
         rows = self._backend.query(STORE_RESULTS, {"linked_subtask": linked_subtask})
         return [InteractionResult.model_validate(r) for r in rows]
+
+
+class WorkingMemory(BaseModel):
+    """L1 working memory assembled for each LLM call."""
+
+    original_goal: str
+    hard_constraints: list[str]
+    agent_role: str
+    agent_scope: str
+    current_subtask: str
+    subtask_id: str
+    retrieved_items: list[str] = Field(default_factory=list)
+    last_error: str | None = None
+    retry_count: int = 0
+    skill_card: str | None = None
+
+    def to_prompt_prefix(self) -> str:
+        """Serialize anchor-first prompt prefix (goal + constraints always first)."""
+        lines = [
+            f"[GOAL]: {self.original_goal}",
+            f"[CONSTRAINTS]: {', '.join(self.hard_constraints) if self.hard_constraints else 'none'}",
+            f"[ROLE]: {self.agent_role}",
+            f"[SCOPE]: {self.agent_scope}",
+            f"[CURRENT TASK]: {self.current_subtask}",
+            f"[SUBTASK ID]: {self.subtask_id}",
+        ]
+        if self.retrieved_items:
+            lines.append("[CONTEXT]:")
+            lines.extend(f"- {item}" for item in self.retrieved_items)
+        if self.last_error:
+            lines.append(f"[LAST ERROR]: {self.last_error}")
+        if self.retry_count:
+            lines.append(f"[RETRY COUNT]: {self.retry_count}")
+        if self.skill_card:
+            lines.append(f"[GUIDANCE]: {self.skill_card}")
+        return "\n".join(lines)
+
+    def token_count(self) -> int:
+        """Rough token estimate: len(text) // 4."""
+        return len(self.to_prompt_prefix()) // 4
 
 
 class MemoryStores:

@@ -1,0 +1,9 @@
+name: planner_decompose
+trigger_keywords:
+  - decompose
+  - sub-task
+  - plan step
+content: |
+  When decomposing a task, output one JSON plan_step decision. Each sub-task must be
+  atomic, verifiable, and non-overlapping. List dependencies explicitly. Do not write
+  code. Rationale must explain ordering. Keep sub-task descriptions under two sentences.

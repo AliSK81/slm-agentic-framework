@@ -1,0 +1,10 @@
+name: executor_test_recovery
+trigger_keywords:
+  - pytest
+  - test failed
+  - assertion
+  - FAILED
+content: |
+  When pytest fails, read stdout for the first failing test and traceback. Fix the root
+  cause not symptoms. Re-run the same test command after the fix. Do not delete tests to
+  pass. Cap retries per sub-task budget. Record failure kind in rationale.

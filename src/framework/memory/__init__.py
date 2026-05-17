@@ -14,6 +14,11 @@ from framework.memory.stores import (
     StateStore,
     SubTask,
     SubTaskRegistry,
+    WorkingMemory,
+)
+from framework.memory.working_memory import (
+    WorkingMemoryBudgetError,
+    WorkingMemoryBuilder,
 )
 
 __all__ = [
@@ -31,6 +36,9 @@ __all__ = [
     "StateStore",
     "SubTask",
     "SubTaskRegistry",
+    "WorkingMemory",
+    "WorkingMemoryBudgetError",
+    "WorkingMemoryBuilder",
     "retrieve_top_k",
     "score",
 ]

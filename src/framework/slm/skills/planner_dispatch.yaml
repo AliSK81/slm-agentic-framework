@@ -1,0 +1,9 @@
+name: planner_dispatch
+trigger_keywords:
+  - dispatch
+  - handoff
+  - assign executor
+content: |
+  When dispatching work, emit a DISPATCH message with task_id, subtask_description,
+  memory_slice_keys, step_budget, and hard_constraints copied from the session anchor.
+  Select the next open sub-task with satisfied dependencies. Do not dispatch abandoned tasks.

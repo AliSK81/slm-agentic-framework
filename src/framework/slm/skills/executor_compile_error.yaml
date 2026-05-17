@@ -1,0 +1,10 @@
+name: executor_compile_error
+trigger_keywords:
+  - SyntaxError
+  - IndentationError
+  - compile error
+  - invalid syntax
+content: |
+  For SyntaxError or compile failures, locate the reported line and column. Fix brackets,
+  indentation, and string delimiters first. Use py_compile output verbatim in rationale.
+  Do not guess missing imports; read the file before editing. Re-run compile after fix.

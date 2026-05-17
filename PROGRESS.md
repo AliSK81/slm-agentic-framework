@@ -9,10 +9,10 @@
 ## CURRENT STATE
 
 ```yaml
-current_phase: 1
-phase_status: IN_PROGRESS
+current_phase: 2
+phase_status: NOT_STARTED
 last_updated: "2026-05-17"
-last_commit: "a5f7bdb"
+last_commit: "659353b"
 blocker: null
 ```
 
@@ -31,10 +31,10 @@ phases:
 
   1:
     name: "SLM Client (OpenRouter)"
-    status: NOT_STARTED
+    status: DONE
     test_gate: "pytest tests/unit/test_slm_client.py"
-    commit: null
-    notes: null
+    commit: "659353b"
+    notes: "6/6 unit tests pass with httpx MockTransport."
 
   2:
     name: "Memory Stores"

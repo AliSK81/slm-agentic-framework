@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "slm-agentic-framework"
+version = "0.1.0"
+description = "SLM-based multi-agent programming framework (MSc thesis)"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "-v --tb=short"
+markers = [
+    "e2e: end-to-end tests requiring real API keys",
+]
+
+[tool.coverage.run]
+source = ["src/framework"]
+omit = ["tests/*"]

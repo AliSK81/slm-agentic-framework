@@ -1,0 +1,43 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+
+# Environment and secrets
+.env
+
+# Data and runtime
+data/
+workspace/
+*.db
+*.sqlite3
+
+# Checkpoints and traces (keep dirs via .gitkeep)
+checkpoints/*
+!checkpoints/.gitkeep
+traces/*
+!traces/.gitkeep
+
+# IDE and OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Testing and coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Chroma / model caches
+.chroma/

@@ -1,0 +1,35 @@
+profiles:
+  devstral-small:
+    openrouter_id: "mistralai/devstral-small"
+    context_limit: 32768
+    effective_context: 16000
+    thinking_budget: null
+    max_working_memory_tokens: 750
+    tool_output_caps:
+      pytest_run: 5000
+      py_compile: 2000
+      read_file: 12000
+      search_codebase: 2000
+    skill_budget_tokens: 150
+    timeout_by_role:
+      executor: 90
+      tool_call: 30
+    tool_call_format: "json"
+
+  qwen2.5-coder-7b-instruct:
+    openrouter_id: "qwen/qwen-2.5-coder-7b-instruct"
+    context_limit: 32768
+    effective_context: 12000
+    thinking_budget: null
+    max_working_memory_tokens: 650
+    tool_output_caps:
+      pytest_run: 4000
+      py_compile: 1500
+      read_file: 8000
+      search_codebase: 1500
+    skill_budget_tokens: 120
+    timeout_by_role:
+      planner: 60
+      executor: 75
+      tool_call: 30
+    tool_call_format: "json"

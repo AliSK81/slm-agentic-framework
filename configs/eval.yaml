@@ -1,0 +1,25 @@
+humaneval:
+  sample_size: 50
+  seed: 42
+  difficulty_split: {easy: 20, medium: 20, hard: 10}
+
+mbpp:
+  sample_size: 50
+  seed: 42
+
+swebench:
+  variant: "lite"   # lite=300 tasks; we use subset
+  sample_size: 30
+  seed: 42
+  docker_required: true
+
+step_budgets:
+  humaneval: {max_steps: 10, max_retries: 3}
+  mbpp:      {max_steps: 15, max_retries: 3}
+  swebench:  {max_steps: 25, max_retries: 3}
+
+ablation_configs:
+  A: {memory: false, control: false, error_control: false}
+  B: {memory: true,  control: false, error_control: false}
+  C: {memory: false, control: true,  error_control: false}
+  D: {memory: true,  control: true,  error_control: true}

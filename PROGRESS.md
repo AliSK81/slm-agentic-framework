@@ -9,10 +9,10 @@
 ## CURRENT STATE
 
 ```yaml
-current_phase: 0
-phase_status: IN_PROGRESS
+current_phase: 1
+phase_status: NOT_STARTED
 last_updated: "2026-05-17"
-last_commit: "none"
+last_commit: "a5f7bdb"
 blocker: null
 ```
 
@@ -24,10 +24,10 @@ blocker: null
 phases:
   0:
     name: "Project Bootstrap"
-    status: IN_PROGRESS      # NOT_STARTED | IN_PROGRESS | DONE | BLOCKED
+    status: DONE      # NOT_STARTED | IN_PROGRESS | DONE | BLOCKED
     test_gate: "pytest tests/ --collect-only"
-    commit: null
-    notes: null
+    commit: "a5f7bdb"
+    notes: "Skeleton, configs, venv, requirements.txt. Import smoke + pytest collect pass."
 
   1:
     name: "SLM Client (OpenRouter)"

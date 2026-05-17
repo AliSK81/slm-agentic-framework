@@ -9,10 +9,10 @@
 ## CURRENT STATE
 
 ```yaml
-current_phase: 2
-phase_status: IN_PROGRESS
+current_phase: 3
+phase_status: NOT_STARTED
 last_updated: "2026-05-17"
-last_commit: "659353b"
+last_commit: "4486a4e"
 blocker: null
 ```
 
@@ -38,10 +38,10 @@ phases:
 
   2:
     name: "Memory Stores"
-    status: NOT_STARTED
+    status: DONE
     test_gate: "pytest tests/unit/test_memory_stores.py"
-    commit: null
-    notes: null
+    commit: "4486a4e"
+    notes: "10/10 unit tests. SQLite backend, 4 stores, Generative Agents scoring."
 
   3:
     name: "Working Memory Builder"
@@ -166,6 +166,6 @@ env_checks:
   - python_version: "3.14.2 (>=3.11)"
   - venv_active: true
   - openrouter_key_set: true
-  - sqlite_path_exists: false   # created in Phase 2
+  - sqlite_path_exists: true    # ./data/framework.db on first use
   - workspace_dir_exists: false # created on first tool run
 ```

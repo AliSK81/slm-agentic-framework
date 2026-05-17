@@ -151,6 +151,13 @@ class SLMClient:
         except httpx.HTTPError as exc:
             elapsed_ms = int((time.perf_counter() - started) * 1000)
             logger.warning("SLM HTTP error: %s", exc)
+            status = int(getattr(getattr(exc, "response", None), "status_code", 0) or 0)
+            if status >= 400:
+                return SLMResponse(
+                    error=f"http_{status}",
+                    model=self._profile.openrouter_id,
+                    elapsed_ms=elapsed_ms,
+                )
             return SLMResponse(
                 error="http_error",
                 model=self._profile.openrouter_id,

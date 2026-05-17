@@ -36,4 +36,14 @@ def require_api_key() -> str:
         validate_openrouter_key()
     except RuntimeError as exc:
         pytest.skip(str(exc))
+
+    from framework.slm.client import SLMClient
+
+    probe = SLMClient("devstral-small").call(
+        [{"role": "user", "content": "ping"}],
+        role="executor",
+    )
+    if probe.error and ("402" in probe.error or probe.error == "http_402"):
+        pytest.skip("OpenRouter credits exhausted (HTTP 402)")
+
     return key

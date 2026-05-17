@@ -55,6 +55,21 @@ def test_client_returns_slm_response_on_success() -> None:
     client.close()
 
 
+def test_client_returns_http_402_on_payment_required() -> None:
+    """402 from httpx → SLMResponse(error='http_402'), no raise."""
+
+    def payment_required(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(402, json={"error": "payment required"})
+
+    client = SLMClient(
+        "qwen2.5-coder-7b-instruct",
+        http_client=httpx.Client(transport=httpx.MockTransport(payment_required)),
+    )
+    result = client.call([{"role": "user", "content": "hi"}], role="planner")
+    assert result.error == "http_402"
+    client.close()
+
+
 def test_client_returns_error_response_on_429() -> None:
     """429 after 3 retries → SLMResponse(error='rate_limited'), no raise."""
 

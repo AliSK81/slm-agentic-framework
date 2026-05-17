@@ -32,6 +32,9 @@ traces/*
 .DS_Store
 Thumbs.db
 
+# Generated reports
+thesis_evaluation_report.md
+
 # Testing and coverage
 .pytest_cache/
 .coverage

@@ -9,10 +9,10 @@
 ## CURRENT STATE
 
 ```yaml
-current_phase: 3
-phase_status: IN_PROGRESS
+current_phase: 4
+phase_status: NOT_STARTED
 last_updated: "2026-05-17"
-last_commit: "4486a4e"
+last_commit: "d913790"
 blocker: null
 ```
 
@@ -45,10 +45,10 @@ phases:
 
   3:
     name: "Working Memory Builder"
-    status: NOT_STARTED
+    status: DONE
     test_gate: "pytest tests/unit/test_retrieval.py"
-    commit: null
-    notes: null
+    commit: "d913790"
+    notes: "6/6 tests. WorkingMemory, builder, 5 skill YAML cards."
 
   4:
     name: "Error Control Infrastructure"

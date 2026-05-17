@@ -44,7 +44,8 @@ def _command_allowed(cmd: str) -> bool:
     parts = shlex.split(cmd, posix=False)
     if not parts:
         return False
-    executable = Path(parts[0]).name.lower()
+    raw = parts[0].replace('"', "").replace("'", "")
+    executable = Path(raw).name.lower()
     if executable.endswith(".exe"):
         executable = executable[:-4]
     return executable in SAFE_COMMANDS

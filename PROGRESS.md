@@ -9,10 +9,10 @@
 ## CURRENT STATE
 
 ```yaml
-current_phase: 4
+current_phase: 5
 phase_status: IN_PROGRESS
 last_updated: "2026-05-17"
-last_commit: "d913790"
+last_commit: "67220b3"
 blocker: null
 ```
 
@@ -52,10 +52,10 @@ phases:
 
   4:
     name: "Error Control Infrastructure"
-    status: NOT_STARTED
+    status: DONE
     test_gate: "pytest tests/unit/test_error_control.py"
-    commit: null
-    notes: null
+    commit: "67220b3"
+    notes: "19/19 tests. Parser, quality gate, truncation, thinking, watchdog, sandbox, checkpoint."
 
   5:
     name: "Bounded Tool Interface"

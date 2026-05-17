@@ -103,7 +103,7 @@ phases:
     name: "Ablation Runner"
     status: DONE
     test_gate: "python eval/scenarios/ablation.py --dry-run"
-    commit: null
+    commit: "6c355c1"
     notes: "76 unit + 24 integration pass. run_ablation A–D, comparison table, agent_count.py. Ablation flags wired: memory→WM retrieval, control→self_check+FSM revise, error_control→quality gate."
 
   12:

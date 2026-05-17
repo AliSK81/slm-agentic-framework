@@ -213,3 +213,252 @@ def test_budget_limiter_stops_cycle(
     )
     assert result.budget_exceeded
     assert slm._responses  # SLM never called
+
+
+def _planner_plan_json() -> str:
+    return json.dumps(
+        {
+            "kind": "plan_step",
+            "rationale": "Decompose into one implementation step.",
+            "payload": {
+                "subtasks": [
+                    {
+                        "task_id": "st-impl",
+                        "description": "Implement the feature",
+                        "owner": "executor",
+                    }
+                ]
+            },
+            "references": [],
+        }
+    )
+
+
+def _agents(
+    slm: MockSLMClient,
+    memory: MemoryStores,
+    workspace: Path,
+) -> tuple:
+    from framework.orchestration.executor import ExecutorAgent
+    from framework.orchestration.planner import PlannerAgent
+
+    cycle = _cycle(slm, memory)
+    planner = PlannerAgent(cycle, memory)
+    executor = ExecutorAgent(cycle, memory, workspace)
+    return planner, executor
+
+
+def _workflow_state(session_id: str) -> dict:
+    return {
+        "session_id": session_id,
+        "goal": "Build feature X",
+        "hard_constraints": ["No external network"],
+        "current_state": "PLAN",
+        "active_subtask_id": None,
+        "step_count": 0,
+        "retry_count": 0,
+        "loop_count": 0,
+        "max_steps": 10,
+        "max_retries": 3,
+        "last_evaluation": None,
+    }
+
+
+def test_planner_writes_subtasks_to_registry(
+    memory: MemoryStores,
+    session_setup: str,
+) -> None:
+    slm = MockSLMClient([_planner_plan_json()])
+    planner, _ = _agents(slm, memory, Path("."))
+    state = _workflow_state(session_setup)
+    planner.plan_node(state)
+    tasks = [
+        t
+        for t in memory.backend.query("subtasks", {"parent_session_id": session_setup})
+        if not t["task_id"].startswith("root:")
+    ]
+    assert len(tasks) == 1
+    assert tasks[0]["task_id"] == "st-impl"
+
+
+def test_planner_dispatch_selects_pending_subtask(
+    memory: MemoryStores,
+    session_setup: str,
+) -> None:
+    memory.subtasks.register(
+        SubTask(
+            task_id="st-pending",
+            parent_session_id=session_setup,
+            description="Do work",
+            status="open",
+            owner="executor",
+        )
+    )
+    slm = MockSLMClient([])
+    planner, _ = _agents(slm, memory, Path("."))
+    updated = planner.dispatch_node(_workflow_state(session_setup))
+    assert updated["active_subtask_id"] == "st-pending"
+    task = memory.subtasks.get("st-pending")
+    assert task is not None
+    assert task.status == "in_progress"
+
+
+def test_executor_calls_tool_on_tool_call_decision(
+    memory: MemoryStores,
+    session_setup: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from framework.orchestration.messages import save_dispatch, DispatchMessage
+    from framework.tools.test_runner import TestResult
+
+    save_dispatch(
+        memory.backend,
+        DispatchMessage(
+            session_id=session_setup,
+            task_id="st-tool",
+            subtask_description="run tests",
+            step_budget=5,
+            hard_constraints=[],
+        ),
+    )
+    calls: list[str] = []
+
+    def fake_run_tests(target: str, workspace: Path, timeout_s: int = 30) -> TestResult:
+        _ = workspace, timeout_s
+        calls.append(target)
+        return TestResult(passed=True, total_tests=1, exit_code=0, duration_ms=1)
+
+    monkeypatch.setattr(
+        "framework.orchestration.executor.run_tests",
+        fake_run_tests,
+    )
+    slm = MockSLMClient([_valid_executor_json()])
+    _, executor = _agents(slm, memory, tmp_path)
+    state = _workflow_state(session_setup)
+    state["active_subtask_id"] = "st-tool"
+    executor.execute_node(state)
+    assert calls == ["tests/"]
+
+
+def test_executor_calls_edit_file_on_code_edit(
+    memory: MemoryStores,
+    session_setup: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from framework.orchestration.messages import DispatchMessage, save_dispatch
+    from framework.tools.file_tools import FileResult
+
+    target = tmp_path / "module.py"
+    target.write_text("def foo():\n    return 1\n", encoding="utf-8")
+    save_dispatch(
+        memory.backend,
+        DispatchMessage(
+            session_id=session_setup,
+            task_id="st-edit",
+            subtask_description="edit module",
+            step_budget=5,
+            hard_constraints=[],
+        ),
+    )
+    edits: list[tuple[str, str, str]] = []
+
+    def fake_edit(
+        file_path: str,
+        old_string: str,
+        new_string: str,
+        workspace: Path,
+    ) -> FileResult:
+        edits.append((file_path, old_string, new_string))
+        return FileResult(ok=True, message="updated")
+
+    monkeypatch.setattr(
+        "framework.orchestration.executor.edit_file",
+        fake_edit,
+    )
+    slm = MockSLMClient(
+        [
+            json.dumps(
+                {
+                    "kind": "code_edit",
+                    "payload": {
+                        "file_path": "module.py",
+                        "old_string": "return 1",
+                        "new_string": "return 2",
+                    },
+                    "rationale": "fix return value",
+                    "references": [],
+                }
+            )
+        ]
+    )
+    _, executor = _agents(slm, memory, tmp_path)
+    executor.execute_node(_workflow_state(session_setup))
+    assert edits
+    assert edits[0][0] == "module.py"
+
+
+def test_executor_emits_handback_when_out_of_scope(
+    memory: MemoryStores,
+    session_setup: str,
+    tmp_path: Path,
+) -> None:
+    from framework.orchestration.messages import DispatchMessage, load_handback, save_dispatch
+
+    save_dispatch(
+        memory.backend,
+        DispatchMessage(
+            session_id=session_setup,
+            task_id="st-hand",
+            subtask_description="blocked task",
+            step_budget=5,
+            hard_constraints=[],
+        ),
+    )
+    slm = MockSLMClient(
+        [
+            json.dumps(
+                {
+                    "kind": "handoff",
+                    "payload": {"blocked_on": "architecture"},
+                    "rationale": "Need planner to replan",
+                    "references": [],
+                }
+            )
+        ]
+    )
+    _, executor = _agents(slm, memory, tmp_path)
+    executor.execute_node(_workflow_state(session_setup))
+    handback = load_handback(memory.backend, session_setup)
+    assert handback is not None
+    assert handback.blocked_on == "architecture"
+
+
+def test_planner_receives_report_after_executor_done(
+    memory: MemoryStores,
+    session_setup: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from framework.orchestration.messages import DispatchMessage, save_dispatch
+    from framework.tools.test_runner import TestResult
+
+    save_dispatch(
+        memory.backend,
+        DispatchMessage(
+            session_id=session_setup,
+            task_id="st-report",
+            subtask_description="run tests",
+            step_budget=5,
+            hard_constraints=[],
+        ),
+    )
+    monkeypatch.setattr(
+        "framework.orchestration.executor.run_tests",
+        lambda *a, **k: TestResult(passed=True, total_tests=1, exit_code=0, duration_ms=1),
+    )
+    slm = MockSLMClient([_valid_executor_json()])
+    planner, executor = _agents(slm, memory, tmp_path)
+    executor.execute_node(_workflow_state(session_setup))
+    assert planner.has_report(session_setup)

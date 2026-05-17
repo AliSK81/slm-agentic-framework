@@ -73,10 +73,10 @@ phases:
 
   7:
     name: "Workflow State Machine"
-    status: NOT_STARTED
+    status: DONE
     test_gate: "pytest tests/integration/test_workflow.py"
-    commit: null
-    notes: null
+    commit: "e1c9cd8"
+    notes: "12/12 tests. LangGraph FSM, ledger, reflection cap, MemorySaver checkpoint."
 
   8:
     name: "Agent Implementations"

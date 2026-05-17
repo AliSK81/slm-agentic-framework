@@ -11,8 +11,11 @@ from framework.memory.stores import DecisionEntry, Issue, MemoryStores, SelfChec
 
 logger = logging.getLogger(__name__)
 
-_PLANNER_KINDS = frozenset({"plan_step", "handoff", "terminate"})
-_EXECUTOR_KINDS = frozenset({"code_edit", "tool_call", "reflection", "quality_failure"})
+_PLANNER_ONLY_KINDS = frozenset({"plan_step", "terminate"})
+_EXECUTOR_ONLY_KINDS = frozenset(
+    {"code_edit", "tool_call", "reflection", "quality_failure"}
+)
+_SHARED_KINDS = frozenset({"handoff"})
 
 
 def _schema_issues(proposal: DecisionEntry) -> list[Issue]:
@@ -55,20 +58,21 @@ def _contradiction_issues(
 def _scope_issues(proposal: DecisionEntry) -> list[Issue]:
     """Executor must not plan; planner must not invoke tools."""
     issues: list[Issue] = []
-    if proposal.by_agent == "executor" and proposal.kind in _PLANNER_KINDS:
-        issues.append(
-            Issue(
-                kind="scope_violation",
-                detail=f"executor cannot emit kind={proposal.kind}",
+    if proposal.kind not in _SHARED_KINDS:
+        if proposal.by_agent == "executor" and proposal.kind in _PLANNER_ONLY_KINDS:
+            issues.append(
+                Issue(
+                    kind="scope_violation",
+                    detail=f"executor cannot emit kind={proposal.kind}",
+                )
             )
-        )
-    if proposal.by_agent == "planner" and proposal.kind in _EXECUTOR_KINDS:
-        issues.append(
-            Issue(
-                kind="scope_violation",
-                detail=f"planner cannot emit kind={proposal.kind}",
+        if proposal.by_agent == "planner" and proposal.kind in _EXECUTOR_ONLY_KINDS:
+            issues.append(
+                Issue(
+                    kind="scope_violation",
+                    detail=f"planner cannot emit kind={proposal.kind}",
+                )
             )
-        )
     return issues
 
 

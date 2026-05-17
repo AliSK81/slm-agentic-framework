@@ -10,7 +10,7 @@
 
 ```yaml
 current_phase: 2
-phase_status: NOT_STARTED
+phase_status: IN_PROGRESS
 last_updated: "2026-05-17"
 last_commit: "659353b"
 blocker: null
@@ -165,7 +165,7 @@ issues: []
 env_checks:
   - python_version: "3.14.2 (>=3.11)"
   - venv_active: true
-  - openrouter_key_set: false   # user must set OPENROUTER_API_KEY in .env
+  - openrouter_key_set: true
   - sqlite_path_exists: false   # created in Phase 2
   - workspace_dir_exists: false # created on first tool run
 ```

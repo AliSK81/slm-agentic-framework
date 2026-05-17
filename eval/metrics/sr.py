@@ -1,8 +1,20 @@
-"""Success rate (SR) metric."""
+"""Success rate (SR) metric and per-run result model."""
 
 from __future__ import annotations
 
-from eval.metrics.results import RunResult
+from pydantic import BaseModel
+
+
+class RunResult(BaseModel):
+    """Outcome of one benchmark task run."""
+
+    task_id: str
+    solved: bool
+    outcome: str  # solved | max_steps_reached | unresolvable | escalate
+    interaction_count: int = 0
+    step_count: int = 0
+    retry_count: int = 0
+    trace_path: str = ""
 
 
 def compute_sr(results: list[RunResult]) -> float:

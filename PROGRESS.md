@@ -12,7 +12,7 @@
 current_phase: 11
 phase_status: NOT_STARTED
 last_updated: "2026-05-17"
-last_commit: "d4b531b"
+last_commit: "f3f6b2b"
 blocker: null
 ```
 
@@ -96,8 +96,8 @@ phases:
     name: "Evaluation Harness"
     status: DONE
     test_gate: "pytest tests/unit/"
-    commit: null
-    notes: "69 unit tests. HumanEval/MBPP/SWE adapters, SR/CER metrics, run_eval JSONL harness."
+    commit: "f3f6b2b"
+    notes: "70 unit tests. HumanEval/MBPP/SWE adapters, SR/CER, stratified sampling, RunResult in sr.py."
 
   11:
     name: "Ablation Runner"

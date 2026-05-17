@@ -8,6 +8,8 @@ import pytest
 from pydantic import ValidationError
 
 from eval.config import AblationFlags, EvalConfig, StepBudget, load_eval_config
+from eval.datasets._sample import sample_stratified
+from eval.datasets.humaneval_adapter import HumanEvalTask
 from eval.metrics import RunResult, compute_cer, compute_sr
 
 
@@ -28,19 +30,19 @@ def _result(
     )
 
 
-def test_sr_all_solved_when_ten_tasks_pass() -> None:
+def test_sr_all_solved() -> None:
     """10 tasks, all solved → SR = 100.0."""
     results = [_result(f"t{i}", solved=True) for i in range(10)]
     assert compute_sr(results) == 100.0
 
 
-def test_sr_none_solved_when_ten_tasks_fail() -> None:
+def test_sr_none_solved() -> None:
     """10 tasks, none solved → SR = 0.0."""
     results = [_result(f"t{i}", solved=False) for i in range(10)]
     assert compute_sr(results) == 0.0
 
 
-def test_cer_all_failed_when_no_task_solved() -> None:
+def test_cer_all_failed() -> None:
     """10 tasks, all failed → CER = 100.0."""
     results = [_result(f"t{i}", solved=False, interactions=4) for i in range(10)]
     assert compute_cer(results) == 100.0
@@ -74,3 +76,19 @@ def test_eval_config_loads_from_yaml() -> None:
         control=True,
         error_control=True,
     )
+
+
+def test_humaneval_stratified_sample_respects_split() -> None:
+    """Stratified sampler returns the configured total when pools are large enough."""
+    rows = [
+        HumanEvalTask(
+            task_id=f"HumanEval/{i}",
+            prompt="def f(): pass",
+            test_code="def check(c): pass",
+            entry_point="f",
+        )
+        for i in range(100)
+    ]
+    split = {"easy": 2, "medium": 2, "hard": 1}
+    sampled = sample_stratified(rows, split, seed=42, key_fn=lambda t: t.task_id)
+    assert len(sampled) == 5

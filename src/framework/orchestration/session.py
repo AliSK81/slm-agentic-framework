@@ -51,6 +51,8 @@ class SessionOutcome(BaseModel):
     )
     final_state: str = STATE_PLAN
     decision_count: int = 0
+    step_count: int = 0
+    retry_count: int = 0
     state_snapshot_count: int = 0
     checkpoint_path: str | None = None
     test_passed: bool = False
@@ -322,6 +324,8 @@ def run_full_session(
         outcome.error = str(exc)
 
     outcome.decision_count = len(memory.decisions.list_for_session(session_id))
+    outcome.step_count = int(state.get("step_count", 0))
+    outcome.retry_count = int(state.get("retry_count", 0))
     outcome.state_snapshot_count = len(memory.state.list_for_session(session_id))
 
     try:

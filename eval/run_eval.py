@@ -41,12 +41,18 @@ def _load_tasks(
     dataset_name: DatasetName,
     n: int,
     seed: int,
+    eval_config: EvalConfig | None = None,
 ) -> list[tuple[str, str, list[str], str]]:
     """Return list of (task_id, goal, constraints, test_code)."""
     if dataset_name == "humaneval":
+        split = None
+        if eval_config is not None:
+            raw_split = eval_config.humaneval.get("difficulty_split")
+            if isinstance(raw_split, dict):
+                split = {str(k): int(v) for k, v in raw_split.items()}
         return [
             (task.task_id, *task_to_session(task))
-            for task in load_humaneval(n=n, seed=seed)
+            for task in load_humaneval(n=n, seed=seed, difficulty_split=split)
         ]
     if dataset_name == "mbpp":
         return [
@@ -92,8 +98,6 @@ def _run_single_task(
             step_count=0,
             retry_count=0,
             trace_path=str(trace_path),
-            config=config_name,
-            dataset=dataset_name,
         )
 
     _ensure_import_paths()
@@ -116,12 +120,9 @@ def _run_single_task(
         solved=session.test_passed and session.outcome == "solved",
         outcome=session.outcome,
         interaction_count=session.decision_count,
-        step_count=int(session.final_state != "PLAN"),
-        retry_count=0,
+        step_count=session.step_count,
+        retry_count=session.retry_count,
         trace_path=str(trace_path),
-        config=config_name,
-        dataset=dataset_name,
-        error=session.error,
     )
     trace_path.write_text(
         json.dumps(row.model_dump(), default=str) + "\n",
@@ -158,7 +159,7 @@ def run_eval(
     max_retries = budget.max_retries if budget else 3
     flags = eval_config.ablation_configs[config_name]
 
-    tasks = _load_tasks(dataset_name, sample_n, sample_seed)
+    tasks = _load_tasks(dataset_name, sample_n, sample_seed, eval_config)
     traces_root = _traces_dir()
     timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     jsonl_path = traces_root / f"{config_name}_{dataset_name}_{timestamp}.jsonl"
@@ -188,9 +189,6 @@ def run_eval(
                 outcome="unresolvable",
                 interaction_count=0,
                 trace_path=str(traces_root / f"{config_name}_{dataset_name}_{task_id}.json"),
-                config=config_name,
-                dataset=dataset_name,
-                error=str(exc),
             )
         results.append(row)
 
@@ -198,14 +196,14 @@ def run_eval(
         for row in results:
             handle.write(json.dumps(row.model_dump(), default=str) + "\n")
 
-    summary = {
+    summary: dict[str, Any] = {
         "sr": compute_sr(results),
         "cer": compute_cer(results),
         "n": len(results),
         "config": config_name,
-        "dataset": dataset_name,
-        "trace_file": str(jsonl_path),
     }
+    summary["trace_file"] = str(jsonl_path)
+    summary["dataset"] = dataset_name
     logger.info("Eval complete: %s", summary)
     return summary
 

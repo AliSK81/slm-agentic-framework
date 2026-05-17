@@ -7,7 +7,7 @@ import re
 
 from pydantic import BaseModel
 
-from eval.datasets._sample import sample_items
+from eval.datasets._sample import resolve_sample_count, sample_items, sample_stratified
 
 logger = logging.getLogger(__name__)
 
@@ -32,10 +32,16 @@ def _infer_entry_point(prompt: str, declared: str) -> str:
     return "candidate"
 
 
-def load_humaneval(n: int = 50, seed: int = 42) -> list[HumanEvalTask]:
+def load_humaneval(
+    n: int = 50,
+    seed: int = 42,
+    *,
+    difficulty_split: dict[str, int] | None = None,
+) -> list[HumanEvalTask]:
     """Load HumanEval from HuggingFace; sample ``n`` tasks with ``seed``.
 
-    Difficulty stratification is not available in the public split; uses uniform sampling.
+    When ``difficulty_split`` is set (e.g. from configs/eval.yaml), tasks are bucketed
+    by a deterministic hash of ``task_id`` into easy/medium/hard strata.
     """
     try:
         from datasets import load_dataset
@@ -58,7 +64,16 @@ def load_humaneval(n: int = 50, seed: int = 42) -> list[HumanEvalTask]:
             )
         )
 
-    sampled = sample_items(rows, n, seed)
+    sample_n, split = resolve_sample_count(n, difficulty_split)
+    if split:
+        sampled = sample_stratified(
+            rows,
+            split,
+            seed,
+            key_fn=lambda task: task.task_id,
+        )
+    else:
+        sampled = sample_items(rows, sample_n, seed)
     logger.info("Loaded %s HumanEval tasks (requested n=%s)", len(sampled), n)
     return sampled
 

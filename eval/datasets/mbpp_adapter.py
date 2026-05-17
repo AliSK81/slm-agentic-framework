@@ -15,11 +15,11 @@ _ENTRY_POINT_RE = re.compile(r"def\s+([a-zA-Z_][\w]*)\s*\(")
 
 
 class MBPPTask(BaseModel):
-    """One MBPP programming task."""
+    """One MBPP programming task (same fields as HumanEvalTask)."""
 
     task_id: str
-    prompt: str
-    test_code: str
+    prompt: str  # MBPP ``text`` field
+    test_code: str  # joined ``test_list`` assertions
     entry_point: str
 
 

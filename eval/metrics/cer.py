@@ -1,8 +1,8 @@
-"""Control-effort ratio (CER) metric — failed interactions per total interactions."""
+"""Control-effort ratio (CER) metric."""
 
 from __future__ import annotations
 
-from eval.metrics.results import RunResult
+from eval.metrics.sr import RunResult
 
 
 def compute_cer(results: list[RunResult]) -> float:

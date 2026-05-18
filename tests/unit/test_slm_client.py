@@ -38,7 +38,7 @@ def test_client_loads_profile() -> None:
     """Client reads model profile from configs/models.yaml correctly."""
     client = _make_client()
     profile = client.profile
-    assert profile.openrouter_id == "qwen/qwen-2.5-coder-32b-instruct"
+    assert profile.model_id == "qwen/qwen-2.5-coder-32b-instruct"
     assert profile.timeout_by_role["planner"] == 60
     assert profile.tool_call_format == "json"
     client.close()
@@ -114,6 +114,24 @@ def test_client_json_mode_sets_response_format() -> None:
     )
     client.call([{"role": "user", "content": "hi"}], role="planner", json_mode=True)
     assert captured["body"]["response_format"] == {"type": "json_object"}
+    client.close()
+
+
+def test_client_deepseek_thinking_payload() -> None:
+    """Profile with api_thinking sends thinking and reasoning_effort in the request."""
+    captured: dict[str, Any] = {}
+
+    def capture_handler(request: httpx.Request) -> httpx.Response:
+        captured["body"] = json.loads(request.content.decode())
+        return _success_handler(request)
+
+    client = SLMClient(
+        "default",
+        http_client=httpx.Client(transport=httpx.MockTransport(capture_handler)),
+    )
+    client.call([{"role": "user", "content": "hi"}], role="planner", json_mode=False)
+    assert captured["body"]["thinking"] == {"type": "enabled"}
+    assert captured["body"]["reasoning_effort"] == "high"
     client.close()
 
 

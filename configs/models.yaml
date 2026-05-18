@@ -1,6 +1,78 @@
+# Active provider when SLM_PROVIDER is unset (must match a key under providers)
+active_provider: deepseek
+
+# OpenAI-compatible endpoints — add any provider here; no code changes required
+providers:
+  openrouter:
+    base_url: https://openrouter.ai/api/v1
+    base_url_env: OPENROUTER_BASE_URL
+    api_key_env: OPENROUTER_API_KEY
+    headers:
+      HTTP-Referer: thesis-framework
+      X-Title: SLM-Thesis
+
+  deepseek:
+    base_url: https://api.deepseek.com
+    base_url_env: DEEPSEEK_BASE_URL
+    api_key_env: DEEPSEEK_API_KEY
+
+  ollama:
+    base_url: http://localhost:11434/v1
+    base_url_env: OLLAMA_BASE_URL
+    api_key_env: OLLAMA_API_KEY
+    api_key_required: false
+
+# Role → profile key (override with PLANNER_PROFILE / EXECUTOR_PROFILE in .env)
+defaults:
+  planner: default
+  executor: default
+
 profiles:
+  default:
+    model_id: deepseek-v4-flash
+    provider: deepseek
+    context_limit: 128000
+    effective_context: 64000
+    thinking_budget: 2048
+    api_thinking: true
+    reasoning_effort: high
+    max_working_memory_tokens: 750
+    tool_output_caps:
+      pytest_run: 5000
+      py_compile: 2000
+      read_file: 12000
+      search_codebase: 2000
+    skill_budget_tokens: 150
+    timeout_by_role:
+      planner: 90
+      executor: 120
+      tool_call: 45
+    tool_call_format: json
+
+  deepseek-v4-flash:
+    model_id: deepseek-v4-flash
+    provider: deepseek
+    context_limit: 128000
+    effective_context: 64000
+    thinking_budget: 2048
+    api_thinking: true
+    reasoning_effort: high
+    max_working_memory_tokens: 750
+    tool_output_caps:
+      pytest_run: 5000
+      py_compile: 2000
+      read_file: 12000
+      search_codebase: 2000
+    skill_budget_tokens: 150
+    timeout_by_role:
+      planner: 90
+      executor: 120
+      tool_call: 45
+    tool_call_format: json
+
   devstral-small:
-    openrouter_id: "mistralai/devstral-small"
+    model_id: mistralai/devstral-small
+    provider: openrouter
     context_limit: 32768
     effective_context: 16000
     thinking_budget: null
@@ -15,10 +87,11 @@ profiles:
       planner: 60
       executor: 90
       tool_call: 30
-    tool_call_format: "json"
+    tool_call_format: json
 
   qwen2.5-coder-7b-instruct:
-    openrouter_id: "qwen/qwen-2.5-coder-32b-instruct"
+    model_id: qwen/qwen-2.5-coder-32b-instruct
+    provider: openrouter
     context_limit: 32768
     effective_context: 12000
     thinking_budget: null
@@ -33,4 +106,23 @@ profiles:
       planner: 60
       executor: 75
       tool_call: 30
-    tool_call_format: "json"
+    tool_call_format: json
+
+  ollama-local:
+    model_id: llama3.2
+    provider: ollama
+    context_limit: 32768
+    effective_context: 16000
+    thinking_budget: null
+    max_working_memory_tokens: 750
+    tool_output_caps:
+      pytest_run: 5000
+      py_compile: 2000
+      read_file: 12000
+      search_codebase: 2000
+    skill_budget_tokens: 150
+    timeout_by_role:
+      planner: 120
+      executor: 180
+      tool_call: 60
+    tool_call_format: json

@@ -16,7 +16,7 @@ from framework.slm.skills import load_skill_cards, select_skill_card
 
 def _profile(*, max_wm: int = 650, skill_budget: int = 120) -> ModelProfile:
     return ModelProfile(
-        openrouter_id="qwen/qwen-2.5-coder-7b-instruct",
+        model_id="qwen/qwen-2.5-coder-7b-instruct",
         context_limit=32768,
         effective_context=12000,
         max_working_memory_tokens=max_wm,

@@ -9,8 +9,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
-import httpx
-import yaml
 from pydantic import BaseModel
 
 from framework.env import load_project_env
@@ -33,15 +31,17 @@ from framework.memory.working_memory import WorkingMemoryBuilder
 from framework.control.ablation import AblationSettings
 from framework.orchestration.executor import ExecutorAgent
 from framework.orchestration.planner import PlannerAgent
-from framework.slm.client import SLMClient
+from framework.slm.config import (
+    active_provider_name,
+    api_key_env_var_for_active_provider,
+    api_key_for_active_provider,
+    api_key_required_for_active_provider,
+)
+from framework.slm.registry import client_for_role, probe_client
 from framework.tools.test_runner import run_tests
 
 load_project_env()
 logger = logging.getLogger(__name__)
-
-_PROJECT_ROOT = Path(__file__).resolve().parents[3]
-_MODELS_CONFIG = _PROJECT_ROOT / "configs" / "models.yaml"
-
 
 class SessionOutcome(BaseModel):
     """Result of a full planner/executor session."""
@@ -60,71 +60,50 @@ class SessionOutcome(BaseModel):
     error: str | None = None
 
 
-def require_openrouter_key() -> str:
-    """Return API key or raise with a clear message."""
-    key = os.getenv("OPENROUTER_API_KEY", "")
-    if not key or key.strip() == "your_key_here":
+def require_slm_api_key() -> str:
+    """Return API key for the active SLM provider or raise with a clear message."""
+    if not api_key_required_for_active_provider():
+        return ""
+    var = api_key_env_var_for_active_provider()
+    key = api_key_for_active_provider()
+    if not key or key == "your_key_here":
         raise RuntimeError(
-            "OPENROUTER_API_KEY is not set. Add it to .env before running e2e tests."
+            f"{var} is not set. Add it to .env before running e2e tests."
         )
     return key
 
 
-def validate_openrouter_key() -> None:
-    """Raise if the API key is missing, placeholder, or rejected by OpenRouter."""
-    key = require_openrouter_key()
-    if len(key.strip()) < 20:
-        raise RuntimeError(
-            "OPENROUTER_API_KEY looks like a placeholder. Set a real key in .env."
-        )
+def require_openrouter_key() -> str:
+    """Backward-compatible alias for :func:`require_slm_api_key`."""
+    return require_slm_api_key()
 
-    base = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1").rstrip("/")
-    raw = yaml.safe_load(_MODELS_CONFIG.read_text(encoding="utf-8"))
-    profiles: dict = raw.get("profiles", {})
-    planner_profile = profiles.get("qwen2.5-coder-7b-instruct", {})
-    probe_model = os.getenv(
-        "OPENROUTER_PROBE_MODEL",
-        planner_profile.get("openrouter_id", "mistralai/devstral-small"),
-    )
-    headers = {
-        "Authorization": f"Bearer {key}",
-        "HTTP-Referer": "thesis-framework",
-        "X-Title": "SLM-Thesis",
-        "Content-Type": "application/json",
-    }
-    payload = {
-        "model": probe_model,
-        "messages": [{"role": "user", "content": "ping"}],
-        "max_tokens": 1,
-    }
+
+def validate_slm_api_key() -> None:
+    """Raise if the API key is missing, placeholder, or rejected by the provider."""
+    if api_key_required_for_active_provider():
+        var = api_key_env_var_for_active_provider()
+        key = require_slm_api_key()
+        if len(key.strip()) < 20:
+            raise RuntimeError(f"{var} looks like a placeholder. Set a real key in .env.")
+
+    client = probe_client()
     try:
-        response = httpx.post(
-            f"{base}/chat/completions",
-            json=payload,
-            headers=headers,
-            timeout=30.0,
+        result = client.call(
+            [{"role": "user", "content": "ping"}],
+            role="planner",
+            json_mode=False,
         )
-    except httpx.HTTPError as exc:
-        raise RuntimeError(f"OpenRouter auth check failed: {exc}") from exc
-    if response.status_code == 401:
-        raise RuntimeError(
-            "OPENROUTER_API_KEY rejected (401). Update .env with a valid key."
-        )
-    if response.status_code >= 400:
-        raise RuntimeError(
-            f"OpenRouter auth check failed: HTTP {response.status_code}"
-        )
+    finally:
+        client.close()
+
+    if result.error:
+        provider = active_provider_name()
+        raise RuntimeError(f"SLM API probe failed (provider={provider}): {result.error}")
 
 
-def _profile_name_for_role(role: str) -> str:
-    raw = yaml.safe_load(_MODELS_CONFIG.read_text(encoding="utf-8"))
-    profiles: dict = raw.get("profiles", {})
-    env_key = "PLANNER_MODEL" if role == "planner" else "EXECUTOR_MODEL"
-    target_id = os.getenv(env_key, "")
-    for name, cfg in profiles.items():
-        if cfg.get("openrouter_id") == target_id:
-            return name
-    return "qwen2.5-coder-7b-instruct" if role == "planner" else "devstral-small"
+def validate_openrouter_key() -> None:
+    """Backward-compatible alias for :func:`validate_slm_api_key`."""
+    validate_slm_api_key()
 
 
 def _build_agents(
@@ -132,8 +111,8 @@ def _build_agents(
     workspace: Path,
     ablation: AblationSettings,
 ) -> tuple[PlannerAgent, ExecutorAgent]:
-    planner_slm = SLMClient(_profile_name_for_role("planner"))
-    executor_slm = SLMClient(_profile_name_for_role("executor"))
+    planner_slm = client_for_role("planner")
+    executor_slm = client_for_role("executor")
     bundle = ErrorControlBundle()
     planner = PlannerAgent(
         DecisionCycle(
@@ -223,7 +202,7 @@ def run_full_session(
     planner_enabled: bool = True,
 ) -> SessionOutcome:
     """Run PLAN → DISPATCH → EXECUTE loop until DONE, ESCALATE, or budget exhausted."""
-    validate_openrouter_key()
+    validate_slm_api_key()
     session_id = session_id or f"sess-{uuid.uuid4().hex[:8]}"
     workspace = workspace.resolve()
     workspace.mkdir(parents=True, exist_ok=True)

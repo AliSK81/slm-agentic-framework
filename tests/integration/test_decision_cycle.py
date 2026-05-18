@@ -26,7 +26,7 @@ class MockSLMClient:
     ) -> None:
         self._responses = list(responses)
         self.profile = profile or ModelProfile(
-            openrouter_id="mock",
+            model_id="mock",
             context_limit=4096,
             effective_context=4096,
             max_working_memory_tokens=650,

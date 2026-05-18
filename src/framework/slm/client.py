@@ -1,48 +1,36 @@
-"""Unified SLM client for OpenRouter.
-
-All agents use this module; no direct HTTP calls elsewhere.
-
-Purpose: load model profiles, call chat completions with retries/timeouts,
-return typed SLMResponse (never raise on API failure).
-"""
+"""OpenAI-compatible SLM HTTP client (provider-agnostic)."""
 
 from __future__ import annotations
 
 import logging
-import os
 import time
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
 import httpx
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from framework.env import load_project_env
+from framework.slm.config import (
+    EndpointConfig,
+    ModelProfile,
+    ProviderSpec,
+    api_key_required,
+    build_headers,
+    load_profile,
+    load_provider,
+    resolve_api_key,
+    resolve_base_url,
+    resolve_endpoint,
+)
 
 load_project_env()
 
 logger = logging.getLogger(__name__)
 
-_PROJECT_ROOT = Path(__file__).resolve().parents[3]
-_MODELS_CONFIG = _PROJECT_ROOT / "configs" / "models.yaml"
-_DEFAULT_BASE_URL = "https://openrouter.ai/api/v1"
 _MAX_RETRIES = 3
 _BACKOFF_BASE_S = 0.5
-
-
-class ModelProfile(BaseModel):
-    """Model capabilities and limits from configs/models.yaml."""
-
-    openrouter_id: str
-    context_limit: int
-    effective_context: int
-    thinking_budget: int | None = None
-    max_working_memory_tokens: int
-    tool_output_caps: dict[str, int]
-    skill_budget_tokens: int
-    timeout_by_role: dict[str, int]
-    tool_call_format: Literal["json"] = "json"
 
 
 class SLMResponse(BaseModel):
@@ -56,7 +44,7 @@ class SLMResponse(BaseModel):
 
 
 class SLMClient:
-    """OpenRouter chat client bound to one model profile."""
+    """Chat client bound to one yaml profile and its resolved provider endpoint."""
 
     def __init__(
         self,
@@ -65,18 +53,21 @@ class SLMClient:
         http_client: httpx.Client | None = None,
         models_config: Path | None = None,
     ) -> None:
-        """Load profile and prepare HTTP client.
+        """Load profile + endpoint; optional mock HTTP client for tests."""
+        if models_config is not None:
+            self._profile, self._endpoint, self._requires_api_key = (
+                _load_from_path(profile_name, models_config)
+            )
+        else:
+            self._profile = load_profile(profile_name)
+            self._endpoint = resolve_endpoint(profile_name)
+            self._requires_api_key = api_key_required(
+                load_provider(self._endpoint.provider)
+            )
 
-        Inputs:
-            profile_name: key under ``profiles`` in models.yaml.
-            http_client: optional client (for tests with MockTransport).
-            models_config: override path to models.yaml.
+        if http_client is not None and not self._endpoint.api_key:
+            self._endpoint = self._endpoint.model_copy(update={"api_key": "mock-test-key"})
 
-        Side effects: reads env and YAML; creates httpx client if not provided.
-        """
-        self._api_key = os.getenv("OPENROUTER_API_KEY", "")
-        self._base_url = os.getenv("OPENROUTER_BASE_URL", _DEFAULT_BASE_URL).rstrip("/")
-        self._profile = self._load_profile(profile_name, models_config or _MODELS_CONFIG)
         self._http = http_client or httpx.Client()
         self._owns_client = http_client is None
 
@@ -84,6 +75,11 @@ class SLMClient:
     def profile(self) -> ModelProfile:
         """Loaded model profile."""
         return self._profile
+
+    @property
+    def endpoint(self) -> EndpointConfig:
+        """Resolved provider connection."""
+        return self._endpoint
 
     def close(self) -> None:
         """Close owned HTTP client."""
@@ -96,47 +92,33 @@ class SLMClient:
     def __exit__(self, *args: object) -> None:
         self.close()
 
-    @staticmethod
-    def _load_profile(profile_name: str, config_path: Path) -> ModelProfile:
-        """Parse a named profile from models.yaml."""
-        raw = yaml.safe_load(config_path.read_text(encoding="utf-8"))
-        profiles: dict[str, Any] = raw.get("profiles", {})
-        if profile_name not in profiles:
-            raise ValueError(f"Unknown model profile: {profile_name}")
-        return ModelProfile.model_validate(profiles[profile_name])
-
     def call(
         self,
         messages: list[dict[str, str]],
         role: str,
         json_mode: bool = True,
     ) -> SLMResponse:
-        """Run chat completion for the configured model.
-
-        Inputs:
-            messages: OpenAI-style message list.
-            role: planner | executor | tool_call — selects timeout.
-            json_mode: request JSON object response format when True.
-
-        Outputs:
-            SLMResponse; ``error`` set on failure (never raises).
-        """
-        if not self._api_key:
-            return SLMResponse(error="missing_api_key", model=self._profile.openrouter_id)
+        """Run chat completion; returns SLMResponse (never raises on API failure)."""
+        if self._requires_api_key and not self._endpoint.api_key:
+            return SLMResponse(error="missing_api_key", model=self._profile.model_id)
 
         timeout_s = self._profile.timeout_by_role.get(role)
         if timeout_s is None:
             return SLMResponse(
                 error=f"unknown_role:{role}",
-                model=self._profile.openrouter_id,
+                model=self._profile.model_id,
             )
 
         payload: dict[str, Any] = {
-            "model": self._profile.openrouter_id,
+            "model": self._profile.model_id,
             "messages": messages,
         }
         if json_mode and self._profile.tool_call_format == "json":
             payload["response_format"] = {"type": "json_object"}
+        if self._profile.api_thinking:
+            payload["thinking"] = {"type": "enabled"}
+            if self._profile.reasoning_effort:
+                payload["reasoning_effort"] = self._profile.reasoning_effort
 
         started = time.perf_counter()
         try:
@@ -145,7 +127,7 @@ class SLMClient:
             elapsed_ms = int((time.perf_counter() - started) * 1000)
             return SLMResponse(
                 error="timeout",
-                model=self._profile.openrouter_id,
+                model=self._profile.model_id,
                 elapsed_ms=elapsed_ms,
             )
         except httpx.HTTPError as exc:
@@ -155,12 +137,12 @@ class SLMClient:
             if status >= 400:
                 return SLMResponse(
                     error=f"http_{status}",
-                    model=self._profile.openrouter_id,
+                    model=self._profile.model_id,
                     elapsed_ms=elapsed_ms,
                 )
             return SLMResponse(
                 error="http_error",
-                model=self._profile.openrouter_id,
+                model=self._profile.model_id,
                 elapsed_ms=elapsed_ms,
             )
 
@@ -169,13 +151,13 @@ class SLMClient:
         if status == 429:
             return SLMResponse(
                 error="rate_limited",
-                model=self._profile.openrouter_id,
+                model=self._profile.model_id,
                 elapsed_ms=elapsed_ms,
             )
         if status >= 400:
             return SLMResponse(
                 error=f"http_{status}",
-                model=self._profile.openrouter_id,
+                model=self._profile.model_id,
                 elapsed_ms=elapsed_ms,
             )
 
@@ -187,7 +169,7 @@ class SLMClient:
 
         usage = data.get("usage") or {}
         tokens = int(usage.get("total_tokens") or 0)
-        model_used = str(data.get("model") or self._profile.openrouter_id)
+        model_used = str(data.get("model") or self._profile.model_id)
 
         return SLMResponse(
             content=content,
@@ -197,21 +179,9 @@ class SLMClient:
         )
 
     def _call_with_retry(self, payload: dict[str, Any], timeout_s: int) -> tuple[dict[str, Any], int]:
-        """POST chat/completions with retries on 429/503.
-
-        Returns:
-            Parsed JSON body and HTTP status on success.
-
-        Raises:
-            httpx.TimeoutException, httpx.HTTPError on transport failure.
-        """
-        url = f"{self._base_url}/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {self._api_key}",
-            "HTTP-Referer": "thesis-framework",
-            "X-Title": "SLM-Thesis",
-            "Content-Type": "application/json",
-        }
+        """POST chat/completions with retries on 429/503."""
+        url = f"{self._endpoint.base_url}/chat/completions"
+        headers = dict(self._endpoint.headers)
         last_status = 0
         last_body: dict[str, Any] = {}
 
@@ -235,3 +205,29 @@ class SLMClient:
             return response.json(), response.status_code
 
         return last_body, last_status
+
+
+def _load_from_path(
+    profile_name: str,
+    config_path: Path,
+) -> tuple[ModelProfile, EndpointConfig, bool]:
+    """Load profile and endpoint from a test-local models.yaml."""
+    raw = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+    profiles: dict[str, Any] = raw.get("profiles", {})
+    providers: dict[str, Any] = raw.get("providers", {})
+    if profile_name not in profiles:
+        raise ValueError(f"Unknown model profile: {profile_name}")
+    profile = ModelProfile.model_validate(profiles[profile_name])
+    provider_name = (profile.provider or raw.get("active_provider", "openrouter")).strip()
+    if provider_name not in providers:
+        raise ValueError(f"Unknown provider: {provider_name}")
+    spec = ProviderSpec.model_validate(providers[provider_name])
+    key = resolve_api_key(spec)
+    endpoint = EndpointConfig(
+        provider=provider_name,
+        base_url=resolve_base_url(spec),
+        api_key=key,
+        headers=build_headers(spec, key),
+        model_id=profile.model_id,
+    )
+    return profile, endpoint, api_key_required(spec)

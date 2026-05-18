@@ -15,7 +15,7 @@ sys.path.insert(0, str(_ROOT / "src"))
 from framework.control.cycle import _json_format_block
 from framework.memory.stores import MemoryStores
 from framework.memory.working_memory import WorkingMemoryBuilder
-from framework.slm.client import SLMClient
+from framework.slm.registry import client_for_role
 
 
 def _decisions(conn: sqlite3.Connection) -> list[dict]:
@@ -46,8 +46,8 @@ def analyze_db(db_path: Path) -> dict:
     if not session_id:
         return {"db": db_path.name, "error": "no session"}
 
-    planner = SLMClient("qwen2.5-coder-7b-instruct")
-    executor = SLMClient("devstral-small")
+    planner = client_for_role("planner")
+    executor = client_for_role("executor")
     executor_wm = WorkingMemoryBuilder(memory, executor.profile)
 
     goal, _constraints = memory.subtasks.get_session_anchor(session_id)

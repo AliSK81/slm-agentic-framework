@@ -12,7 +12,7 @@
 current_phase: 29
 phase_status: NOT_STARTED
 last_updated: "2026-05-20T23:00Z"
-last_commit: "52f9252"
+last_commit: "cda296e"
 blocker: null
 ```
 
@@ -230,10 +230,10 @@ phases:
 
   28:
     name: "Hardening (registry, parser, ThinkingBudget)"
-    status: NOT_STARTED
+    status: DONE
     test_gate: "pytest tests/unit/test_slm_registry.py tests/unit/test_error_control.py tests/unit/test_thinking_budget.py"
     commit: null
-    notes: "ROADMAP phase 28."
+    notes: "28/28 tests. ProfileResolutionError, parser literal-newline repair, ThinkingBudget unit tests."
 
   29:
     name: "Retrieval ablation + Redis backend (RQ1)"

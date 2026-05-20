@@ -1,28 +1,38 @@
 # Thesis Project Handoff — SLM Agentic Framework
 
-**For:** Claude Opus (roadmap extension)  
-**Generated:** 2026-05-21 | **Git:** `d0c28a5` | **Tag:** `v1.0-thesis-prototype`  
-**Roadmap completed through phase:** 29  
-**Next phase to plan:** 30
+**For:** Claude (replan: **Aviona** = Claude Code–minimal in terminal; thesis benchmarks deferred)  
+**UX contract:** `AVIONA_UX_SPEC.md`  
+**Generated:** 2026-05-21 | **Git:** `f91cae4`  
+**Roadmap in repo:** phases **0–41** defined in `ROADMAP.md`  
+**Implementation status:** phases **0–38** `DONE` (structural); **39–41** `NOT_STARTED` (paused by user)  
+**Pivot:** User is **not** spending API tokens on benchmark matrices now; replanning before resuming thesis phases 39+.
 
 ---
 
 ## 1. Executive summary
 
-The SLM Agentic Framework thesis prototype is **feature-complete through ROADMAP phase 29**. All phases `0–29` are `DONE` in `PROGRESS.md`.
+The codebase is a **working SLM agentic framework** (memory, control, error control, LangGraph production path) with a full **evaluation harness** for thesis ablations. It is **not yet** packaged as a daily-use production CLI.
 
-**What works end-to-end today**
+**What works today (verified with dry-run + unit/integration tests)**
 
-- **Eval path:** `eval/run_eval.py` → `run_full_session()` (default **`engine=graph`**, LangGraph + SqliteSaver) with Decision Cycle, memory stores, tools, and ablation flags A–D.
-- **Active provider:** DeepSeek `deepseek-v4-flash` (`configs/models.yaml` defaults); OpenRouter `slm_small` bundle (Qwen-7B + Devstral) is wired but needs live API budget.
-- **Canonical cited results:** `humaneval_hard`, n=10, seed=42 — A/B **90% SR**, C/D **100% SR** (see `configs/cite_allowlist.yaml` and `thesis_evaluation_report.md` curated section).
-- **Tests:** 160 unit (1 skipped Redis live), 32 integration — all pass at handoff time.
+- **Session path:** `run_full_session(engine="graph")` — LangGraph + SqliteSaver; used by `eval/run_eval.py`.
+- **Ablation A–D:** `eval/scenarios/ablation.py` — memory / control / error_control toggles.
+- **Datasets:** HumanEval, discriminative slice, MBPP, multistep, SWE-bench adapters (SWE needs Docker for live).
+- **Quality gate:** `assess_run()` rejects runs with too many `interaction_count=0` tasks.
+- **Tests at handoff:** **181 unit** passed (9 skipped), **32 integration** passed.
 
-**What is not thesis-ready without more live runs**
+**What the user wants next (not in ROADMAP 39–41)**
 
-- Multi-seed **statistical** ablation (seeds 41,42,43) — dry-run + harness exist; full live matrix mostly pending API budget.
-- **MBPP** n=50, **SWE-bench** Docker instances, **agent-count** live CER, **keyword vs semantic** retrieval comparison — code exists; curated traces sparse or absent.
-- **Cost/token columns** in old traces are zero (pre–phase-26 runs); re-run cited configs for non-zero usage metrics.
+1. **Efficiency first** — lower token use (especially **output tokens**), faster runs, without sacrificing task success on real work.
+2. **Production CLI** — installable on Windows (e.g. `aviona` on `PATH`), for **agentic workloads** (create/edit files, repo tasks), not only benchmarks.
+3. **Dev-friendly install** — editable/local install that picks up code changes without reinstall friction.
+4. **Thesis preserved** — framework and eval stay valid; **live benchmark matrices and thesis reports only after explicit approval**.
+
+**What was intentionally deferred**
+
+- Phase **31** live 12-run DeepSeek discriminative matrix (user stopped ablation; child Python PIDs had to be killed separately).
+- Phases **32–37** live API runs (structural gates only in commit `101c993`).
+- Phase **39–41** (LaTeX figures, docs bundle, e2e smoke) — **skipped for now**.
 
 ---
 
@@ -30,191 +40,130 @@ The SLM Agentic Framework thesis prototype is **feature-complete through ROADMAP
 
 | Area | Path | Role |
 |------|------|------|
-| Framework core | `src/framework/` | SLM client, memory, control, orchestration, tools, error control |
-| Evaluation | `eval/` | `run_eval`, adapters, metrics, manifests, scenarios |
+| Framework | `src/framework/` | SLM, memory, control, orchestration, tools, error_control |
+| Evaluation | `eval/` | `run_eval`, adapters, metrics, scenarios, curated allowlist |
 | Config | `configs/` | `models.yaml`, `eval.yaml`, `memory.yaml`, `cite_allowlist.yaml` |
-| Tests | `tests/unit`, `tests/integration`, `tests/e2e` | Mocked unit; integration; real API e2e |
-| Traces | `traces/` (gitignored) | Aggregate `*_*.jsonl`, manifests, decision JSONL |
-| Reports | `scripts/generate_report.py`, `thesis_evaluation_report.md` | Curated + optional full history |
-| Progress | `PROGRESS.md`, `ROADMAP.md` | Agent memory + phase specs |
+| CLI scripts | `scripts/` | `generate_report.py`, `smoke_test.py`, `analyze_traces.py` |
+| Tests | `tests/unit`, `tests/integration`, `tests/e2e` | Mocked / SQLite / real API (`@pytest.mark.e2e`) |
+| Agent memory | `PROGRESS.md`, `ROADMAP.md` | Phase state and specs |
+| Traces | `traces/` (gitignored) | JSONL aggregates, manifests, decisions |
+
+**No production entry point yet** — there is no `aviona.exe` / `pyproject` console script for end-user workloads.
 
 ---
 
-## 3. Cross-cutting architecture (all phases)
+## 3. Cross-cutting architecture
 
-| Pillar | Implementation | Notes |
-|--------|----------------|-------|
-| **Memory** | `MemoryStores` + SQLite default; optional `RedisBackend`; retrieval keyword (GA) or semantic (Chroma) | `MEMORY_RETRIEVAL_MODE` / `memory.yaml` `retrieval.mode` |
-| **Control** | `DecisionCycle` — never raises on SLM failure; `next_state()` in Python only | Ablation toggles memory / control / error_control |
-| **Error control** | Parser (8 patterns), quality gate, truncation, watchdog, sandbox | Phase 28: literal-newline repair, `ProfileResolutionError` |
-| **Orchestration** | **Production:** `run_full_session(engine="graph")` — LangGraph nodes call same planner/executor | **Parity:** `engine="loop"` for tests; not used in eval |
-| **SLM** | `client_for_role("planner"\|"executor")` — no model names at call sites | Usage tracked via `TrackingSLMClient` (phase 26) |
-| **Eval validity** | `assess_run()` — invalid if >10% tasks have `interaction_count=0` | Ablation aborts on invalid non-dry runs |
+| Pillar | Implementation |
+|--------|----------------|
+| Memory | `MemoryStores`, keyword or semantic retrieval, optional Redis |
+| Control | `DecisionCycle`; transitions in Python only |
+| Error control | Parser, truncation, quality gate, watchdog, sandbox |
+| Orchestration | **Production:** `engine="graph"`; **Tests:** `engine="loop"` |
+| SLM | `TrackingSLMClient`, profiles in `configs/models.yaml` |
+| Eval | `run_eval` → `run_full_session`; ablation never raises on SLM error |
 
-**Ablation configs (eval.yaml)**
+**Ablation configs:** A (none), B (memory), C (control+errors), D (full).
 
-| Config | Memory | Control | Error control |
-|--------|--------|---------|---------------|
-| A | off | off | off |
-| B | on | off | off |
-| C | off | on | on |
-| D | on | on | on |
+**Important fix (commit `101c993`):** `run_eval` now uses CLI `seed` instead of always forcing `eval.yaml` dataset `seed: 42` (required for multi-seed ablations).
 
 ---
 
-## 4. Phase-by-phase (0–29)
+## 4. Phase-by-phase (0–38)
 
-Summaries from `PROGRESS.md` + code audit. Test gates passed unless noted.
+| Range | Status | Notes |
+|-------|--------|-------|
+| 0–29 | DONE | Full framework + eval + LangGraph production + cost/curated/repro (see prior handoff detail) |
+| 30 | DONE | Discriminative slice, `_difficulty.py`, `--dataset discriminative` |
+| 31–37 | DONE (structural) | Cite sections, `retrieval_compare`, `efficiency`, dry-run gates; **no live cite traces** |
+| 38 | DONE | `failure_taxonomy.py` + unit tests |
+| 39–41 | NOT_STARTED | User paused for replan |
 
-### Phases 0–5 — Foundation
-
-| Phase | Title | Built | Deviations |
-|-------|-------|-------|------------|
-| 0 | Bootstrap | Layout, requirements, pytest collect | — |
-| 1 | SLM client | OpenRouter-compatible `SLMClient`, mocked tests | Production default is **DeepSeek**, not OpenRouter Qwen from early ROADMAP text |
-| 2 | Memory stores | SQLite, 4 stores, retrieval index | Redis was stub until phase 29 |
-| 3 | Working memory | Builder, skill cards, token ceiling | — |
-| 4 | Error control | Parser, quality, truncation, thinking, watchdog, sandbox, checkpoint | ThinkingBudget untested until phase 28 |
-| 5 | Tools | compile, pytest runner, file tools, search | — |
-
-### Phases 6–12 — Agent loop + eval + e2e
-
-| Phase | Title | Built | Deviations |
-|-------|-------|-------|------------|
-| 6 | Decision cycle | READ→PROPOSE→SELF_CHECK→ACT→RECORD | — |
-| 7 | Workflow FSM | LangGraph + `next_state`, ledger | Was test-only until phase 25 |
-| 8 | Agents | Planner/Executor, typed messages | — |
-| 9 | E2E session | `run_full_session`, smoke | — |
-| 10 | Eval harness | HumanEval/MBPP/SWE adapters, SR/CER | — |
-| 11 | Ablation runner | A–D table, multi-config | — |
-| 12 | Qualitative / e2e gate | 20-task D @ 100% canonical; invalid 70% run documented | `test_ablation_d_beats_a` skipped when A≈D |
-
-### Phases 13–19 — Integrity + benchmarks + reflection
-
-| Phase | Title | Built | Deviations |
-|-------|-------|-------|------------|
-| 13 | Run quality | Probe retry, zero-ix gate | — |
-| 14 | Manifest + `--task-id` | `RunManifest`, per-run JSONL | — |
-| 15 | Hard slice | `humaneval_hard`, curated id list | — |
-| 16 | Interaction length | Synthetic L=2,4,6,8 multistep | — |
-| 17 | Reflection on REVISE | SLM reflection capped per subtask | — |
-| 18 | SLM small bundle | Qwen-7B + Devstral profiles | Live smoke needs key |
-| 19 | Multi-seed ablation | `--seeds`, mean±std, quality abort | **Live** multi-seed humaneval_hard: user budget |
-
-### Phases 20–24 — More benchmarks + analysis
-
-| Phase | Title | Built | Deviations |
-|-------|-------|-------|------------|
-| 20 | MBPP | Adapter, dry-run gates | Live n=50 ablation not run |
-| 21 | SWE-bench Docker | `swe_docker.py`, sandbox allow docker | Live instances not run |
-| 22 | Agent-count | 1 vs 2 agents, CER column | Live API pending |
-| 23 | Decision JSONL | Streamed decisions, `task_id` join | — |
-| 24 | Qualitative metrics | Contradiction, oscillation, rationale coverage | Needs decision JSONL on cited runs |
-
-### Phases 25–29 — Production polish
-
-| Phase | Title | Built | Deviations |
-|-------|-------|-------|------------|
-| 25 | LangGraph production | SqliteSaver, `engine=graph` default, loop parity tests | ROADMAP once said loop default until parity — parity proven, graph is default |
-| 26 | Cost accounting | `tokens_total`, `estimate_cost`, report columns | Old traces lack usage fields |
-| 27 | Curated report | `cite_allowlist.yaml`, repro bundle, 95% CI helper | Phase-12 20-task runs not in allowlist until files exist |
-| 28 | Hardening | `ProfileResolutionError`, newline JSON repair, ThinkingBudget tests | — |
-| 29 | Retrieval + Redis | SemanticRetriever, RedisBackend, `--retrieval-mode` | Redis live test skipped without server |
+**Phase 31 caveat:** Partial live runs existed (`A_discriminative_*` with real API); user stopped processes. Allowlist section `humaneval_discriminative_deepseek` remains **empty** by design until approved benchmark sprint.
 
 ---
 
-## 5. Evaluation results
+## 5. Evaluation results (thesis — deferred)
 
-### Canonical (cite in thesis)
+- **Canonical (still valid from earlier e2e):** `humaneval_hard` n=10 seed=42 — A/B 90% SR, C/D 100% SR (`configs/cite_allowlist.yaml`).
+- **Discriminative matrix:** Not cited; incomplete / stopped.
+- **Report:** `scripts/generate_report.py --curated` works when allowlist entries exist; `--efficiency` aggregates usage from cited runs (mostly zero on old traces).
 
-Source: `configs/cite_allowlist.yaml`, validated by `scripts/generate_report.py --curated --dry-run`.
-
-| Config | Dataset | n | Seed | SR | CER | Run ID |
-|--------|---------|---|------|-----|-----|--------|
-| A | humaneval_hard | 10 | 42 | 90% | 20.8% | `A_humaneval_hard_20260520T125039Z` |
-| B | humaneval_hard | 10 | 42 | 90% | 20.0% | `B_humaneval_hard_20260520T125743Z` |
-| C | humaneval_hard | 10 | 42 | 100% | 0% | `C_humaneval_hard_20260520T130606Z` |
-| D | humaneval_hard | 10 | 42 | 100% | 0% | `D_humaneval_hard_20260520T131220Z` |
-
-**Do not cite:** `D_humaneval_20260520T085222Z` (70% SR, six zero-interaction tasks — network failure).
-
-**Phase-12 reference runs** (20-task humaneval, seed=42): `D_humaneval_20260520T082826Z` (100%), `A_humaneval_20260520T083955Z` (100%) — add to allowlist when trace files are present.
-
-### Historical / experimental
-
-`thesis_evaluation_report.md` (`--curated --all`) lists 150+ aggregate JSONL files including dry-runs, failed probes, and early experiments. **Do not use the aggregate table for thesis claims** — use curated section only.
-
-Log reference: `logs/e2e_20260520T125009Z.log` (A/B 90%, C/D 100% on humaneval_hard).
+Do **not** re-run live benchmarks until user approves API budget.
 
 ---
 
-## 6. Production data flow
+## 6. Production data flow (today vs target)
+
+**Today (benchmark-oriented)**
 
 ```text
-run_eval / ablation
-  → run_single_task()
-    → run_full_session(engine="graph")   # LangGraph + SqliteSaver
-      → validate_slm_api_key()           # probe with retry
-      → PlannerAgent / ExecutorAgent
-        → DecisionCycle → SLMClient (TrackingSLMClient)
-      → SessionOutcome → RunResult JSONL row
-  → write_manifest + optional decisions JSONL
-  → assess_run() quality sidecar
+python -m eval.run_eval D discriminative --seed 42
+  → load tasks from HuggingFace / curated ids
+  → run_full_session per task
+  → write traces/*.jsonl + manifest
 ```
 
-**Checkpointing:** JSON session checkpoints under `traces/checkpoints/`; LangGraph SQLite under `{checkpoint_dir}/{session_id}_langgraph.sqlite`.
+**Target (Aviona = Claude Code–minimal)**
+
+See **`AVIONA_UX_SPEC.md`**. Summary:
+
+```text
+cd D:\my-project
+aviona
+  → session in cwd
+  → loop: gather context → act → verify (interrupt anytime)
+  → tools: files, search, pytest/shell (guarded)
+  → AVIONA.md project rules; session log under ~/.aviona/
+  → checkpoints before edits; efficiency = low output tokens
+```
+
+**Not v1:** dataset benchmarks as main UI; `eval/` stays for thesis when approved.
 
 ---
 
-## 7. Known issues and limitations
+## 7. Known issues
 
-1. **Thin live evidence for RQ1/RQ3** — Many scenarios are dry-run complete but not backed by multi-seed curated traces.
-2. **Token/cost data** — Pre-phase-26 JSONL rows show zeros; re-run cited configs for thesis efficiency chapter.
-3. **D vs A delta** — On cited humaneval_hard slice, D≈C at 100% vs A at 90%; `test_ablation_d_beats_a` may skip; thesis should discuss ceiling effect on n=10.
-4. **Redis** — Implemented; live round-trip test skipped without local Redis.
-5. **Semantic retrieval** — Implemented; no curated A/B comparison run (keyword vs semantic) in `cite_allowlist.yaml`.
-6. **traces/** gitignored — Repro bundle: `python scripts/make_repro_bundle.py` for cited artifacts only.
+1. **No packaged CLI** — only module invocations (`python -m eval...`).
+2. **Output token cost** — full prompts + tool dumps; truncation exists but not tuned for “daily driver” efficiency.
+3. **Windows process cleanup** — stopping shell job may leave child `python.exe` ablation workers running (must kill by command line).
+4. **LangGraph vs loop** — production eval uses graph; document clearly for any CLI wrapper.
+5. **Thesis phases 39–41** — unimplemented; not blocking production replan.
 
 ---
 
-## 8. Suggested phases after 29 (headlines only)
+## 8. Suggested roadmap after pause (headlines for Claude)
 
-For Claude to expand into full `ROADMAP.md` sections starting at **phase 30**:
+**Track A — Production “Aviona” (user priority)**
 
-1. **Live multi-seed humaneval_hard ablation** — seeds 41,42,43; update `cite_allowlist.yaml`; SR/CER mean±95% CI in results chapter.
-2. **Keyword vs semantic retrieval live comparison** — B/D arms with `--retrieval-mode`; attribute SR/CER delta to mechanism (RQ1).
-3. **Re-run cited configs with cost accounting** — refresh allowlisted JSONL with `tokens_total` / `estimated_usd`.
-4. **MBPP full ablation n=50** — A–D traces + manifest + quality gate.
-5. **SWE-bench Lite pilot** — 5–10 instances, Docker grading path validation.
-6. **Agent-count live experiment** — multistep, CER-focused table for RQ3.
-7. **OpenRouter slm_small live matrix** — true-SLM cost/latency comparison vs DeepSeek.
-8. **Phase-12 runs into allowlist** — merge 20-task canonical humaneval traces when on disk.
-9. **Qualitative metrics on cited runs** — `--qualitative` / `--compare-a-d` for chapter RQ2.
-10. **Decision-log interpretability appendix** — `analyze_traces --session` samples per config.
-11. **Interaction-length live sweep** — L=2,4,6,8 with manifests (RQ3).
-12. **Failure taxonomy from traces** — classify escalate vs max_steps vs unresolvable across configs.
-13. **Thesis figure automation** — SR/CER bar charts from curated report only.
-14. **LaTeX table export** — `generate_report --latex` or pandoc pipeline.
-15. **E2E regression CI** — nightly humaneval_hard n=3 smoke (optional GitHub Action).
-16. **Redis-backed session store pilot** — `MEMORY_BACKEND=redis` under load.
-17. **Handoff reproducibility package** — zip `artifacts/repro_bundle` + MANIFEST_INDEX for committee.
-18. **Documentation pass** — architecture diagram aligned with graph-default reality.
-19. **Performance profiling** — latency breakdown planner vs executor per session.
-20. **Roadmap phase 40+ buffer** — committee-requested extensions (human subjects, user study, etc.).
+- A1 — Output-token budget: planner/executor caps, aggressive tool truncation, concise self-check, structured JSON-only where possible  
+- A2 — Latency: parallel tool calls where safe, cache skill cards, reduce redundant Decision Cycle rounds  
+- A3 — `pyproject.toml` → `aviona` on PATH; `pip install -e .` on Windows  
+- A4 — **Interactive session REPL** in cwd (like `claude` in Claude Code): prompt loop, file ops, session context — map to `run_full_session` / graph  
+- A5 — Path jail + write-guard for cwd; global secrets in `%USERPROFILE%\.aviona\`  
+- A6 — Dev mode: editable install; `aviona doctor` for API probe without starting a session  
+- A6 — Safety: write-guard, secret scan, dry-run / plan-only mode  
+
+**Track B — Thesis completion (after user approval)**
+
+- B1 — Resume ROADMAP 39–41 (LaTeX, repro zip, smoke e2e)  
+- B2 — Live discriminative matrix + cite allowlist + curated report  
+- B3 — slm_small + retrieval compare live runs  
+- B4 — Final thesis tables/figures from cite-only pipeline  
 
 ---
 
 ## 9. Pointers
 
-| Resource | Path |
-|----------|------|
-| Phase log | `PROGRESS.md` |
-| Specs | `ROADMAP.md` |
-| Extend prompt | `PROMPT_EXTEND_ROADMAP.md` |
-| Curated runs | `configs/cite_allowlist.yaml` |
-| Latest report | `thesis_evaluation_report.md` |
+| Doc | Path |
+|-----|------|
+| Phase specs | `ROADMAP.md` |
+| Agent state | `PROGRESS.md` |
+| UX spec (Claude Code–minimal) | `AVIONA_UX_SPEC.md` |
+| Replan prompt | `PROMPT_REPLAN_PRODUCTION.md` |
 | Iterate skill | `.cursor/skills/thesis-iterate/SKILL.md` |
-| Thesis standards | `.cursor/rules/thesis-roadmap.mdc` |
+| Architecture rules | `.cursor/rules/thesis-roadmap.mdc` |
+| Models / cost | `configs/models.yaml`, `eval/metrics/cost.py` |
 
 ---
 
@@ -222,23 +171,11 @@ For Claude to expand into full `ROADMAP.md` sections starting at **phase 30**:
 
 ```text
 agentic-ai/
-├── configs/          models, eval, memory, cite_allowlist, humaneval_hard_ids
-├── src/framework/
-│   ├── slm/          client, config, registry, usage, skills
-│   ├── memory/       stores, retrieval, working_memory, reflection, backend
-│   ├── control/      cycle, workflow, self_check, ablation, ledger
-│   ├── orchestration/ session, graph, planner, executor, messages
-│   ├── tools/        test_runner, file_tools, compile, search
-│   └── error_control/ parser, quality, truncation, thinking, watchdog, sandbox
-├── eval/             run_eval, manifest, metrics, curated, scenarios, datasets
-├── scripts/          generate_report, make_repro_bundle, analyze_traces, smoke_test
-├── tests/            unit, integration, e2e
-├── traces/           (gitignored) JSONL, manifests, checkpoints
-├── logs/             e2e logs
-├── PROGRESS.md
-└── ROADMAP.md
+├── src/framework/          # Core agent framework
+├── eval/                   # Benchmark harness (thesis)
+├── configs/                # YAML configuration
+├── scripts/                # Reports, smoke, analyze
+├── tests/                  # unit / integration / e2e
+├── PROGRESS.md ROADMAP.md
+└── (no aviona CLI yet)
 ```
-
----
-
-*End of handoff — merge `ROADMAP_PHASES_NEXT.md` from Claude starting at phase 30, then resume with `thesis-iterate`.*

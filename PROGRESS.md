@@ -9,11 +9,14 @@
 ## CURRENT STATE
 
 ```yaml
-current_phase: 39
+current_phase: aviona-1
 phase_status: NOT_STARTED
-last_updated: "2026-05-20T19:00Z"
-last_commit: "101c993"
+last_updated: "2026-05-21T14:00Z"
+last_commit: "f91cae4"
 blocker: null
+active_roadmap: ROADMAP_PRODUCTION_AVIONA.md
+thesis_track: paused_at_phase_39
+replan_note: "Aviona production roadmap merged. Thesis ROADMAP 39-41 + live benchmarks frozen until THESIS-RESUME approval."
 ```
 
 ---
@@ -253,78 +256,92 @@ phases:
     name: "Live multi-seed A-D ablation DeepSeek"
     status: DONE
     test_gate: "python -m eval.scenarios.ablation --dataset discriminative --seeds 41,42,43 --dry-run && pytest tests/unit/test_cite_allowlist.py"
-    commit: pending
+    commit: "101c993"
     notes: "Structural: cite sections, seed CLI fix, test_cite_allowlist. Live 12-run matrix deferred (no benchmark API spend)."
 
   32:
     name: "True-SLM live matrix (slm_small)"
     status: DONE
     test_gate: "pytest tests/unit/test_slm_profiles.py && ablation --profile-bundle slm_small --dry-run"
-    commit: pending
+    commit: "101c993"
     notes: "Structural dry-run OK. Live slm_small matrix deferred."
 
   33:
     name: "Keyword vs semantic retrieval comparison"
     status: DONE
     test_gate: "pytest tests/unit/test_retrieval_compare.py"
-    commit: pending
+    commit: "101c993"
     notes: "retrieval_compare.py (B/D only); 3/3 unit tests; dry-run CLI OK. Live runs deferred."
 
   34:
     name: "Efficiency chapter (cost/latency/token)"
     status: DONE
     test_gate: "pytest tests/unit/test_efficiency.py"
-    commit: pending
+    commit: "101c993"
     notes: "efficiency.py + --efficiency report; devstral price_known=false; 4/4 unit tests."
 
   35:
     name: "MBPP n=50 ablation"
     status: DONE
     test_gate: "python -m eval.run_eval --config D --dataset mbpp --n 5 --dry-run"
-    commit: pending
+    commit: "101c993"
     notes: "MBPP dry-run gate OK; mbpp_50 allowlist section stub. Live n=50 deferred."
 
   36:
     name: "RQ3 interaction-length + agent-count"
     status: DONE
     test_gate: "pytest tests/unit/test_interaction_length.py && agent_count --dry-run"
-    commit: pending
+    commit: "101c993"
     notes: "interaction_length dry-run OK; agent_count contradiction from decision log. Live sweeps deferred."
 
   37:
     name: "SWE-bench Lite pilot"
     status: DONE
     test_gate: "pytest tests/unit/test_swebench_docker.py"
-    commit: pending
+    commit: "101c993"
     notes: "swebench unit tests pass; eval dry-run OK. Docker pilot deferred."
 
   38:
     name: "Qualitative + failure taxonomy"
     status: DONE
     test_gate: "pytest tests/unit/test_failure_taxonomy.py tests/unit/test_qualitative_metrics.py"
-    commit: pending
+    commit: "101c993"
     notes: "failure_taxonomy.py; 4/4 unit tests. analyze_traces --taxonomy via taxonomy module."
 
   39:
     name: "Thesis tables + figures (LaTeX)"
-    status: NOT_STARTED
+    status: PAUSED
     test_gate: "pytest tests/unit/test_report_latex.py tests/unit/test_figures.py"
     commit: null
     notes: "Curated-only export."
 
   40:
     name: "Docs + zipped repro bundle"
-    status: NOT_STARTED
+    status: PAUSED
     test_gate: "pytest tests/unit/test_repro_package.py && make_repro_bundle --zip --dry-run"
     commit: null
     notes: "No API."
 
   41:
     name: "E2E regression smoke + Redis pilot"
-    status: NOT_STARTED
+    status: PAUSED
     test_gate: "pytest tests/e2e/test_regression_smoke.py --collect-only"
     commit: null
     notes: "[REQUIRES_USER_INPUT optional]"
+```
+
+---
+
+## AVIONA TRACK (`ROADMAP_PRODUCTION_AVIONA.md`)
+
+```yaml
+aviona_phases:
+  1:  { status: NOT_STARTED, gate: "pip install -e . && aviona --version && pytest tests/unit/test_aviona_cli.py" }
+  2:  { status: NOT_STARTED, gate: "pytest tests/unit/test_verifier.py tests/unit/test_aviona_session.py" }
+  3:  { status: NOT_STARTED, gate: "pytest tests/unit/test_aviona_repl.py" }
+  4:  { status: NOT_STARTED, gate: "v1 DoD — REPL + AVIONA.md + session store" }
+  5-12: { status: NOT_STARTED, see ROADMAP_PRODUCTION_AVIONA.md }
+  thesis_resume: { status: PAUSED, requires_user_input: true }
 ```
 
 ---

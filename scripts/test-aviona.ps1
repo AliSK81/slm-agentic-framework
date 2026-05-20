@@ -45,19 +45,21 @@ if (Test-Path $Aviona) {
     Write-Host "==> CLI version: $CliVersion"
 }
 
-Write-Host "==> pytest Aviona unit + journey tests"
+Write-Host "==> pytest Aviona unit + contract tests"
 & $Python -m pytest `
     tests/unit/test_aviona_cli.py `
     tests/unit/test_aviona_console.py `
+    tests/unit/test_aviona_contract.py `
     tests/unit/test_aviona_doctor.py `
-    tests/unit/test_aviona_effects.py `
     tests/unit/test_aviona_intent.py `
     tests/unit/test_aviona_journeys.py `
+    tests/unit/test_aviona_patch_grep.py `
     tests/unit/test_aviona_project.py `
     tests/unit/test_aviona_repl.py `
     tests/unit/test_aviona_resume.py `
     tests/unit/test_aviona_session.py `
     tests/unit/test_aviona_store.py `
+    tests/unit/test_turn_io.py `
     -v --tb=short
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 

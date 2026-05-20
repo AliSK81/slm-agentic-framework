@@ -412,7 +412,9 @@ def _setup_interactive_dispatch(
             hard_constraints=constraints,
         ),
     )
-    memory.subtasks.set_status("st-main", "in_progress")
+    task = memory.subtasks.get("st-main")
+    if task is not None and task.status == "open":
+        memory.subtasks.set_status("st-main", "in_progress")
 
 
 def _interactive_initial_state(
@@ -478,8 +480,12 @@ def _run_interactive_executor_turn(
     outcome = SessionOutcome(session_id=session_id, step_count=1)
 
     if decision is not None and decision.kind == "terminate":
-        user_msg = parse_terminate_payload(decision.payload).user_message
+        parsed = parse_terminate_payload(decision.payload)
+        user_msg = parsed.user_message
         outcome.user_message = user_msg
+        if parsed.turn_type in ("edit", "build"):
+            evaluation = verifier.evaluate(workspace).as_dict()
+            outcome.test_passed = bool(evaluation.get("passed"))
         outcome.outcome = "solved" if user_msg else "unresolvable"
         outcome.final_state = STATE_DONE
         outcome.decision_count = len(memory.decisions.list_for_session(session_id))

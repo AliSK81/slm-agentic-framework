@@ -14,24 +14,11 @@ from aviona.session import AvionaSession, aviona_project_dir, project_hash
 from framework.control.workflow import WorkflowState
 from framework.memory.stores import DecisionEntry, MemoryStores, SelfCheckRecord, SubTask
 from framework.orchestration.executor import ExecutorAgent
-from framework.orchestration.planner import PlannerAgent
 from framework.tools.file_tools import write_file
 
 
 def _self_check() -> SelfCheckRecord:
     return SelfCheckRecord(verdict="pass", issues=[])
-
-
-def _register_main_subtask(memory: MemoryStores, session_id: str, goal: str) -> None:
-    memory.subtasks.register(
-        SubTask(
-            task_id="st-main",
-            parent_session_id=session_id,
-            description=goal,
-            status="open",
-            owner="executor",
-        )
-    )
 
 
 @pytest.fixture
@@ -50,24 +37,39 @@ def sample_repo(tmp_path: Path) -> Path:
     return dest
 
 
-def _patch_graph_for_hello_write(
+def _patch_interactive_write(
     monkeypatch: pytest.MonkeyPatch,
     workspace: Path,
+    *,
+    user_message: str = "Created hello.txt.",
 ) -> None:
-    """Mock planner/executor so one turn writes ``hello.txt`` under ``workspace``."""
-
-    def _noop_plan(self: PlannerAgent, state: WorkflowState) -> WorkflowState:
-        return state
-
-    def _fake_dispatch(self: PlannerAgent, state: WorkflowState) -> WorkflowState:
-        return {**state, "active_subtask_id": "st-main", "current_state": "DISPATCH"}
+    """Mock executor interactive turn: write file + typed terminate."""
 
     def _fake_execute(self: ExecutorAgent, state: WorkflowState) -> WorkflowState:
         write_file("hello.txt", "hi\n", workspace)
-        return {**state, "current_state": "EXECUTE"}
+        self._memory.decisions.append(
+            DecisionEntry(
+                session_id=state["session_id"],
+                decision_id=f"d-exec-{len(self._memory.decisions.list_for_session(state['session_id']))}",
+                step_index=0,
+                by_agent="executor",
+                kind="terminate",
+                payload={
+                    "user_message": user_message,
+                    "turn_type": "edit",
+                },
+                rationale=user_message,
+                references=[],
+                self_check=_self_check(),
+                timestamp=datetime.now(UTC),
+            )
+        )
+        return {
+            **state,
+            "current_state": "EXECUTE",
+            "last_evaluation": {"passed": True},
+        }
 
-    monkeypatch.setattr(PlannerAgent, "plan_node", _noop_plan)
-    monkeypatch.setattr(PlannerAgent, "dispatch_node", _fake_dispatch)
     monkeypatch.setattr(ExecutorAgent, "execute_node", _fake_execute)
 
 
@@ -75,15 +77,15 @@ def test_turn_creates_file_in_cwd(
     project_dir: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """run_turn drives the graph; mocked execute writes hello.txt under cwd."""
+    """run_turn drives interactive mode; mocked execute writes hello.txt under cwd."""
     session = AvionaSession(project_dir)
-    _patch_graph_for_hello_write(monkeypatch, project_dir)
-    _register_main_subtask(session.memory, session._session_id, "create hello.txt")
+    _patch_interactive_write(monkeypatch, project_dir)
 
     result = session.run_turn("create hello.txt with hi")
     assert (project_dir / "hello.txt").is_file()
     assert (project_dir / "hello.txt").read_text(encoding="utf-8") == "hi\n"
     assert result.test_passed or result.outcome == "solved"
+    assert result.detail == "Created hello.txt."
 
 
 def test_v1_sample_repo_repl_creates_hello_and_logs_session(
@@ -91,14 +93,13 @@ def test_v1_sample_repo_repl_creates_hello_and_logs_session(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """v1 DoD: REPL in sample_repo creates hello.txt and appends a JSONL turn line."""
+    """REPL in sample_repo creates hello.txt and appends a JSONL turn line."""
     store_root = tmp_path / "aviona-store"
     monkeypatch.setattr("aviona.store.aviona_project_dir", lambda _cwd: store_root)
     monkeypatch.setattr("aviona.session.aviona_project_dir", lambda _cwd: store_root)
 
     session = AvionaSession(sample_repo)
-    _patch_graph_for_hello_write(monkeypatch, sample_repo)
-    _register_main_subtask(session.memory, session._session_id, 'create hello.txt with "hi"')
+    _patch_interactive_write(monkeypatch, sample_repo)
 
     run_repl(
         session,
@@ -137,19 +138,29 @@ def test_memory_db_persists_between_turns(
 
     turn_calls: list[str] = []
 
-    def _noop_plan(self: PlannerAgent, state: WorkflowState) -> WorkflowState:
-        return state
+    def _noop_execute(self: ExecutorAgent, state: WorkflowState) -> WorkflowState:
+        turn_calls.append(state["session_id"])
+        self._memory.decisions.append(
+            DecisionEntry(
+                session_id=state["session_id"],
+                decision_id=f"d-{len(turn_calls)}",
+                step_index=0,
+                by_agent="executor",
+                kind="terminate",
+                payload={"user_message": "ok", "turn_type": "answer"},
+                rationale="ok",
+                references=[],
+                self_check=_self_check(),
+                timestamp=datetime.now(UTC),
+            )
+        )
+        return {
+            **state,
+            "current_state": "EXECUTE",
+            "last_evaluation": {"passed": True},
+        }
 
-    def _fake_dispatch(self: PlannerAgent, state: WorkflowState) -> WorkflowState:
-        return {**state, "active_subtask_id": "st-main", "current_state": "DISPATCH"}
-
-    def _fake_execute(self: ExecutorAgent, state: WorkflowState) -> WorkflowState:
-        return {**state, "current_state": "EXECUTE"}
-
-    monkeypatch.setattr(PlannerAgent, "plan_node", _noop_plan)
-    monkeypatch.setattr(PlannerAgent, "dispatch_node", _fake_dispatch)
-    monkeypatch.setattr(ExecutorAgent, "execute_node", _fake_execute)
-    _register_main_subtask(session.memory, session._session_id, "noop")
+    monkeypatch.setattr(ExecutorAgent, "execute_node", _noop_execute)
 
     session.memory.decisions.append(
         DecisionEntry(
@@ -168,12 +179,10 @@ def test_memory_db_persists_between_turns(
     before = len(session.memory.decisions.list_for_session(session._session_id))
 
     session.run_turn("first")
-    turn_calls.append("first")
     session.run_turn("second")
-    turn_calls.append("second")
 
     after = len(session.memory.decisions.list_for_session(session._session_id))
-    assert after >= before
+    assert after > before
     assert len(turn_calls) == 2
     assert project_hash(project_dir) == project_hash(project_dir.resolve())
     assert aviona_project_dir(project_dir) == session.session_root

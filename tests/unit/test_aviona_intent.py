@@ -4,9 +4,25 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from aviona.effects import analyze_turn_effects, classify_goal
+from aviona.contract import TurnContractResult, TurnFileObs, verify_turn
 from aviona.intent import conversational_reply, is_conversational
 from framework.memory.stores import DecisionEntry, SelfCheckRecord
+from framework.orchestration.session import SessionOutcome
+
+
+def _terminate_entry(answer: str) -> DecisionEntry:
+    return DecisionEntry(
+        session_id="s1",
+        decision_id="d1",
+        step_index=0,
+        by_agent="executor",
+        kind="terminate",
+        payload={"user_message": answer, "turn_type": "answer"},
+        rationale=answer,
+        references=[],
+        self_check=SelfCheckRecord(verdict="pass", issues=[]),
+        timestamp=datetime.now(UTC),
+    )
 
 
 def test_greetings_are_conversational() -> None:
@@ -19,81 +35,34 @@ def test_greetings_are_conversational() -> None:
     assert not is_conversational("create hello.txt")
 
 
-def test_codebase_questions_use_explain_or_read_content() -> None:
-    """Explain vs read-content vs general classification."""
-    assert not is_conversational("explain the codebase")
-    assert classify_goal("explain the codebase") == "explain"
-    assert classify_goal("what is content of hello file?") == "read_content"
-    assert classify_goal("what is your model?") == "general"
-    assert classify_goal("what language model?") == "general"
-
-
-def test_general_question_accepts_terminate_answer() -> None:
-    """General Q&A succeeds when the agent terminates with an answer."""
-    effects = analyze_turn_effects(
-        goal="what is your model?",
-        new_entries=[
-            DecisionEntry(
-                session_id="s1",
-                decision_id="d1",
-                step_index=0,
-                by_agent="executor",
-                kind="terminate",
-                payload={
-                    "answer": "Provider deepseek, model deepseek-v4-flash per runtime anchor."
-                },
-                rationale="Provider deepseek, model deepseek-v4-flash per runtime anchor.",
-                references=[],
-                self_check=SelfCheckRecord(verdict="pass", issues=[]),
-                timestamp=datetime.now(UTC),
-            )
-        ],
-        file_changes=[],
-        tool_outputs=[],
+def test_answer_turn_accepts_typed_user_message() -> None:
+    """Answer contract passes on typed terminate user_message without writes."""
+    outcome = SessionOutcome(
+        session_id="s1",
+        user_message="Provider deepseek, model deepseek-v4-flash.",
+        outcome="solved",
     )
-    assert effects.satisfied
-    assert "deepseek" in (effects.user_detail or "").lower()
+    result = verify_turn("answer", outcome, TurnFileObs())
+    assert result == TurnContractResult(passed=True)
+    assert "deepseek" in outcome.user_message.lower()
 
 
-def test_requested_reply_salam() -> None:
-    """Short verbatim replies must satisfy general goals and show in detail."""
-    from aviona.effects import requested_reply_text
+def test_answer_turn_fails_without_user_message() -> None:
+    """Empty user_message fails the answer contract."""
+    outcome = SessionOutcome(session_id="s1", user_message="")
+    result = verify_turn("answer", outcome, TurnFileObs())
+    assert not result.passed
 
-    goal = 'try to fastly reply with "salam"'
-    assert requested_reply_text(goal) == "salam"
-    effects = analyze_turn_effects(
-        goal=goal,
-        new_entries=[
-            DecisionEntry(
-                session_id="s1",
-                decision_id="d1",
-                step_index=0,
-                by_agent="executor",
-                kind="terminate",
-                payload={"answer": "salam"},
-                rationale="salam",
-                references=[],
-                self_check=SelfCheckRecord(verdict="pass", issues=[]),
-                timestamp=datetime.now(UTC),
-            )
-        ],
-        file_changes=[],
-        tool_outputs=[],
+
+def test_inspect_turn_rejects_unsolicited_writes() -> None:
+    """Inspect contract fails when files were written."""
+    outcome = SessionOutcome(session_id="s1", user_message="listed files")
+    result = verify_turn(
+        "inspect",
+        outcome,
+        TurnFileObs(changed_paths=["notes.txt"]),
     )
-    assert effects.satisfied
-    assert effects.user_detail == "salam"
-
-
-def test_requested_reply_missing_fails() -> None:
-    """General reply request without the text must fail, not vacuous ok."""
-    effects = analyze_turn_effects(
-        goal='reply with "salam"',
-        new_entries=[],
-        file_changes=[],
-        tool_outputs=[],
-    )
-    assert not effects.satisfied
-    assert effects.failure_reason == "no reply"
+    assert not result.passed
 
 
 def test_conversational_reply_mentions_explain() -> None:
@@ -102,21 +71,7 @@ def test_conversational_reply_mentions_explain() -> None:
     assert "explain" in reply.lower()
 
 
-def test_explain_goal_requires_answer_not_edits() -> None:
-    """Explain turns need an answer and must not edit files."""
-    effects = analyze_turn_effects(
-        goal="explain the codebase",
-        new_entries=[],
-        file_changes=["hello.txt"],
-        tool_outputs=[],
-    )
-    assert not effects.satisfied
-
-    ok = analyze_turn_effects(
-        goal="explain the codebase",
-        new_entries=[],
-        file_changes=[],
-        tool_outputs=["This repo is a small sample with main.py and AVIONA.md rules."],
-    )
-    assert ok.satisfied
-    assert "main.py" in (ok.user_detail or "")
+def test_declared_answer_from_terminate_entry() -> None:
+    """Terminate decisions carry user_message used by TurnContract."""
+    entry = _terminate_entry("salam")
+    assert entry.payload["user_message"] == "salam"

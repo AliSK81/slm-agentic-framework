@@ -37,19 +37,19 @@ def test_run_turn_passes_project_rules_into_session(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """AvionaSession merges AVIONA.md rules into run_full_session constraints."""
+    """AvionaSession merges AVIONA.md rules into interactive turn constraints."""
     (tmp_path / "AVIONA.md").write_text("No print in library code.\n", encoding="utf-8")
     session = AvionaSession(tmp_path)
     captured: list[list[str]] = []
 
-    def fake_run(goal: str, constraints: list[str], **kwargs: object) -> object:
-        _ = goal, kwargs
+    def fake_run(goal: str, constraints: list[str], workspace: Path, **kwargs: object) -> object:
+        _ = workspace, kwargs
         captured.append(list(constraints))
         from framework.orchestration.session import SessionOutcome
 
         return SessionOutcome(session_id=session._session_id, outcome="solved")
 
-    monkeypatch.setattr("aviona.session.run_full_session", fake_run)
+    monkeypatch.setattr("aviona.session.framework_run_turn", fake_run)
     monkeypatch.setattr(
         "aviona.session.SessionStore.append_turn",
         lambda self, **kwargs: None,

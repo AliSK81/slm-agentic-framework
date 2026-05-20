@@ -12,7 +12,7 @@
 current_phase: 12
 phase_status: DONE
 last_updated: "2026-05-20T12:45Z"
-last_commit: "6edc6aa"   # uncommitted: planner int task_id fix, framework e2e fixes, staged runner
+last_commit: "072fbf2"
 blocker: null
 ```
 
@@ -110,7 +110,7 @@ phases:
     name: "Qualitative Trace Analysis"
     status: DONE
     test_gate: "pytest tests/e2e/ -m e2e"
-    commit: "PLACEHOLDER"
+    commit: "072fbf2"
     notes: >
       2026-05-20 staged gate (scripts/run_phase12_staged.py) exit 0: session 6/6;
       test_humaneval_20_tasks_config_D PASSED. Provider: DeepSeek V4 Flash (configs/models.yaml).

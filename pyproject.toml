@@ -8,6 +8,15 @@ version = "0.1.0"
 description = "SLM-based multi-agent programming framework (MSc thesis)"
 requires-python = ">=3.11"
 
+[project.scripts]
+aviona = "aviona.cli:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]

@@ -39,6 +39,11 @@ bundles:
     executor: devstral-small
     provider: openrouter
 
+  aviona_daily:
+    planner: aviona-daily
+    executor: aviona-daily
+    provider: deepseek
+
 profiles:
   default:
     model_id: deepseek-v4-flash
@@ -55,6 +60,27 @@ profiles:
       read_file: 12000
       search_codebase: 2000
     skill_budget_tokens: 150
+    timeout_by_role:
+      planner: 90
+      executor: 120
+      tool_call: 45
+    tool_call_format: json
+
+  aviona-daily:
+    model_id: deepseek-v4-flash
+    provider: deepseek
+    context_limit: 128000
+    effective_context: 64000
+    thinking_budget: 2048
+    api_thinking: true
+    reasoning_effort: high
+    max_working_memory_tokens: 480
+    tool_output_caps:
+      pytest_run: 4000
+      py_compile: 2000
+      read_file: 8000
+      search_codebase: 2000
+    skill_budget_tokens: 90
     timeout_by_role:
       planner: 90
       executor: 120

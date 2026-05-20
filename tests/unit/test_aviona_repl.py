@@ -23,7 +23,7 @@ def test_repl_runs_one_turn_then_exits_on_slash_exit(project_dir: Path) -> None:
     session = AvionaSession(project_dir)
     run_turn = MagicMock(
         return_value=TurnResult(
-            status="ok · 1 steps",
+            status="✓ · 1 steps",
             outcome="solved",
             test_passed=True,
             step_count=1,
@@ -43,7 +43,7 @@ def test_repl_runs_one_turn_then_exits_on_slash_exit(project_dir: Path) -> None:
     )
     assert code == 0
     run_turn.assert_called_once_with("create hello.txt with hi")
-    assert any("ok" in line for line in lines)
+    assert any("steps" in line for line in lines)
 
 
 def test_repl_help_does_not_invoke_turn(project_dir: Path) -> None:
@@ -75,7 +75,7 @@ def test_repl_survives_keyboard_interrupt_during_turn(project_dir: Path) -> None
         if calls == 1:
             raise KeyboardInterrupt
         return TurnResult(
-            status="ok · 1 steps",
+            status="✓ · 1 steps",
             outcome="solved",
             session_id=session._session_id,
         )
@@ -89,4 +89,4 @@ def test_repl_survives_keyboard_interrupt_during_turn(project_dir: Path) -> None
     )
     assert calls == 2
     assert any("cancelled" in line for line in output)
-    assert any("ok" in line for line in output)
+    assert any("steps" in line for line in output)

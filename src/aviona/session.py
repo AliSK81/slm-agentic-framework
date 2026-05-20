@@ -7,10 +7,12 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
+from aviona.profiles import apply_daily_driver_profiles
 from aviona.project import load_project_rules
+from aviona.render import render_status
 from aviona.store import SessionStore, aviona_project_dir, project_hash
 from framework.control.ablation import AblationSettings
-from framework.memory.stores import MemoryStores
+from framework.memory.stores import DecisionEntry, MemoryStores
 from framework.orchestration.session import SessionOutcome, run_full_session
 from framework.orchestration.verify import NoOpVerifier, Verifier
 
@@ -33,6 +35,7 @@ class AvionaSession:
     """cwd-rooted session sharing persistent memory across REPL turns."""
 
     def __init__(self, cwd: Path) -> None:
+        apply_daily_driver_profiles()
         self.workspace = cwd.resolve()
         self.session_root = aviona_project_dir(self.workspace)
         self.session_root.mkdir(parents=True, exist_ok=True)
@@ -87,8 +90,9 @@ class AvionaSession:
             planner_enabled=True,
             max_steps=max_steps,
         )
-        status = _status_line(session_outcome)
         after_entries = self.memory.decisions.list_for_session(self._session_id)
+        edited_path = _last_edited_path(after_entries)
+        status = render_status(session_outcome, edited_path=edited_path)
         new_refs = [
             entry.decision_id
             for entry in after_entries
@@ -112,16 +116,13 @@ class AvionaSession:
         )
 
 
-def _status_line(outcome: SessionOutcome) -> str:
-    if outcome.test_passed or outcome.outcome == "solved":
-        label = "ok"
-    elif outcome.outcome == "escalate":
-        label = "escalate"
-    else:
-        label = outcome.outcome
-    parts = [label, f"{outcome.step_count} steps"]
-    if outcome.tokens_total:
-        parts.append(f"{outcome.tokens_total} tok")
-    if outcome.error:
-        parts.append(outcome.error[:80])
-    return " · ".join(parts)
+def _last_edited_path(entries: list[DecisionEntry]) -> str | None:
+    """Return the most recent code_edit file_path from decision payloads."""
+    for entry in reversed(entries):
+        if entry.kind != "code_edit":
+            continue
+        payload = entry.payload or {}
+        path = payload.get("file_path") or payload.get("path")
+        if isinstance(path, str) and path.strip():
+            return path.strip()
+    return None

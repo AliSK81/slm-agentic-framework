@@ -36,16 +36,26 @@ _EXECUTOR_PAYLOAD_HINT = (
 )
 
 
-def _json_format_block(agent_role: str) -> str:
-    """Append strict JSON instructions so SLMs emit parseable decisions."""
+def _json_format_block(agent_role: str, *, include_example: bool = True) -> str:
+    """Append strict JSON instructions so SLMs emit parseable decisions.
+
+    The full example block is omitted when ``include_example`` is False (compact
+    corrective rounds after self-check failure).
+    """
     kinds = _FORMAT_BY_ROLE.get(agent_role, "terminate")
     hint = f"\n{_EXECUTOR_PAYLOAD_HINT}" if agent_role == "executor" else ""
-    return (
+    header = (
         "\n[FORMAT]: Respond with a single JSON object only. "
         "Do not use markdown fences or prose outside the JSON.\n"
         f'Required keys: "kind" (one of: {kinds}), '
         '"rationale" (non-empty string), "payload" (object), '
-        '"references" (array of strings, optional).\n'
+        '"references" (array of strings, optional).'
+    )
+    if not include_example:
+        return header + hint
+    return (
+        header
+        + "\n"
         'Example: {"kind":"plan_step","rationale":"because ...",'
         f'"payload":{{"subtasks":[]}},"references":[]}}{hint}'
     )
@@ -78,6 +88,9 @@ class DecisionCycle:
         wm: WorkingMemory,
         issues: list,
         retry_count: int,
+        agent_role: str,
+        *,
+        include_example: bool,
     ) -> list[dict[str, str]]:
         """Prepend anchor prompt and append issue-specific corrective instructions."""
         base = wm.to_prompt_prefix()
@@ -86,12 +99,15 @@ class DecisionCycle:
             "",
             f"[CORRECTION RETRY {retry_count}]",
             "Your previous output failed validation. Fix all issues below.",
-            "Respond with strict JSON only.",
         ]
         for issue in issues:
             lines.append(f"- [{issue.kind}] {issue.detail}")
         lines.append("Restate all hard constraints from [CONSTRAINTS] in your rationale.")
-        return [{"role": "user", "content": "\n".join(lines)}]
+        content = "\n".join(lines) + _json_format_block(
+            agent_role,
+            include_example=include_example,
+        )
+        return [{"role": "user", "content": content}]
 
     def _proposal_to_entry(
         self,
@@ -154,7 +170,8 @@ class DecisionCycle:
         messages: list[dict[str, str]] = [
             {
                 "role": "user",
-                "content": wm.to_prompt_prefix() + _json_format_block(agent_role),
+                "content": wm.to_prompt_prefix()
+                + _json_format_block(agent_role, include_example=True),
             }
         ]
 
@@ -192,7 +209,13 @@ class DecisionCycle:
                 mode = quality.failure_mode or "unparseable"
                 kind: str = "schema_violation" if mode == "unparseable" else "empty"
                 issues = [Issue(kind=kind, detail=f"quality gate: {mode}")]  # type: ignore[arg-type]
-                messages = self._build_corrective_prompt(wm, issues, retry_count)
+                messages = self._build_corrective_prompt(
+                    wm,
+                    issues,
+                    retry_count,
+                    agent_role,
+                    include_example=True,
+                )
                 continue
 
             step_index = len(self._memory.decisions.list_for_session(session_id))
@@ -233,7 +256,13 @@ class DecisionCycle:
                     subtask_id=subtask_id,
                     retry_count=retry_count,
                 )
-                messages = self._build_corrective_prompt(wm, check.issues, retry_count)
+                messages = self._build_corrective_prompt(
+                    wm,
+                    check.issues,
+                    retry_count,
+                    agent_role,
+                    include_example=False,
+                )
                 continue
 
             outcome = action_fn(draft)

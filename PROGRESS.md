@@ -12,7 +12,7 @@
 current_phase: 14
 phase_status: NOT_STARTED
 last_updated: "2026-05-20T20:00Z"
-last_commit: "b9e5e7f"
+last_commit: "fa24e04"
 blocker: null
 ```
 
@@ -286,7 +286,7 @@ decisions:
   - "2026-05-20: Planner coerces SLM numeric task_id/depends_on to str (tests/unit/test_planner.py)."
   - "2026-05-20: Phase 12 e2e runs A+D only (not B/C); full ablation is Phase 11 eval/scenarios/ablation.py."
 issues:
-  - "Phases 14–29 merged into ROADMAP.md 2026-05-20; Phase 13 implemented (uncommitted)."
+  - "Phases 14–29 merged into ROADMAP.md 2026-05-20; Phase 13 done."
   - "eval.run_eval has no --task-id — addressed by Phase 14."
   - "scripts/run_phase12_staged.ps1 broken on Windows; use scripts/run_phase12_staged.py."
 ```

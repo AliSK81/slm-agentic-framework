@@ -12,7 +12,7 @@
 current_phase: 17
 phase_status: NOT_STARTED
 last_updated: "2026-05-20T23:30Z"
-last_commit: "a921d8c"
+last_commit: "7eb1d74"
 blocker: null
 ```
 
@@ -146,10 +146,10 @@ phases:
 
   16:
     name: "Multi-step interaction-length scenarios (RQ3)"
-    status: NOT_STARTED
+    status: DONE
     test_gate: "pytest tests/unit/test_interaction_length.py"
     commit: null
-    notes: "ROADMAP phase 16."
+    notes: "4/4 unit tests + CLI dry-run gate. synthetic_multistep L=2,4,6,8; interaction_length sweep with per-L JSONL+manifest."
 
   17:
     name: "Reflection on REVISE"

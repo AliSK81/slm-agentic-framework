@@ -10,19 +10,13 @@ from typing import Literal
 
 from pydantic import BaseModel
 
+from eval.datasets._curated_ids import load_curated_ids, resolve_ids_path
+from eval.datasets._difficulty import DifficultyLabel, difficulty_of as _difficulty_of
 from eval.datasets._sample import resolve_sample_count, sample_items, sample_stratified
 
 logger = logging.getLogger(__name__)
 
 _ENTRY_POINT_RE = re.compile(r"def\s+([a-zA-Z_][\w]*)\s*\(")
-_HARD_KEYWORDS = re.compile(
-    r"(dynamic programming|nested loop|O\(n\^2\)|O\(n\*\*2\)|memoization|"
-    r"topological sort|dijkstra|backtrack)",
-    re.IGNORECASE,
-)
-_NESTED_LOOP = re.compile(r"for\b[^\n]*:\s*\n\s*for\b", re.MULTILINE)
-
-DifficultyLabel = Literal["easy", "medium", "hard"]
 
 _CONFIGS_DIR = Path(__file__).resolve().parents[2] / "configs"
 _CURATED_HARD_IDS_PATH = _CONFIGS_DIR / "humaneval_hard_ids.txt"
@@ -40,26 +34,7 @@ class HumanEvalTask(BaseModel):
 @lru_cache(maxsize=1)
 def _curated_hard_ids() -> frozenset[str]:
     """Load version-controlled HumanEval ids that are always treated as hard."""
-    if not _CURATED_HARD_IDS_PATH.is_file():
-        return frozenset()
-    ids: set[str] = set()
-    for line in _CURATED_HARD_IDS_PATH.read_text(encoding="utf-8").splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#"):
-            continue
-        ids.add(stripped)
-    return frozenset(ids)
-
-
-def _count_assertions(test_code: str) -> int:
-    """Count assertion statements in HumanEval test harness code."""
-    return len(re.findall(r"\bassert\b", test_code))
-
-
-def _has_hard_keyword_signals(task: HumanEvalTask) -> bool:
-    """Detect nested-loop or DP-style signals in prompt or tests."""
-    blob = f"{task.prompt}\n{task.test_code}"
-    return bool(_HARD_KEYWORDS.search(blob)) or bool(_NESTED_LOOP.search(task.prompt))
+    return load_curated_ids(_CURATED_HARD_IDS_PATH)
 
 
 def difficulty_of(task: HumanEvalTask) -> DifficultyLabel:
@@ -67,17 +42,7 @@ def difficulty_of(task: HumanEvalTask) -> DifficultyLabel:
 
     Curated ids in ``configs/humaneval_hard_ids.txt`` always return ``hard``.
     """
-    if task.task_id in _curated_hard_ids():
-        return "hard"
-
-    prompt_loc = len(task.prompt.splitlines())
-    n_assertions = _count_assertions(task.test_code)
-
-    if prompt_loc > 12 or n_assertions >= 8 or _has_hard_keyword_signals(task):
-        return "hard"
-    if 6 <= prompt_loc <= 12 or 4 <= n_assertions <= 7:
-        return "medium"
-    return "easy"
+    return _difficulty_of(task, curated_ids=_curated_hard_ids())
 
 
 def _infer_entry_point(prompt: str, declared: str) -> str:
@@ -114,11 +79,17 @@ def _load_humaneval_rows() -> list[HumanEvalTask]:
     return rows
 
 
-def load_humaneval_curated_hard(n: int = 30, seed: int = 42) -> list[HumanEvalTask]:
-    """Load the frozen curated hard slice from ``configs/humaneval_hard_ids.txt``."""
-    curated = sorted(_curated_hard_ids())
+def load_humaneval_curated_hard(
+    n: int = 30,
+    seed: int = 42,
+    *,
+    ids_file: str | None = None,
+) -> list[HumanEvalTask]:
+    """Load the frozen curated hard slice from a version-controlled id list."""
+    ids_path = resolve_ids_path(ids_file)
+    curated = sorted(load_curated_ids(ids_path))
     if not curated:
-        raise ValueError("configs/humaneval_hard_ids.txt is empty")
+        raise ValueError(f"{ids_path} is empty")
     tasks = load_humaneval_by_ids(curated)
     return sample_items(tasks, min(n, len(tasks)), seed)
 

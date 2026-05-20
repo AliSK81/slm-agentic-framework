@@ -4,16 +4,12 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Literal
-
 from pydantic import BaseModel
 
 from eval.datasets._sample import sample_items
-from eval.datasets.humaneval_adapter import HumanEvalTask, difficulty_of as humaneval_difficulty
+from eval.datasets._difficulty import DifficultyLabel, difficulty_of as _difficulty_of
 
 logger = logging.getLogger(__name__)
-
-DifficultyLabel = Literal["easy", "medium", "hard"]
 
 _ENTRY_POINT_RE = re.compile(r"def\s+([a-zA-Z_][\w]*)\s*\(")
 
@@ -80,13 +76,7 @@ def load_mbpp(n: int = 50, seed: int = 42) -> list[MBPPTask]:
 
 def difficulty_of(task: MBPPTask) -> DifficultyLabel:
     """Assign a deterministic difficulty label using the same heuristics as HumanEval."""
-    proxy = HumanEvalTask(
-        task_id=str(task.task_id),
-        prompt=task.prompt,
-        test_code=task.test_code,
-        entry_point=task.entry_point,
-    )
-    return humaneval_difficulty(proxy)
+    return _difficulty_of(task, curated_ids=frozenset())
 
 
 def task_to_session(task: MBPPTask) -> tuple[str, list[str], str]:

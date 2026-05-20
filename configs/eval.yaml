@@ -9,6 +9,13 @@ humaneval_hard:
   seed: 42
   curated_only: true
 
+discriminative:
+  dataset: humaneval
+  ids_file: humaneval_hard_ids.txt
+  sample_size: 30
+  seed: 42
+  curated_only: true
+
 mbpp:
   sample_size: 50
   seed: 42
@@ -27,6 +34,7 @@ multistep:
 step_budgets:
   humaneval: {max_steps: 10, max_retries: 3}
   humaneval_hard: {max_steps: 10, max_retries: 3}
+  discriminative: {max_steps: 10, max_retries: 3}
   multistep: {max_steps: 15, max_retries: 3}
   mbpp:      {max_steps: 15, max_retries: 3}
   swebench:  {max_steps: 25, max_retries: 3}

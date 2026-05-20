@@ -9,6 +9,12 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 
+_PROJECT_ROOT = Path(__file__).resolve().parents[1]
+_SRC_ROOT = _PROJECT_ROOT / "src"
+_src = str(_SRC_ROOT)
+if _src not in sys.path:
+    sys.path.insert(0, _src)
+
 from eval.config import AblationFlags, EvalConfig, load_eval_config
 from eval.datasets.humaneval_adapter import (
     load_humaneval,
@@ -39,10 +45,14 @@ from eval.run_quality import assess_run
 
 logger = logging.getLogger(__name__)
 
-_PROJECT_ROOT = Path(__file__).resolve().parents[1]
-_SRC_ROOT = _PROJECT_ROOT / "src"
-
-DatasetName = Literal["humaneval", "humaneval_hard", "multistep", "mbpp", "swebench"]
+DatasetName = Literal[
+    "humaneval",
+    "humaneval_hard",
+    "discriminative",
+    "multistep",
+    "mbpp",
+    "swebench",
+]
 ConfigName = Literal["A", "B", "C", "D"]
 
 
@@ -85,10 +95,15 @@ def _load_tasks(
             )
             for task in generated
         ]
-    if dataset_name == "humaneval_hard":
-        block = eval_config.humaneval_hard if eval_config is not None else {}
+    if dataset_name in ("humaneval_hard", "discriminative"):
+        block = (
+            getattr(eval_config, dataset_name, {})
+            if eval_config is not None
+            else {}
+        )
         if block.get("curated_only", True):
-            tasks = load_humaneval_curated_hard(n=n, seed=seed)
+            ids_file = block.get("ids_file")
+            tasks = load_humaneval_curated_hard(n=n, seed=seed, ids_file=ids_file)
         else:
             difficulty = str(block.get("difficulty", "hard"))
             tasks = load_humaneval(n=n, seed=seed, difficulty=difficulty)
@@ -126,7 +141,7 @@ def _load_tasks_by_ids(
     task_ids: list[str],
 ) -> list[tuple[str, str, list[str], str, str | None]]:
     """Load exactly the named tasks (no sampling)."""
-    if dataset_name in ("humaneval", "humaneval_hard"):
+    if dataset_name in ("humaneval", "humaneval_hard", "discriminative"):
         return [
             (task.task_id, *task_to_session(task), task_solution_stub(task))
             for task in load_humaneval_by_ids(task_ids)
@@ -431,14 +446,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "dataset",
         nargs="?",
-        choices=["humaneval", "humaneval_hard", "mbpp", "swebench"],
+        choices=["humaneval", "humaneval_hard", "discriminative", "mbpp", "swebench"],
         help="Dataset name (positional or use --dataset)",
     )
     parser.add_argument("--config", dest="config_flag", choices=["A", "B", "C", "D"])
     parser.add_argument(
         "--dataset",
         dest="dataset_flag",
-        choices=["humaneval", "humaneval_hard", "mbpp", "swebench"],
+        choices=["humaneval", "humaneval_hard", "discriminative", "mbpp", "swebench"],
     )
     parser.add_argument("--n", type=int, default=None)
     parser.add_argument("--seed", type=int, default=42)

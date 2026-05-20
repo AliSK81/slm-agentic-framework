@@ -29,6 +29,7 @@ class EvalConfig(BaseModel):
 
     humaneval: dict[str, Any] = Field(default_factory=dict)
     humaneval_hard: dict[str, Any] = Field(default_factory=dict)
+    discriminative: dict[str, Any] = Field(default_factory=dict)
     multistep: dict[str, Any] = Field(default_factory=dict)
     mbpp: dict[str, Any] = Field(default_factory=dict)
     swebench: dict[str, Any] = Field(default_factory=dict)
@@ -53,6 +54,7 @@ def load_eval_config(path: Path | None = None) -> EvalConfig:
     return EvalConfig(
         humaneval=raw.get("humaneval") or {},
         humaneval_hard=raw.get("humaneval_hard") or {},
+        discriminative=raw.get("discriminative") or {},
         multistep=raw.get("multistep") or {},
         mbpp=raw.get("mbpp") or {},
         swebench=raw.get("swebench") or {},

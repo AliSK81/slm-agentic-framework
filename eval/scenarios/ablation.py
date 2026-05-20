@@ -273,13 +273,27 @@ def main(argv: list[str] | None = None) -> int:
         "dataset",
         nargs="?",
         default=None,
-        choices=["humaneval", "humaneval_hard", "multistep", "mbpp", "swebench"],
+        choices=[
+            "humaneval",
+            "humaneval_hard",
+            "discriminative",
+            "multistep",
+            "mbpp",
+            "swebench",
+        ],
         help="Dataset (positional; optional if --dataset is set)",
     )
     parser.add_argument(
         "--dataset",
         dest="dataset_flag",
-        choices=["humaneval", "humaneval_hard", "multistep", "mbpp", "swebench"],
+        choices=[
+            "humaneval",
+            "humaneval_hard",
+            "discriminative",
+            "multistep",
+            "mbpp",
+            "swebench",
+        ],
     )
     parser.add_argument("--n", type=int, default=None)
     parser.add_argument("--seed", type=int, default=42)

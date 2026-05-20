@@ -2,27 +2,19 @@
 
 from __future__ import annotations
 
-import hashlib
 import uuid
 from pathlib import Path
 
 from pydantic import BaseModel
 
+from aviona.project import load_project_rules
+from aviona.store import SessionStore, aviona_project_dir, project_hash
 from framework.control.ablation import AblationSettings
 from framework.memory.stores import MemoryStores
 from framework.orchestration.session import SessionOutcome, run_full_session
 from framework.orchestration.verify import NoOpVerifier, Verifier
 
-
-def project_hash(cwd: Path) -> str:
-    """Stable short hash for a project directory (session store key)."""
-    digest = hashlib.sha256(str(cwd.resolve()).encode("utf-8")).hexdigest()
-    return digest[:16]
-
-
-def aviona_project_dir(cwd: Path) -> Path:
-    """Return ``~/.aviona/projects/<hash>/`` for the given cwd."""
-    return Path.home() / ".aviona" / "projects" / project_hash(cwd)
+__all__ = ["AvionaSession", "TurnResult", "aviona_project_dir", "project_hash"]
 
 
 class TurnResult(BaseModel):
@@ -50,6 +42,8 @@ class AvionaSession:
         self.memory = MemoryStores.sqlite(db_path)
         self._session_id = f"aviona-{uuid.uuid4().hex[:8]}"
         self._verifier: Verifier = NoOpVerifier()
+        self._project_rules = load_project_rules(self.workspace)
+        self._store = SessionStore(self.workspace, self._session_id)
 
     def run_turn(
         self,
@@ -71,7 +65,13 @@ class AvionaSession:
             ``TurnResult`` with a one-line-friendly status string.
         """
         goal = text.strip()
-        hard_constraints = list(constraints or [])
+        before_ids = {
+            entry.decision_id
+            for entry in self.memory.decisions.list_for_session(self._session_id)
+        }
+        hard_constraints = list(self._project_rules)
+        if constraints:
+            hard_constraints.extend(constraints)
         effective = verifier or self._verifier
         session_outcome: SessionOutcome = run_full_session(
             goal,
@@ -88,6 +88,19 @@ class AvionaSession:
             max_steps=max_steps,
         )
         status = _status_line(session_outcome)
+        after_entries = self.memory.decisions.list_for_session(self._session_id)
+        new_refs = [
+            entry.decision_id
+            for entry in after_entries
+            if entry.decision_id not in before_ids
+        ]
+        self._store.append_turn(
+            user_text=goal,
+            status=status,
+            outcome=session_outcome.outcome,
+            tokens_total=session_outcome.tokens_total,
+            decision_refs=new_refs,
+        )
         return TurnResult(
             status=status,
             outcome=session_outcome.outcome,

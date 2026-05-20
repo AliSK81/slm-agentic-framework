@@ -198,9 +198,11 @@ class DecisionLog:
         self,
         backend: MemoryBackend,
         on_index: Callable[[RetrievalItem], None],
+        on_append: Callable[[DecisionEntry], None] | None = None,
     ) -> None:
         self._backend = backend
         self._on_index = on_index
+        self._on_append = on_append
 
     def append(self, entry: DecisionEntry) -> DecisionEntry:
         self._backend.append(STORE_DECISIONS, _dump(entry))
@@ -214,6 +216,8 @@ class DecisionLog:
                 last_accessed=now,
             )
         )
+        if self._on_append is not None:
+            self._on_append(entry)
         return entry
 
     def get_last_n(self, session_id: str, n: int) -> list[DecisionEntry]:
@@ -373,19 +377,29 @@ class WorkingMemory(BaseModel):
 class MemoryStores:
     """Facade over four L2 stores and the retrieval index."""
 
-    def __init__(self, backend: MemoryBackend) -> None:
+    def __init__(
+        self,
+        backend: MemoryBackend,
+        *,
+        on_decision: Callable[[DecisionEntry], None] | None = None,
+    ) -> None:
         self.backend = backend
         self.retrieval = RetrievalIndex(backend)
         self._index_cb: Callable[[RetrievalItem], None] = self.retrieval.append
         self.state = StateStore(backend, self._index_cb)
-        self.decisions = DecisionLog(backend, self._index_cb)
+        self.decisions = DecisionLog(backend, self._index_cb, on_append=on_decision)
         self.subtasks = SubTaskRegistry(backend, self._index_cb)
         self.results = ResultStore(backend, self._index_cb)
 
     @classmethod
-    def sqlite(cls, db_path: str | Path) -> MemoryStores:
+    def sqlite(
+        cls,
+        db_path: str | Path,
+        *,
+        on_decision: Callable[[DecisionEntry], None] | None = None,
+    ) -> MemoryStores:
         """Construct stores with a SQLite backend."""
-        return cls(SQLiteBackend(db_path))
+        return cls(SQLiteBackend(db_path), on_decision=on_decision)
 
 
 def create_backend_from_env() -> MemoryBackend:

@@ -31,6 +31,7 @@ from eval.datasets.swebench_adapter import (
     task_to_session as swebench_task_to_session,
 )
 from eval.swe_docker import DockerNotAvailableError, require_docker, run_swe_instance_tests
+from eval.decision_log import DecisionLogWriter, decisions_path_for_run
 from eval.manifest import manifest_provider_and_profiles, resolve_git_sha, write_manifest
 from eval.metrics import RunResult, compute_cer, compute_sr
 from eval.paths import safe_task_slug
@@ -159,6 +160,7 @@ def _run_single_task(
     planner_enabled: bool = True,
     solution_stub: str | None = None,
     swe_task: SWEBenchTask | None = None,
+    decision_log_path: Path | None = None,
 ) -> RunResult:
     """Execute one task and return a typed result row."""
     slug = safe_task_slug(task_id)
@@ -179,6 +181,7 @@ def _run_single_task(
     _ensure_import_paths()
     from framework.env import load_project_env
     from framework.control.ablation import AblationSettings
+    from framework.memory.stores import DecisionEntry
     from framework.orchestration.session import run_full_session
 
     load_project_env()
@@ -188,6 +191,13 @@ def _run_single_task(
         if not stub_path.is_file():
             stub_path.write_text(solution_stub, encoding="utf-8")
     ablation = AblationSettings(**flags.model_dump())
+    on_decision = None
+    if decision_log_path is not None:
+        writer = DecisionLogWriter(decision_log_path)
+
+        def on_decision(entry: DecisionEntry) -> None:
+            writer.append(entry, task_id=task_id)
+
     session = run_full_session(
         goal,
         constraints,
@@ -198,6 +208,7 @@ def _run_single_task(
         checkpoint_dir=traces_root / "checkpoints",
         ablation=ablation,
         planner_enabled=planner_enabled,
+        on_decision_append=on_decision,
     )
     solved = session.test_passed and session.outcome == "solved"
     if swe_task is not None:
@@ -221,6 +232,7 @@ def _run_single_task(
         step_count=session.step_count,
         retry_count=session.retry_count,
         trace_path=str(trace_path),
+        session_id=session.session_id,
     )
     try:
         trace_path.parent.mkdir(parents=True, exist_ok=True)
@@ -291,6 +303,8 @@ def run_eval(
     timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     run_id = f"{config_name}_{dataset_name}_{timestamp}"
     jsonl_path = traces_root / f"{run_id}.jsonl"
+    decision_log_path = decisions_path_for_run(traces_root, run_id)
+    task_to_session_map: dict[str, str] = {}
 
     results: list[RunResult] = []
     for task_id, goal, constraints, test_code, solution_stub in tasks:
@@ -311,7 +325,10 @@ def run_eval(
                 planner_enabled=planner_enabled,
                 solution_stub=solution_stub,
                 swe_task=swe_lookup.get(task_id),
+                decision_log_path=decision_log_path if not dry_run else None,
             )
+            if row.session_id:
+                task_to_session_map[task_id] = row.session_id
         except DockerNotAvailableError:
             raise
         except Exception as exc:  # noqa: BLE001 — eval must continue across tasks
@@ -362,10 +379,14 @@ def run_eval(
         executor_profile=executor_profile,
         git_sha=resolve_git_sha(_PROJECT_ROOT),
         task_ids=[task_id for task_id, *_ in tasks],
+        task_to_session_map=task_to_session_map,
+        decisions_file=str(decision_log_path) if not dry_run else "",
         ablation_flags=flags.model_dump(),
         created_at=datetime.now(UTC),
     )
     summary["manifest_file"] = str(manifest_path)
+    summary["decisions_file"] = str(decision_log_path) if not dry_run else ""
+    summary["task_to_session_map"] = task_to_session_map
 
     if dry_run:
         summary["run_valid"] = True

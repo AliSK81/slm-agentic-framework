@@ -78,9 +78,11 @@ def _mean_interactions_from_trace(trace_file: str) -> float:
     return float(statistics.mean(counts)) if counts else 0.0
 
 
-def _contradiction_count_from_trace(_trace_file: str) -> int:
-    """Placeholder until Phase-23 decision JSONL is available."""
-    return 0
+def _contradiction_count_from_trace(trace_file: str) -> int:
+    """Count contradictions via decision JSONL when manifest is present."""
+    from scripts.analyze_traces import count_contradictions
+
+    return count_contradictions(trace_file)
 
 
 def _aggregate_arm(

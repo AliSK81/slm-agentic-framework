@@ -34,6 +34,8 @@ class RunManifest(BaseModel):
     executor_profile: str
     git_sha: str
     task_ids: list[str]
+    task_to_session_map: dict[str, str] = Field(default_factory=dict)
+    decisions_file: str = ""
     ablation_flags: dict[str, bool] = Field(default_factory=dict)
     created_at: datetime
 

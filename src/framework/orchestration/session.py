@@ -8,6 +8,7 @@ import time
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
+from collections.abc import Callable
 from typing import Any, Literal
 
 from pydantic import BaseModel
@@ -28,7 +29,7 @@ from framework.control.workflow import (
 )
 from framework.memory.checkpoint import save_checkpoint
 from framework.memory.reflection import _reflection_config, write_reflection
-from framework.memory.stores import MemoryStores, StateEntry, SubTask
+from framework.memory.stores import DecisionEntry, MemoryStores, StateEntry, SubTask
 from framework.memory.working_memory import WorkingMemoryBuilder
 from framework.control.ablation import AblationSettings
 from framework.orchestration.executor import ExecutorAgent
@@ -348,6 +349,7 @@ def run_full_session(
     checkpoint_dir: Path | None = None,
     ablation: AblationSettings | None = None,
     planner_enabled: bool = True,
+    on_decision_append: Callable[[DecisionEntry], None] | None = None,
 ) -> SessionOutcome:
     """Run PLAN → DISPATCH → EXECUTE loop until DONE, ESCALATE, or budget exhausted."""
     validate_slm_api_key()  # raises ProbeFailedError before task loop on probe failure
@@ -357,7 +359,9 @@ def run_full_session(
 
     if memory is None:
         db_path = workspace.parent / "data" / f"{session_id}.db"
-        memory = MemoryStores.sqlite(db_path)
+        memory = MemoryStores.sqlite(db_path, on_decision=on_decision_append)
+    elif on_decision_append is not None:
+        memory.decisions._on_append = on_decision_append  # noqa: SLF001 — eval streaming hook
 
     memory.subtasks.register(
         SubTask(

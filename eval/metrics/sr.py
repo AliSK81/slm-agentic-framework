@@ -15,6 +15,7 @@ class RunResult(BaseModel):
     step_count: int = 0
     retry_count: int = 0
     trace_path: str = ""
+    session_id: str = ""
 
 
 def compute_sr(results: list[RunResult]) -> float:

@@ -12,7 +12,7 @@
 current_phase: 23
 phase_status: NOT_STARTED
 last_updated: "2026-05-21T14:20Z"
-last_commit: "f201606"
+last_commit: "8655943"
 blocker: null
 ```
 
@@ -190,7 +190,7 @@ phases:
     name: "Agent-count experiment (RQ3)"
     status: DONE
     test_gate: "python -m eval.scenarios.agent_count multistep --dry-run"
-    commit: null
+    commit: "8655943"
     notes: "8/8 ablation_runner tests. agent_count multistep+seeds, CER/mean_ix per arm. contradiction_count stub until phase 23. Live API: [REQUIRES_USER_INPUT]."
 
   23:

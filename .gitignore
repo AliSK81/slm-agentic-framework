@@ -35,8 +35,11 @@ Thumbs.db
 # Generated reports
 thesis_evaluation_report.md
 
-# E2E / eval run logs (framework logging)
-logs/*.log
+# E2E / eval run logs (framework logging, staged runners, reruns)
+logs/*
+!logs/.gitkeep
+*.log
+*.log.session
 
 # Testing and coverage
 .pytest_cache/

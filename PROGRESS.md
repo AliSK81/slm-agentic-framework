@@ -9,9 +9,9 @@
 ## CURRENT STATE
 
 ```yaml
-current_phase: 23
-phase_status: IN_PROGRESS
-last_updated: "2026-05-21T15:00Z"
+current_phase: 24
+phase_status: NOT_STARTED
+last_updated: "2026-05-21T15:10Z"
 last_commit: "8655943"
 blocker: null
 ```
@@ -195,10 +195,10 @@ phases:
 
   23:
     name: "Decision-log JSONL + task_id linking"
-    status: NOT_STARTED
+    status: DONE
     test_gate: "pytest tests/unit/test_decision_jsonl.py tests/unit/test_analyze_traces.py"
-    commit: null
-    notes: "ROADMAP phase 23."
+    commit: "1c50d28"
+    notes: "12/12 unit tests. eval/decision_log.py, on_decision hook, manifest map, analyze_traces task_id join."
 
   24:
     name: "Qualitative metrics (RQ1/RQ2)"

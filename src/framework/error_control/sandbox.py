@@ -26,6 +26,7 @@ SAFE_COMMANDS: frozenset[str] = frozenset(
         "echo",
         "ast",
         "docker",
+        "git",
     }
 )
 

@@ -9,6 +9,7 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from aviona.compaction import HistoryBlock, compact, history_to_constraint
+from aviona.gitctx import git_anchor_segment, git_status
 from aviona.permissions import Mode, PermissionAction, PermissionGate
 from aviona.profiles import apply_daily_driver_profiles
 from aviona.project import load_project_rules
@@ -62,7 +63,11 @@ class AvionaSession:
             allowlist=settings.commands,
         )
         self._context_ceiling = get_compaction_ceiling()
+        self.git_status = git_status(self.workspace)
         anchor_text = f"workspace: {self.workspace}"
+        git_seg = git_anchor_segment(self.git_status)
+        if git_seg:
+            anchor_text = anchor_text + "\n" + git_seg
         if self._project_rules:
             anchor_text = anchor_text + "\n" + self._project_rules[0]
         self._history: list[HistoryBlock] = [

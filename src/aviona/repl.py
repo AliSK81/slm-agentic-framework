@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable, Iterator, Sequence
 
+from aviona.gitctx import format_git_summary
 from aviona.session import AvionaSession, TurnResult
 
 logger = logging.getLogger(__name__)
@@ -105,6 +106,9 @@ def run_repl(
 
     write(f"Aviona — workspace: {session.workspace}")
     write(f"mode: {session.permission_gate.mode}")
+    git_line = format_git_summary(session.git_status)
+    if git_line:
+        write(git_line)
     write("Type /help for commands.")
 
     while True:

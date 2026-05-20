@@ -92,6 +92,25 @@ def test_repl_survives_keyboard_interrupt_during_turn(project_dir: Path) -> None
     assert any("steps" in line for line in output)
 
 
+def test_repl_prints_git_summary_at_startup(
+    project_dir: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """REPL startup includes git branch summary when available."""
+    from aviona.gitctx import GitStatus
+
+    session = AvionaSession(project_dir)
+    session.git_status = GitStatus(branch="dev", changed_files=["x.py"])
+    output: list[str] = []
+    run_repl(
+        session,
+        reader=ScriptedReader(["/exit"]),
+        writer=output.append,
+        run_turn=MagicMock(),
+    )
+    assert any("git: dev" in line for line in output)
+
+
 def test_repl_mode_command_changes_session_mode(project_dir: Path) -> None:
     """/mode auto switches permission mode without running a turn."""
     session = AvionaSession(project_dir)

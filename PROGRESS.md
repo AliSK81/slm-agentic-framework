@@ -148,7 +148,7 @@ phases:
     name: "Multi-step interaction-length scenarios (RQ3)"
     status: DONE
     test_gate: "pytest tests/unit/test_interaction_length.py"
-    commit: null
+    commit: "7eb1d74"
     notes: "4/4 unit tests + CLI dry-run gate. synthetic_multistep L=2,4,6,8; interaction_length sweep with per-L JSONL+manifest."
 
   17:

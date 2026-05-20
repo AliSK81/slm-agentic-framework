@@ -9,10 +9,10 @@
 ## CURRENT STATE
 
 ```yaml
-current_phase: aviona-1
+current_phase: aviona-3
 phase_status: NOT_STARTED
-last_updated: "2026-05-21T14:00Z"
-last_commit: "504bef6"
+last_updated: "2026-05-20T13:00Z"
+last_commit: "TBD"
 blocker: null
 active_roadmap: ROADMAP_PRODUCTION_AVIONA.md
 thesis_track: paused_at_phase_39
@@ -336,8 +336,8 @@ phases:
 
 ```yaml
 aviona_phases:
-  1:  { status: NOT_STARTED, gate: "pip install -e . && aviona --version && pytest tests/unit/test_aviona_cli.py" }
-  2:  { status: NOT_STARTED, gate: "pytest tests/unit/test_verifier.py tests/unit/test_aviona_session.py" }
+  1:  { status: DONE, commit: "5a52fbf", gate: "pip install -e . && aviona --version && pytest tests/unit/test_aviona_cli.py", notes: "5/5 CLI tests; editable install + console script." }
+  2:  { status: DONE, commit: "TBD", gate: "pytest tests/unit/test_verifier.py tests/unit/test_aviona_session.py", notes: "5 verifier + 3 session tests; workflow regression 15/15." }
   3:  { status: NOT_STARTED, gate: "pytest tests/unit/test_aviona_repl.py" }
   4:  { status: NOT_STARTED, gate: "v1 DoD — REPL + AVIONA.md + session store" }
   5-12: { status: NOT_STARTED, see ROADMAP_PRODUCTION_AVIONA.md }

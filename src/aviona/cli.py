@@ -41,6 +41,10 @@ def build_parser() -> argparse.ArgumentParser:
         "doctor",
         help="Check environment and API connectivity (stub in AVIONA-1).",
     )
+    subparsers.add_parser(
+        "undo",
+        help="Restore files snapshotted before the last turn's edits.",
+    )
     return parser
 
 
@@ -65,6 +69,15 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.command == "doctor":
         print("aviona doctor: not implemented yet (AVIONA-1 stub).")
+        return 0
+
+    if args.command == "undo":
+        session = AvionaSession(Path.cwd())
+        restored = session.undo_last()
+        if not restored:
+            print("nothing to undo")
+            return 0
+        print("restored:", ", ".join(restored))
         return 0
 
     validate_slm_api_key()

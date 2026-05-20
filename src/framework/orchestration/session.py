@@ -34,7 +34,7 @@ from framework.memory.reflection import _reflection_config, write_reflection
 from framework.memory.stores import DecisionEntry, MemoryStores, StateEntry, SubTask
 from framework.memory.working_memory import WorkingMemoryBuilder
 from framework.control.ablation import AblationSettings
-from framework.orchestration.executor import ExecutorAgent
+from framework.orchestration.executor import EditFileFn, ExecutorAgent, WriteFileFn
 from framework.orchestration.planner import PlannerAgent
 from framework.orchestration.verify import Verifier, resolve_verifier
 from framework.slm.client import SLMClient
@@ -211,6 +211,8 @@ def _build_agents(
     ablation: AblationSettings,
     *,
     permission_check: Callable[[str, str], bool] | None = None,
+    write_file_fn: WriteFileFn | None = None,
+    edit_file_fn: EditFileFn | None = None,
 ) -> tuple[PlannerAgent, ExecutorAgent, SLMUsageAccumulator, str]:
     usage = SLMUsageAccumulator()
     planner_inner = client_for_role("planner")
@@ -246,6 +248,8 @@ def _build_agents(
         memory,
         workspace,
         permission_check=permission_check,
+        write_file_fn=write_file_fn,
+        edit_file_fn=edit_file_fn,
     )
     return planner, executor, usage, primary_model_id
 
@@ -377,6 +381,8 @@ def run_full_session(
     verifier: Verifier | None = None,
     probe: bool = True,
     permission_check: Callable[[str, str], bool] | None = None,
+    write_file_fn: WriteFileFn | None = None,
+    edit_file_fn: EditFileFn | None = None,
 ) -> SessionOutcome:
     """Run PLAN → DISPATCH → EXECUTE until DONE, ESCALATE, or budget exhausted.
 
@@ -412,7 +418,12 @@ def run_full_session(
 
     settings = ablation or AblationSettings()
     planner, executor, usage, primary_model_id = _build_agents(
-        memory, workspace, settings, permission_check=permission_check
+        memory,
+        workspace,
+        settings,
+        permission_check=permission_check,
+        write_file_fn=write_file_fn,
+        edit_file_fn=edit_file_fn,
     )
 
     memory.state.write(

@@ -14,7 +14,9 @@ from aviona.profiles import apply_daily_driver_profiles
 from aviona.project import load_project_rules
 from aviona.render import render_status
 from aviona.settings import load_settings
+from aviona.snapshots import SnapshotStore
 from aviona.store import SessionStore, aviona_project_dir, project_hash
+from aviona.tools import bind_snapshot_tools
 from framework.control.ablation import AblationSettings
 from framework.error_control.truncation import get_compaction_ceiling, set_caps_profile
 from framework.memory.stores import DecisionEntry, MemoryStores
@@ -34,6 +36,7 @@ class TurnResult(BaseModel):
     tokens_total: int = 0
     error: str | None = None
     session_id: str = ""
+    checkpoint_path: str | None = None
 
 
 class AvionaSession:
@@ -65,6 +68,16 @@ class AvionaSession:
         self._history: list[HistoryBlock] = [
             HistoryBlock(kind="anchor", text=anchor_text),
         ]
+        self.snapshots = SnapshotStore(self.workspace, store_root=self.session_root)
+        self._write_file_fn, self._edit_file_fn = bind_snapshot_tools(
+            self.snapshots,
+            self.workspace,
+        )
+        self._last_checkpoint_path: str | None = None
+
+    def undo_last(self) -> list[str]:
+        """Restore files snapshotted before the last turn's mutations."""
+        return self.snapshots.undo_last()
 
     def set_mode(self, mode: Mode) -> None:
         """Switch permission mode for subsequent turns."""
@@ -115,21 +128,28 @@ class AvionaSession:
         if constraints:
             hard_constraints.extend(constraints)
         effective = verifier or self._verifier
-        session_outcome: SessionOutcome = run_full_session(
-            goal,
-            hard_constraints,
-            workspace=self.workspace,
-            memory=self.memory,
-            session_id=self._session_id,
-            checkpoint_dir=self.checkpoint_dir,
-            ablation=AblationSettings(memory=True, control=True, error_control=True),
-            engine="graph",
-            probe=False,
-            verifier=effective,
-            planner_enabled=True,
-            max_steps=max_steps,
-            permission_check=self._permission_check,
-        )
+        self.snapshots.begin_turn()
+        try:
+            session_outcome: SessionOutcome = run_full_session(
+                goal,
+                hard_constraints,
+                workspace=self.workspace,
+                memory=self.memory,
+                session_id=self._session_id,
+                checkpoint_dir=self.checkpoint_dir,
+                ablation=AblationSettings(memory=True, control=True, error_control=True),
+                engine="graph",
+                probe=False,
+                verifier=effective,
+                planner_enabled=True,
+                max_steps=max_steps,
+                permission_check=self._permission_check,
+                write_file_fn=self._write_file_fn,
+                edit_file_fn=self._edit_file_fn,
+            )
+        finally:
+            self.snapshots.end_turn()
+        self._last_checkpoint_path = session_outcome.checkpoint_path
         after_entries = self.memory.decisions.list_for_session(self._session_id)
         edited_path = _last_edited_path(after_entries)
         status = render_status(session_outcome, edited_path=edited_path)
@@ -166,6 +186,7 @@ class AvionaSession:
             tokens_total=session_outcome.tokens_total,
             error=session_outcome.error,
             session_id=session_outcome.session_id,
+            checkpoint_path=session_outcome.checkpoint_path,
         )
 
 

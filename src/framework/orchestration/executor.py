@@ -20,6 +20,9 @@ from framework.orchestration.messages import (
 from framework.tools.code_sanitize import sanitize_python_source
 from framework.tools.compile_check import CompileResult, py_compile_check
 from framework.tools.file_tools import FileResult, edit_file, write_file
+
+WriteFileFn = Callable[[str, str, Path], FileResult]
+EditFileFn = Callable[[str, str, str, Path], FileResult]
 from framework.tools.test_runner import run_tests
 
 logger = logging.getLogger(__name__)
@@ -73,6 +76,8 @@ class ExecutorAgent:
         workspace: Path,
         *,
         permission_check: Callable[[str, str], bool] | None = None,
+        write_file_fn: WriteFileFn | None = None,
+        edit_file_fn: EditFileFn | None = None,
     ) -> None:
         self._cycle = cycle
         self._memory = memory
@@ -82,6 +87,8 @@ class ExecutorAgent:
         self.last_tool_result: Any = None
         self.last_edit_result: FileResult | None = None
         self._permission_check = permission_check
+        self._write_file = write_file_fn or write_file
+        self._edit_file = edit_file_fn or edit_file
 
     def _require_permission(self, kind: str, detail: str) -> FileResult | None:
         """Return a denial ``FileResult`` when Aviona permission gate blocks the action."""
@@ -109,20 +116,20 @@ class ExecutorAgent:
             return blocked
 
         if not target.is_file():
-            result = write_file(file_path, body, self._workspace)
+            result = self._write_file(file_path, body, self._workspace)
         elif old_string:
             new_body = sanitize_python_source(str(new_raw))
-            result = edit_file(file_path, old_string, new_body, self._workspace)
+            result = self._edit_file(file_path, old_string, new_body, self._workspace)
         elif body:
             original = target.read_text(encoding="utf-8")
             if not original.strip():
                 target.unlink(missing_ok=True)
-                result = write_file(file_path, body, self._workspace)
+                result = self._write_file(file_path, body, self._workspace)
             else:
                 new_body = sanitize_python_source(str(new_raw))
-                result = edit_file(file_path, original, new_body, self._workspace)
+                result = self._edit_file(file_path, original, new_body, self._workspace)
         else:
-            result = edit_file(file_path, old_string, "", self._workspace)
+            result = self._edit_file(file_path, old_string, "", self._workspace)
 
         if not result.ok:
             return result
@@ -172,7 +179,7 @@ class ExecutorAgent:
                     content = sanitize_python_source(
                         str(decision.payload.get("content", ""))
                     )
-                    self.last_edit_result = write_file(
+                    self.last_edit_result = self._write_file(
                         file_path, content, self._workspace
                     )
                     if self.last_edit_result.ok:

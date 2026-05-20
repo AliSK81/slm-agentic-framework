@@ -9,9 +9,9 @@
 ## CURRENT STATE
 
 ```yaml
-current_phase: 21
-phase_status: IN_PROGRESS
-last_updated: "2026-05-21T14:00Z"
+current_phase: 22
+phase_status: NOT_STARTED
+last_updated: "2026-05-21T14:10Z"
 last_commit: "70c09da"
 blocker: null
 ```
@@ -181,10 +181,10 @@ phases:
 
   21:
     name: "SWE-bench lite Docker runner"
-    status: NOT_STARTED
+    status: DONE
     test_gate: "pytest tests/unit/test_swebench_docker.py"
-    commit: null
-    notes: "ROADMAP phase 21. [REQUIRES_USER_INPUT] Docker + API."
+    commit: "f201606"
+    notes: "5/5 unit tests. swe_docker.py + extended adapter (FAIL_TO_PASS, materialize). docker in sandbox allow-list. run_eval Docker grading. Live instance: [REQUIRES_USER_INPUT] Docker+API."
 
   22:
     name: "Agent-count experiment (RQ3)"

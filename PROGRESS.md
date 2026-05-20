@@ -9,10 +9,10 @@
 ## CURRENT STATE
 
 ```yaml
-current_phase: aviona-6
+current_phase: aviona-7
 phase_status: NOT_STARTED
-last_updated: "2026-05-20T16:00Z"
-last_commit: "214818d"
+last_updated: "2026-05-20T17:00Z"
+last_commit: "TBD"
 blocker: null
 active_roadmap: ROADMAP_PRODUCTION_AVIONA.md
 thesis_track: paused_at_phase_39
@@ -340,7 +340,9 @@ aviona_phases:
   2:  { status: DONE, commit: "d60dd5b", gate: "pytest tests/unit/test_verifier.py tests/unit/test_aviona_session.py", notes: "5 verifier + 3 session tests; workflow regression 15/15." }
   3:  { status: DONE, commit: "21a07ad", gate: "pytest tests/unit/test_aviona_repl.py", notes: "3/3 REPL tests; cli wires probe+run_repl; per-turn KeyboardInterrupt." }
   4:  { status: DONE, commit: "7c6f835", gate: "pytest tests/unit/test_aviona_project.py tests/unit/test_aviona_store.py", notes: "4+5 tests; AVIONA.md→constraints; JSONL+meta; secret guard. v1 DoD met." }
-  5:  { status: DONE, commit: "TBD", gate: "pytest tests/unit/test_token_efficiency.py && pytest tests/integration/test_decision_cycle.py", notes: "6/6 efficiency; compact JSON on self-check retry; aviona-daily profile; render.py." }
+  5:  { status: DONE, commit: "214818d", gate: "pytest tests/unit/test_token_efficiency.py && pytest tests/integration/test_decision_cycle.py", notes: "6/6 efficiency; compact JSON on self-check retry; aviona-daily profile; render.py." }
+  6:  { status: DONE, commit: "TBD", gate: "pytest tests/unit/test_truncation_caps.py tests/unit/test_compaction.py", notes: "4+5 tests; configs/truncation.yaml; interactive caps; compact before turn." }
+  7-12: { status: NOT_STARTED, see ROADMAP_PRODUCTION_AVIONA.md }
   thesis_resume: { status: PAUSED, requires_user_input: true }
 ```
 

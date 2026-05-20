@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from framework.control.cycle import DecisionCycle
+from framework.control.models import user_message_from_payload
 from framework.control.workflow import STATE_EXECUTE, WorkflowState
 from framework.memory.stores import DecisionEntry, MemoryStores
 from framework.orchestration.messages import (
@@ -253,8 +254,9 @@ class ExecutorAgent:
                 self.last_edit_result = self._apply_code_edit(decision)
                 return self.last_edit_result
             if decision.kind == "terminate":
-                answer = str(
-                    (decision.payload or {}).get("answer") or decision.rationale or ""
+                answer = user_message_from_payload(
+                    decision.payload,
+                    fallback_rationale=decision.rationale,
                 ).strip()
                 self.last_tool_result = FileResult(
                     ok=bool(answer),

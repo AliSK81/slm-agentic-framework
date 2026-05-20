@@ -4,10 +4,48 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field, ValidationError
 
 from framework.memory.stores import DecisionEntry
 from framework.error_control.quality import QualityGate
+
+TurnType = Literal["answer", "inspect", "edit", "build"]
+
+
+class TerminatePayload(BaseModel):
+    """Typed payload for ``kind=terminate`` decisions (interactive product mode)."""
+
+    user_message: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "user_message",
+            "answer",
+            "summary",
+            "response",
+        ),
+    )
+    turn_type: TurnType | None = None
+
+
+def parse_terminate_payload(payload: dict[str, Any] | None) -> TerminatePayload:
+    """Validate and normalize a terminate payload dict."""
+    return TerminatePayload.model_validate(payload or {})
+
+
+def user_message_from_payload(
+    payload: dict[str, Any] | None,
+    *,
+    fallback_rationale: str = "",
+) -> str:
+    """Return ``user_message`` from a terminate payload; optional legacy rationale fallback."""
+    try:
+        parsed = parse_terminate_payload(payload)
+    except ValidationError:
+        return fallback_rationale.strip()
+    msg = parsed.user_message.strip()
+    if msg:
+        return msg
+    return fallback_rationale.strip()
 
 
 class SLMProposal(BaseModel):

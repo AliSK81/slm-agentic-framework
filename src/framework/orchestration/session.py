@@ -70,9 +70,20 @@ class SessionOutcome(BaseModel):
     latency_ms_total: int = 0
     llm_calls: int = 0
     model_id: str = ""
+    user_message: str = ""
 
 
-def require_slm_api_key() -> str:
+def _session_user_message_from_decisions(
+    memory: MemoryStores,
+    session_id: str,
+) -> str:
+    """Return typed user_message from the last terminate decision (benchmark may leave empty)."""
+    from framework.control.models import parse_terminate_payload
+
+    for entry in reversed(memory.decisions.list_for_session(session_id)):
+        if entry.kind == "terminate":
+            return parse_terminate_payload(entry.payload).user_message
+    return ""
     """Return API key for the active SLM provider or raise with a clear message."""
     if not api_key_required_for_active_provider():
         return ""
@@ -475,6 +486,7 @@ def run_full_session(
         )
 
     _apply_session_usage(outcome, usage, primary_model_id)
+    outcome.user_message = _session_user_message_from_decisions(memory, session_id)
     planner._cycle._slm.close()  # noqa: SLF001 — release HTTP clients
     executor._cycle._slm.close()
     return outcome

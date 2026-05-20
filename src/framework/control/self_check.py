@@ -7,6 +7,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from framework.control.models import parse_terminate_payload
 from framework.memory.stores import DecisionEntry, Issue, MemoryStores, SelfCheckRecord
 
 logger = logging.getLogger(__name__)
@@ -98,6 +99,19 @@ def _rationale_issues(proposal: DecisionEntry) -> list[Issue]:
     return []
 
 
+def _terminate_payload_issues(proposal: DecisionEntry) -> list[Issue]:
+    """Validate typed terminate payload when kind is terminate."""
+    if proposal.kind != "terminate":
+        return []
+    try:
+        parse_terminate_payload(proposal.payload)
+    except ValidationError as exc:
+        return [
+            Issue(kind="schema_violation", detail=str(exc.errors()[0]["msg"]))
+        ]
+    return []
+
+
 def self_check(
     proposal: DecisionEntry,
     memory: MemoryStores,
@@ -111,6 +125,7 @@ def self_check(
     issues.extend(_contradiction_issues(proposal, recent))
     issues.extend(_scope_issues(proposal))
     issues.extend(_rationale_issues(proposal))
+    issues.extend(_terminate_payload_issues(proposal))
 
     if issues:
         logger.debug("self_check failed with %d issues", len(issues))

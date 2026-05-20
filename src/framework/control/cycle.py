@@ -35,6 +35,12 @@ _EXECUTOR_PAYLOAD_HINT = (
     'replacement function in content/code/new_string.'
 )
 
+_TERMINATE_PAYLOAD_HINT = (
+    'For terminate include payload "user_message" (exact text shown to the user) '
+    'and "turn_type" (one of: answer, inspect, edit, build). '
+    "Benchmark/eval tasks may leave user_message empty."
+)
+
 
 def _json_format_block(agent_role: str, *, include_example: bool = True) -> str:
     """Append strict JSON instructions so SLMs emit parseable decisions.
@@ -43,7 +49,13 @@ def _json_format_block(agent_role: str, *, include_example: bool = True) -> str:
     corrective rounds after self-check failure).
     """
     kinds = _FORMAT_BY_ROLE.get(agent_role, "terminate")
-    hint = f"\n{_EXECUTOR_PAYLOAD_HINT}" if agent_role == "executor" else ""
+    hints: list[str] = []
+    if agent_role == "executor":
+        hints.append(_EXECUTOR_PAYLOAD_HINT)
+        hints.append(_TERMINATE_PAYLOAD_HINT)
+    elif agent_role == "planner":
+        hints.append(_TERMINATE_PAYLOAD_HINT)
+    hint = "\n" + "\n".join(hints) if hints else ""
     header = (
         "\n[FORMAT]: Respond with a single JSON object only. "
         "Do not use markdown fences or prose outside the JSON.\n"
@@ -53,12 +65,25 @@ def _json_format_block(agent_role: str, *, include_example: bool = True) -> str:
     )
     if not include_example:
         return header + hint
-    return (
-        header
-        + "\n"
-        'Example: {"kind":"plan_step","rationale":"because ...",'
-        f'"payload":{{"subtasks":[]}},"references":[]}}{hint}'
-    )
+    if agent_role == "executor":
+        example = (
+            'Example: {"kind":"terminate","rationale":"because ...",'
+            '"payload":{"user_message":"Here is the answer.","turn_type":"answer"},'
+            '"references":[]}'
+        )
+    elif agent_role == "planner":
+        example = (
+            'Example: {"kind":"plan_step","rationale":"because ...",'
+            '"payload":{"subtasks":[]},"references":[]}\n'
+            'Example terminate: {"kind":"terminate","rationale":"because ...",'
+            '"payload":{"user_message":"","turn_type":"build"},"references":[]}'
+        )
+    else:
+        example = (
+            'Example: {"kind":"plan_step","rationale":"because ...",'
+            '"payload":{"subtasks":[]},"references":[]}'
+        )
+    return header + "\n" + example + hint
 
 
 class DecisionCycle:

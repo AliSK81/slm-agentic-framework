@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel
 
@@ -78,32 +79,111 @@ def require_openrouter_key() -> str:
     return require_slm_api_key()
 
 
-def validate_slm_api_key() -> None:
-    """Raise if the API key is missing, placeholder, or rejected by the provider."""
+class ProbeResult(BaseModel):
+    """Outcome of the SLM connectivity probe."""
+
+    ok: bool
+    attempts: int
+    error: str | None = None
+
+
+class ProbeFailedError(RuntimeError):
+    """Raised when the SLM probe fails after all retry attempts."""
+
+    def __init__(self, result: ProbeResult) -> None:
+        self.result = result
+        provider = active_provider_name()
+        message = (
+            f"SLM API probe failed after {result.attempts} attempt(s) "
+            f"(provider={provider}): {result.error}"
+        )
+        super().__init__(message)
+
+
+_TRANSIENT_PROBE_ERRORS = frozenset(
+    {
+        "timeout",
+        "http_error",
+        "connection_error",
+        "ssl_error",
+    }
+)
+
+
+def _is_transient_probe_error(error: str | None) -> bool:
+    """Return True when the probe error is worth retrying."""
+    if not error:
+        return False
+    if error in _TRANSIENT_PROBE_ERRORS:
+        return True
+    if error.startswith("http_5"):
+        return True
+    lowered = error.lower()
+    return "connection" in lowered or "ssl" in lowered
+
+
+def _run_probe_call(client: Any) -> Any:
+    """Execute one planner-role probe ping."""
+    return client.call(
+        [{"role": "user", "content": "ping"}],
+        role="planner",
+        json_mode=False,
+    )
+
+
+def validate_slm_api_key(max_attempts: int = 3, *, base_delay_s: float = 2.0) -> ProbeResult:
+    """Probe the active SLM provider with retries on transient failures.
+
+    Inputs:
+        max_attempts: Maximum probe tries (default 3).
+        base_delay_s: Base delay for exponential backoff between retries.
+
+    Outputs:
+        ProbeResult with ``ok=True`` on success.
+
+    Side effects:
+        Sleeps between retries; raises ProbeFailedError when exhausted;
+        raises RuntimeError for missing or placeholder API keys (no retry).
+    """
     if api_key_required_for_active_provider():
         var = api_key_env_var_for_active_provider()
         key = require_slm_api_key()
         if len(key.strip()) < 20:
             raise RuntimeError(f"{var} looks like a placeholder. Set a real key in .env.")
 
-    client = probe_client()
-    try:
-        result = client.call(
-            [{"role": "user", "content": "ping"}],
-            role="planner",
-            json_mode=False,
-        )
-    finally:
-        client.close()
+    last_error: str | None = None
+    for attempt in range(1, max_attempts + 1):
+        client = probe_client()
+        try:
+            result = _run_probe_call(client)
+        finally:
+            client.close()
 
-    if result.error:
-        provider = active_provider_name()
-        raise RuntimeError(f"SLM API probe failed (provider={provider}): {result.error}")
+        if not result.error:
+            return ProbeResult(ok=True, attempts=attempt, error=None)
+
+        last_error = result.error
+        if not _is_transient_probe_error(last_error):
+            break
+
+        if attempt < max_attempts:
+            delay = base_delay_s * (2 ** (attempt - 1))
+            logger.warning(
+                "SLM probe transient error (%s); retry %s/%s in %.1fs",
+                last_error,
+                attempt,
+                max_attempts,
+                delay,
+            )
+            time.sleep(delay)
+
+    failed = ProbeResult(ok=False, attempts=attempt, error=last_error)
+    raise ProbeFailedError(failed)
 
 
-def validate_openrouter_key() -> None:
+def validate_openrouter_key() -> ProbeResult:
     """Backward-compatible alias for :func:`validate_slm_api_key`."""
-    validate_slm_api_key()
+    return validate_slm_api_key()
 
 
 def _build_agents(
@@ -204,7 +284,7 @@ def run_full_session(
     planner_enabled: bool = True,
 ) -> SessionOutcome:
     """Run PLAN → DISPATCH → EXECUTE loop until DONE, ESCALATE, or budget exhausted."""
-    validate_slm_api_key()
+    validate_slm_api_key()  # raises ProbeFailedError before task loop on probe failure
     session_id = session_id or f"sess-{uuid.uuid4().hex[:8]}"
     workspace = workspace.resolve()
     workspace.mkdir(parents=True, exist_ok=True)

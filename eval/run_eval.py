@@ -19,6 +19,7 @@ from eval.datasets.mbpp_adapter import load_mbpp, task_to_session as mbpp_task_t
 from eval.datasets.swebench_adapter import load_swebench
 from eval.metrics import RunResult, compute_cer, compute_sr
 from eval.paths import safe_task_slug
+from eval.run_quality import assess_run
 
 logger = logging.getLogger(__name__)
 
@@ -236,6 +237,25 @@ def run_eval(
     }
     summary["trace_file"] = str(jsonl_path)
     summary["dataset"] = dataset_name
+
+    if not dry_run:
+        quality = assess_run(str(jsonl_path))
+        quality_path = jsonl_path.with_name(f"{jsonl_path.stem}.quality.json")
+        quality_payload = {
+            **quality.model_dump(),
+            "run_valid": quality.valid,
+            "run_invalid_reason": quality.reason,
+        }
+        quality_path.write_text(
+            json.dumps(quality_payload, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        summary["run_valid"] = quality.valid
+        summary["run_invalid_reason"] = quality.reason
+        summary["quality_file"] = str(quality_path)
+        if not quality.valid:
+            print(f"RUN INVALID: {quality.reason}", file=sys.stderr)
+
     logger.info("Eval complete: %s", summary)
     return summary
 
@@ -262,6 +282,8 @@ def main(argv: list[str] | None = None) -> int:
         dry_run=args.dry_run,
     )
     print(json.dumps(summary, indent=2))
+    if summary.get("run_valid") is False:
+        return 1
     return 0
 
 

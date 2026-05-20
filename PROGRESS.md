@@ -9,10 +9,10 @@
 ## CURRENT STATE
 
 ```yaml
-current_phase: 13
+current_phase: 14
 phase_status: NOT_STARTED
-last_updated: "2026-05-20T18:00Z"
-last_commit: "1521636"
+last_updated: "2026-05-20T20:00Z"
+last_commit: "b9e5e7f"
 blocker: null
 ```
 
@@ -125,10 +125,10 @@ phases:
 
   13:
     name: "Run Integrity (probe retry + run quality gate)"
-    status: NOT_STARTED
+    status: DONE
     test_gate: "pytest tests/unit/test_run_quality.py tests/unit/test_api_probe_retry.py"
     commit: null
-    notes: "ROADMAP phase 13. Zero-interaction runs flagged INVALID."
+    notes: "6/6 unit tests pass. ProbeResult + ProbeFailedError + exponential probe retry; eval/run_quality assess_run; run_eval quality sidecar + exit 1 on INVALID."
 
   14:
     name: "Eval CLI --task-id + run manifest"
@@ -286,8 +286,7 @@ decisions:
   - "2026-05-20: Planner coerces SLM numeric task_id/depends_on to str (tests/unit/test_planner.py)."
   - "2026-05-20: Phase 12 e2e runs A+D only (not B/C); full ablation is Phase 11 eval/scenarios/ablation.py."
 issues:
-  - "Phases 13–29 merged into ROADMAP.md 2026-05-20; implementation not started."
-  - "validate_slm_api_key() at session start has no retry — addressed by Phase 13."
+  - "Phases 14–29 merged into ROADMAP.md 2026-05-20; Phase 13 implemented (uncommitted)."
   - "eval.run_eval has no --task-id — addressed by Phase 14."
   - "scripts/run_phase12_staged.ps1 broken on Windows; use scripts/run_phase12_staged.py."
 ```

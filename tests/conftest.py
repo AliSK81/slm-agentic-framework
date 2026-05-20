@@ -86,7 +86,7 @@ def require_api_key() -> str:
     try:
         validate_slm_api_key()
     except RuntimeError as exc:
-        pytest.skip(str(exc))
+        pytest.skip(str(exc))  # includes ProbeFailedError
 
     probe = probe_client().call(
         [{"role": "user", "content": "ping"}],

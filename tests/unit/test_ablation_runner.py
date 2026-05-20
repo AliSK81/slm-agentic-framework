@@ -163,3 +163,75 @@ def test_comparison_table_has_feature_and_validity_columns() -> None:
     assert "SR std" in out
     assert "CER std" in out
     assert "28" in out
+
+
+def test_agent_count_one_agent_disables_planner() -> None:
+    """Executor-only arm calls run_eval with planner_enabled=False."""
+    from eval.scenarios.agent_count import run_agent_count_experiment
+
+    with patch("eval.scenarios.agent_count.run_eval") as mock_run:
+        mock_run.return_value = {
+            "sr": 0.0,
+            "cer": 0.0,
+            "n": 3,
+            "n_valid_tasks": 0,
+            "trace_file": "traces/one.jsonl",
+            "manifest_file": "traces/one.manifest.json",
+            "run_valid": True,
+        }
+        run_agent_count_experiment("multistep", n=3, seed=42, dry_run=True)
+
+    planner_flags = [call.kwargs.get("planner_enabled") for call in mock_run.call_args_list]
+    assert planner_flags.count(True) == 1
+    assert planner_flags.count(False) == 1
+
+
+def test_agent_count_two_agent_enables_planner() -> None:
+    """Two-agent arm runs before one-agent and enables the planner."""
+    from eval.scenarios.agent_count import run_agent_count_experiment
+
+    with patch("eval.scenarios.agent_count.run_eval") as mock_run:
+        mock_run.return_value = {
+            "sr": 50.0,
+            "cer": 10.0,
+            "n": 2,
+            "n_valid_tasks": 2,
+            "trace_file": "traces/two.jsonl",
+            "manifest_file": "traces/two.manifest.json",
+            "run_valid": True,
+        }
+        result = run_agent_count_experiment("multistep", n=2, seed=7, dry_run=True)
+
+    assert mock_run.call_args_list[0].kwargs["planner_enabled"] is True
+    assert result.two_agent.planner_enabled is True
+    assert result.two_agent.sr == 50.0
+
+
+def test_agent_count_reports_cer_per_arm() -> None:
+    """Each arm exposes distinct CER values in the structured result."""
+    from eval.scenarios.agent_count import run_agent_count_experiment
+
+    def fake_run(
+        _config: str,
+        _dataset: str,
+        *,
+        planner_enabled: bool = True,
+        **_kwargs: object,
+    ) -> dict[str, object]:
+        cer = 5.0 if planner_enabled else 25.0
+        return {
+            "sr": 80.0 if planner_enabled else 60.0,
+            "cer": cer,
+            "n": 4,
+            "n_valid_tasks": 4,
+            "trace_file": f"traces/{planner_enabled}.jsonl",
+            "manifest_file": "traces/x.manifest.json",
+            "run_valid": True,
+        }
+
+    with patch("eval.scenarios.agent_count.run_eval", side_effect=fake_run):
+        result = run_agent_count_experiment("multistep", n=4, seeds=[42], dry_run=True)
+
+    assert result.two_agent.cer == 5.0
+    assert result.one_agent.cer == 25.0
+    assert result.two_agent.cer < result.one_agent.cer

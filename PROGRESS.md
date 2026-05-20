@@ -9,10 +9,10 @@
 ## CURRENT STATE
 
 ```yaml
-current_phase: 22
+current_phase: 23
 phase_status: NOT_STARTED
-last_updated: "2026-05-21T14:10Z"
-last_commit: "70c09da"
+last_updated: "2026-05-21T14:20Z"
+last_commit: "f201606"
 blocker: null
 ```
 
@@ -188,10 +188,10 @@ phases:
 
   22:
     name: "Agent-count experiment (RQ3)"
-    status: NOT_STARTED
-    test_gate: "python -m eval.scenarios.agent_count --dataset multistep --dry-run"
+    status: DONE
+    test_gate: "python -m eval.scenarios.agent_count multistep --dry-run"
     commit: null
-    notes: "ROADMAP phase 22. [REQUIRES_USER_INPUT]."
+    notes: "8/8 ablation_runner tests. agent_count multistep+seeds, CER/mean_ix per arm. contradiction_count stub until phase 23. Live API: [REQUIRES_USER_INPUT]."
 
   23:
     name: "Decision-log JSONL + task_id linking"

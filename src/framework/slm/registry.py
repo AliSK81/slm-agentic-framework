@@ -8,14 +8,57 @@ from typing import Any, Literal
 from framework.slm.config import (
     ModelProfile,
     active_provider_name,
-    list_bundle_names,
-    list_profile_names,
     load_profile,
     resolve_bundle,
     resolve_endpoint,
 )
 
 AgentRole = Literal["planner", "executor"]
+
+
+class ProfileResolutionError(ValueError):
+    """Raised when a role cannot be mapped to a yaml profile or bundle."""
+
+    def __init__(
+        self,
+        role: AgentRole,
+        candidate: str | None,
+        *,
+        profile_names: list[str],
+        bundle_names: list[str],
+    ) -> None:
+        self.role = role
+        self.candidate = candidate
+        self.profile_names = profile_names
+        self.bundle_names = bundle_names
+        if candidate:
+            message = (
+                f"No profile matches {role!r} override {candidate!r}. "
+                f"Known profiles: {', '.join(profile_names) or '(none)'}; "
+                f"known bundles: {', '.join(bundle_names) or '(none)'}."
+            )
+        else:
+            message = (
+                f"No profile configured for role {role!r}. "
+                "Set defaults in configs/models.yaml or {ROLE}_PROFILE in .env. "
+                f"Known profiles: {', '.join(profile_names) or '(none)'}; "
+                f"known bundles: {', '.join(bundle_names) or '(none)'}."
+            )
+        super().__init__(message)
+
+
+def _known_profile_names() -> list[str]:
+    """Profile keys from models.yaml without importing list helpers from config."""
+    from framework.slm.config import _load_raw
+
+    return sorted(_load_raw().get("profiles", {}).keys())
+
+
+def _known_bundle_names() -> list[str]:
+    """Bundle keys from models.yaml."""
+    from framework.slm.config import _load_raw
+
+    return sorted(_load_raw().get("bundles", {}).keys())
 
 
 def resolve_profile_name(role: AgentRole) -> str:
@@ -30,10 +73,11 @@ def resolve_profile_name(role: AgentRole) -> str:
         resolved = _resolve_env_candidate(role, candidate)
         if resolved:
             return resolved
-        raise ValueError(
-            f"No profile matches {role!r} override {candidate!r}. "
-            f"Known profiles: {', '.join(list_profile_names())}; "
-            f"known bundles: {', '.join(list_bundle_names())}"
+        raise ProfileResolutionError(
+            role,
+            candidate,
+            profile_names=_known_profile_names(),
+            bundle_names=_known_bundle_names(),
         )
 
     defaults: dict[str, str] = _load_raw().get("defaults", {})
@@ -42,9 +86,11 @@ def resolve_profile_name(role: AgentRole) -> str:
     if name and name in profiles:
         return name
 
-    raise ValueError(
-        f"No profile configured for role {role!r}. "
-        "Set defaults in configs/models.yaml or {ROLE}_PROFILE in .env."
+    raise ProfileResolutionError(
+        role,
+        None,
+        profile_names=_known_profile_names(),
+        bundle_names=_known_bundle_names(),
     )
 
 

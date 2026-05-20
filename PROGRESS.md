@@ -9,9 +9,9 @@
 ## CURRENT STATE
 
 ```yaml
-current_phase: 28
+current_phase: 29
 phase_status: NOT_STARTED
-last_updated: "2026-05-20T22:00Z"
+last_updated: "2026-05-20T23:00Z"
 last_commit: "52f9252"
 blocker: null
 ```
@@ -225,7 +225,7 @@ phases:
     name: "Curated results report + repro bundle"
     status: DONE
     test_gate: "pytest tests/unit/test_report_curated.py && python scripts/generate_report.py --curated --dry-run"
-    commit: null
+    commit: "52f9252"
     notes: "6/6 unit tests. cite_allowlist.yaml, eval/curated.py, --curated report + CI, make_repro_bundle.py."
 
   28:

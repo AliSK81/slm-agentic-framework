@@ -94,6 +94,15 @@ def test_parser_preserves_escaped_newline_in_rationale() -> None:
     assert parsed.rationale == "line one\nline two"
 
 
+def test_parser_repairs_literal_newline_in_string() -> None:
+    """Pattern 8: raw newlines inside JSON strings are escaped before parse."""
+    raw = '{"kind": "code_edit", "rationale": "line one\nline two"}'
+    parsed = parse_decision(raw, SampleDecision)
+    assert parsed is not None
+    assert parsed.kind == "code_edit"
+    assert parsed.rationale == "line one\nline two"
+
+
 # --- Quality gate ---
 
 

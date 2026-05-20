@@ -36,9 +36,42 @@ def _extract_candidates(raw_text: str) -> list[str]:
     return candidates
 
 
+def _escape_literal_newlines_in_json_strings(text: str) -> str:
+    """Escape raw line breaks inside double-quoted JSON string values (pattern 8)."""
+    result: list[str] = []
+    in_string = False
+    escape = False
+    for char in text:
+        if in_string:
+            if escape:
+                result.append(char)
+                escape = False
+                continue
+            if char == "\\":
+                result.append(char)
+                escape = True
+                continue
+            if char == '"':
+                result.append(char)
+                in_string = False
+                continue
+            if char == "\n":
+                result.append("\\n")
+                continue
+            if char == "\r":
+                continue
+            result.append(char)
+            continue
+        if char == '"':
+            in_string = True
+        result.append(char)
+    return "".join(result)
+
+
 def _repair_json(text: str) -> str:
     """Apply deterministic repairs for common malformed JSON patterns."""
     repaired = text.strip()
+    repaired = _escape_literal_newlines_in_json_strings(repaired)
     repaired = _TRAILING_COMMA_RE.sub(r"\1", repaired)
     repaired = _SINGLE_QUOTED_KEY_RE.sub(r'"\1":', repaired)
     open_braces = repaired.count("{") - repaired.count("}")

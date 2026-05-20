@@ -20,7 +20,10 @@ from framework.control.workflow import (
 from framework.memory.backend import SQLiteBackend
 from framework.memory.reflection import write_reflection
 from framework.memory.stores import DecisionEntry, MemoryStores, SelfCheckRecord, SubTask
-from framework.orchestration.graph import build_graph
+from framework.control.ablation import AblationSettings
+from framework.orchestration.executor import ExecutorAgent
+from framework.orchestration.graph import build_graph, sqlite_checkpointer
+from framework.orchestration.session import ProbeResult, run_full_session
 from framework.slm.client import ModelProfile, SLMResponse
 
 
@@ -222,3 +225,145 @@ def test_reflection_capped_at_max_per_config(memory: MemoryStores) -> None:
         if e.kind == "reflection"
     ]
     assert len(reflections) == 3
+
+
+def test_graph_uses_sqlite_saver(tmp_path: Path) -> None:
+    """Production graph path persists checkpoints via SqliteSaver."""
+    from langgraph.checkpoint.sqlite import SqliteSaver
+
+    db_path = tmp_path / "langgraph" / "sess-sqlite.sqlite"
+    with sqlite_checkpointer(db_path) as checkpointer:
+        assert isinstance(checkpointer, SqliteSaver)
+    assert db_path.is_file()
+
+
+def test_graph_engine_reaches_done_on_passing_task(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """LangGraph engine reaches solved when workspace already passes tests."""
+    workspace = tmp_path / "ws"
+    workspace.mkdir()
+    (workspace / "solution.py").write_text(
+        "def multiply(a, b):\n    return a * b\n",
+        encoding="utf-8",
+    )
+    memory = MemoryStores(SQLiteBackend(tmp_path / "graph_sess.db"))
+    memory.subtasks.register(
+        SubTask(
+            task_id="st-main",
+            parent_session_id="sess-graph",
+            description="fix multiply",
+            status="open",
+            owner="executor",
+        )
+    )
+
+    def _fake_execute(self: ExecutorAgent, state: WorkflowState) -> WorkflowState:
+        return {**state, "current_state": "EXECUTE"}
+
+    monkeypatch.setattr(
+        "framework.orchestration.session.validate_slm_api_key",
+        lambda *args, **kwargs: ProbeResult(ok=True, attempts=1),
+    )
+    monkeypatch.setattr(ExecutorAgent, "execute_node", _fake_execute)
+
+    result = run_full_session(
+        "Fix multiply",
+        [],
+        "assert multiply(3, 4) == 12",
+        workspace,
+        memory=memory,
+        session_id="sess-graph",
+        max_steps=8,
+        checkpoint_dir=tmp_path / "checkpoints",
+        ablation=AblationSettings(memory=False, control=False, error_control=False),
+        planner_enabled=False,
+        engine="graph",
+    )
+    assert result.outcome == "solved"
+    assert result.test_passed
+
+
+def test_graph_and_loop_produce_same_terminal_outcome(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Graph and imperative loop agree on terminal outcome for the same seeded task."""
+    workspace = tmp_path / "ws"
+    workspace.mkdir()
+    (workspace / "solution.py").write_text(
+        "def multiply(a, b):\n    return a * b\n",
+        encoding="utf-8",
+    )
+
+    def _fake_execute(self: ExecutorAgent, state: WorkflowState) -> WorkflowState:
+        return {**state, "current_state": "EXECUTE"}
+
+    monkeypatch.setattr(
+        "framework.orchestration.session.validate_slm_api_key",
+        lambda *args, **kwargs: ProbeResult(ok=True, attempts=1),
+    )
+    monkeypatch.setattr(ExecutorAgent, "execute_node", _fake_execute)
+
+    kwargs = dict(
+        goal="Fix multiply",
+        constraints=[],
+        test_code="assert multiply(3, 4) == 12",
+        workspace=workspace,
+        max_steps=8,
+        checkpoint_dir=tmp_path / "checkpoints",
+        ablation=AblationSettings(memory=False, control=False, error_control=False),
+        planner_enabled=False,
+    )
+
+    memory_loop = MemoryStores(SQLiteBackend(tmp_path / "loop.db"))
+    memory_loop.subtasks.register(
+        SubTask(
+            task_id="st-main",
+            parent_session_id="sess-loop",
+            description="fix multiply",
+            status="open",
+            owner="executor",
+        )
+    )
+    loop_result = run_full_session(
+        kwargs["goal"],
+        kwargs["constraints"],
+        kwargs["test_code"],
+        kwargs["workspace"],
+        memory=memory_loop,
+        session_id="sess-loop",
+        engine="loop",
+        max_steps=kwargs["max_steps"],
+        checkpoint_dir=kwargs["checkpoint_dir"],
+        ablation=kwargs["ablation"],
+        planner_enabled=kwargs["planner_enabled"],
+    )
+
+    memory_graph = MemoryStores(SQLiteBackend(tmp_path / "graph.db"))
+    memory_graph.subtasks.register(
+        SubTask(
+            task_id="st-main",
+            parent_session_id="sess-graph-parity",
+            description="fix multiply",
+            status="open",
+            owner="executor",
+        )
+    )
+    graph_result = run_full_session(
+        kwargs["goal"],
+        kwargs["constraints"],
+        kwargs["test_code"],
+        kwargs["workspace"],
+        memory=memory_graph,
+        session_id="sess-graph-parity",
+        engine="graph",
+        max_steps=kwargs["max_steps"],
+        checkpoint_dir=kwargs["checkpoint_dir"],
+        ablation=kwargs["ablation"],
+        planner_enabled=kwargs["planner_enabled"],
+    )
+
+    assert loop_result.outcome == graph_result.outcome == "solved"
+    assert loop_result.test_passed and graph_result.test_passed

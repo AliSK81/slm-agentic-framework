@@ -35,6 +35,7 @@ class WorkflowState(TypedDict, total=False):
     max_retries: int
     last_evaluation: dict | None
     reflection_guidance: str | None
+    planned: bool
 
 
 def _decision_hash(entry: DecisionEntry) -> str:

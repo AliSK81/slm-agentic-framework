@@ -11,6 +11,8 @@ from pathlib import Path
 from collections.abc import Callable
 from typing import Any, Literal
 
+EngineName = Literal["loop", "graph"]
+
 from pydantic import BaseModel
 
 from framework.env import load_project_env
@@ -350,8 +352,13 @@ def run_full_session(
     ablation: AblationSettings | None = None,
     planner_enabled: bool = True,
     on_decision_append: Callable[[DecisionEntry], None] | None = None,
+    engine: EngineName = "graph",
 ) -> SessionOutcome:
-    """Run PLAN → DISPATCH → EXECUTE loop until DONE, ESCALATE, or budget exhausted."""
+    """Run PLAN → DISPATCH → EXECUTE until DONE, ESCALATE, or budget exhausted.
+
+    ``engine='graph'`` (default) drives the LangGraph FSM with SqliteSaver; ``engine='loop'``
+    uses the legacy imperative loop for parity testing.
+    """
     validate_slm_api_key()  # raises ProbeFailedError before task loop on probe failure
     session_id = session_id or f"sess-{uuid.uuid4().hex[:8]}"
     workspace = workspace.resolve()
@@ -377,6 +384,170 @@ def run_full_session(
 
     settings = ablation or AblationSettings()
     planner, executor = _build_agents(memory, workspace, settings)
+
+    memory.state.write(
+        StateEntry(
+            session_id=session_id,
+            step_index=0,
+            artifact_hash="session:start",
+            tests_status={"passed": 0, "failed": 0, "errors": 0},
+            open_subtasks=[],
+            timestamp=datetime.now(UTC),
+        )
+    )
+
+    if engine == "graph":
+        return _run_full_session_graph(
+            goal=goal,
+            constraints=constraints,
+            test_code=test_code,
+            workspace=workspace,
+            memory=memory,
+            planner=planner,
+            executor=executor,
+            settings=settings,
+            session_id=session_id,
+            max_steps=max_steps,
+            max_retries=max_retries,
+            checkpoint_dir=checkpoint_dir,
+            planner_enabled=planner_enabled,
+        )
+
+    return _run_full_session_loop(
+        goal=goal,
+        constraints=constraints,
+        test_code=test_code,
+        workspace=workspace,
+        memory=memory,
+        planner=planner,
+        executor=executor,
+        settings=settings,
+        session_id=session_id,
+        max_steps=max_steps,
+        max_retries=max_retries,
+        checkpoint_dir=checkpoint_dir,
+        planner_enabled=planner_enabled,
+    )
+
+
+def _langgraph_sqlite_path(
+    session_id: str,
+    workspace: Path,
+    checkpoint_dir: Path | None,
+) -> Path:
+    """Path for LangGraph SqliteSaver checkpoints (separate from JSON checkpoints)."""
+    if checkpoint_dir is not None:
+        return checkpoint_dir / f"{session_id}_langgraph.sqlite"
+    return workspace.parent / "langgraph" / f"{session_id}.sqlite"
+
+
+def _run_full_session_graph(
+    *,
+    goal: str,
+    constraints: list[str],
+    test_code: str,
+    workspace: Path,
+    memory: MemoryStores,
+    planner: PlannerAgent,
+    executor: ExecutorAgent,
+    settings: AblationSettings,
+    session_id: str,
+    max_steps: int,
+    max_retries: int,
+    checkpoint_dir: Path | None,
+    planner_enabled: bool,
+) -> SessionOutcome:
+    """Production path: LangGraph FSM with durable SQLite checkpointing."""
+    from framework.orchestration.graph import SessionGraphDeps, run_session_graph
+
+    initial: WorkflowState = {
+        "session_id": session_id,
+        "goal": goal,
+        "hard_constraints": constraints,
+        "current_state": STATE_PLAN,
+        "active_subtask_id": None,
+        "step_count": 0,
+        "retry_count": 0,
+        "loop_count": 0,
+        "max_steps": max_steps,
+        "max_retries": max_retries,
+        "last_evaluation": None,
+        "reflection_guidance": None,
+        "planned": False,
+    }
+    deps = SessionGraphDeps(
+        planner=planner,
+        executor=executor,
+        memory=memory,
+        workspace=workspace,
+        test_code=test_code,
+        goal=goal,
+        settings=settings,
+        planner_enabled=planner_enabled,
+    )
+    sqlite_path = _langgraph_sqlite_path(session_id, workspace, checkpoint_dir)
+    outcome = SessionOutcome(session_id=session_id)
+
+    try:
+        state = run_session_graph(
+            deps,
+            initial,
+            sqlite_path=sqlite_path,
+            recursion_limit=max(max_steps * 6, 24),
+        )
+        evaluation = state.get("last_evaluation") or {}
+        outcome.test_passed = bool(evaluation.get("passed"))
+        outcome.step_count = int(state.get("step_count", 0))
+        outcome.retry_count = int(state.get("retry_count", 0))
+        final = state.get("current_state", STATE_PLAN)
+        outcome.final_state = final
+        if outcome.test_passed or final == STATE_DONE:
+            outcome.outcome = "solved"
+            outcome.final_state = STATE_DONE
+        elif final == STATE_ESCALATE:
+            outcome.outcome = "escalate"
+        elif int(state.get("step_count", 0)) >= max_steps:
+            outcome.outcome = "max_steps_reached"
+        else:
+            outcome.outcome = "unresolvable"
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("LangGraph session failed: %s", exc)
+        outcome.outcome = "unresolvable"
+        outcome.error = str(exc)
+        state = initial
+
+    outcome.decision_count = len(memory.decisions.list_for_session(session_id))
+    outcome.state_snapshot_count = len(memory.state.list_for_session(session_id))
+    try:
+        ckpt = save_checkpoint(
+            session_id,
+            int(state.get("step_count", 0)),
+            memory,
+            checkpoint_dir=checkpoint_dir,
+        )
+        outcome.checkpoint_path = str(ckpt)
+    except OSError as exc:
+        logger.warning("Checkpoint save failed: %s", exc)
+    return outcome
+
+
+def _run_full_session_loop(
+    *,
+    goal: str,
+    constraints: list[str],
+    test_code: str,
+    workspace: Path,
+    memory: MemoryStores,
+    planner: PlannerAgent,
+    executor: ExecutorAgent,
+    settings: AblationSettings,
+    session_id: str,
+    max_steps: int,
+    max_retries: int,
+    checkpoint_dir: Path | None,
+    planner_enabled: bool,
+) -> SessionOutcome:
+    """Legacy imperative loop (parity / fallback)."""
     state: WorkflowState = {
         "session_id": session_id,
         "goal": goal,
@@ -390,29 +561,18 @@ def run_full_session(
         "max_retries": max_retries,
         "last_evaluation": None,
         "reflection_guidance": None,
+        "planned": False,
     }
 
     outcome: SessionOutcome = SessionOutcome(session_id=session_id)
-    planned = False
-
-    memory.state.write(
-        StateEntry(
-            session_id=session_id,
-            step_index=0,
-            artifact_hash="session:start",
-            tests_status={"passed": 0, "failed": 0, "errors": 0},
-            open_subtasks=[],
-            timestamp=datetime.now(UTC),
-        )
-    )
 
     try:
         while int(state.get("step_count", 0)) < max_steps:
-            if not planned:
+            if not state.get("planned"):
                 if planner_enabled:
                     planner.plan_node(state)
                 _ensure_work_subtasks(memory, session_id, goal)
-                planned = True
+                state["planned"] = True
                 state["step_count"] = int(state.get("step_count", 0)) + 1
                 state["current_state"] = STATE_PLAN
                 continue

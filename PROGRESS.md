@@ -12,7 +12,7 @@
 current_phase: 18
 phase_status: NOT_STARTED
 last_updated: "2026-05-21T00:00Z"
-last_commit: "1d2d1fb"
+last_commit: "a183368"
 blocker: null
 ```
 
@@ -153,10 +153,10 @@ phases:
 
   17:
     name: "Reflection on REVISE"
-    status: NOT_STARTED
+    status: DONE
     test_gate: "pytest tests/integration/test_reflection_revise.py"
     commit: null
-    notes: "ROADMAP phase 17. error_control-gated."
+    notes: "5/5 integration tests. _run_revise_reflection on REVISE; error_control-gated; reflection_guidance → executor last_error."
 
   18:
     name: "True-SLM bundle (Qwen-7B + Devstral)"

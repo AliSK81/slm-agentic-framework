@@ -63,6 +63,8 @@ profiles:
 
   deepseek-v4-flash:
     model_id: deepseek-v4-flash
+    price_per_1k_in: 0.14
+    price_per_1k_out: 0.28
     provider: deepseek
     context_limit: 128000
     effective_context: 64000
@@ -103,6 +105,8 @@ profiles:
 
   qwen2.5-coder-7b-instruct:
     model_id: qwen/qwen2.5-coder-7b-instruct
+    price_per_1k_in: 0.03
+    price_per_1k_out: 0.09
     provider: openrouter
     context_limit: 32768
     effective_context: 12000

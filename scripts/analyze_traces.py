@@ -20,6 +20,7 @@ if str(_SRC) not in sys.path:
 from eval.decision_log import StreamedDecisionLine, load_streamed_decisions
 from eval.manifest import RunManifest
 from eval.metrics import RunResult, compute_cer, compute_sr
+from eval.metrics.cost import estimate_cost, load_price_table
 from eval.metrics.qualitative import compare_qualitative, compute_qualitative
 from datetime import UTC, datetime
 
@@ -289,11 +290,16 @@ def summarize_trace(trace_path: str, *, checkpoint_dir: str | None = None) -> di
     """Summary metrics for report generation."""
     rows = load_jsonl_rows(trace_path)
     manifest = load_run_manifest(trace_path)
+    cost_summary = estimate_cost(trace_path, load_price_table())
     return {
         "trace_path": str(_resolve_path(trace_path)),
         "n": len(rows),
         "sr": compute_sr(rows),
         "cer": compute_cer(rows),
+        "tokens_total": cost_summary["tokens_total"],
+        "latency_ms_total": cost_summary["latency_ms_total"],
+        "llm_calls": cost_summary["llm_calls"],
+        "estimated_usd": cost_summary["estimated_usd"],
         "self_check_failures": count_self_check_failures(
             trace_path, checkpoint_dir=checkpoint_dir
         ),

@@ -9,10 +9,10 @@
 ## CURRENT STATE
 
 ```yaml
-current_phase: 26
+current_phase: 27
 phase_status: NOT_STARTED
-last_updated: "2026-05-20T18:00Z"
-last_commit: "3fbaf7f"
+last_updated: "2026-05-20T20:00Z"
+last_commit: null
 blocker: null
 ```
 
@@ -216,10 +216,10 @@ phases:
 
   26:
     name: "Cost/latency/token accounting"
-    status: NOT_STARTED
+    status: DONE
     test_gate: "pytest tests/unit/test_cost_accounting.py"
     commit: null
-    notes: "ROADMAP phase 26."
+    notes: "5/5 unit tests. TrackingSLMClient, RunResult usage fields, eval/metrics/cost.py, report cost columns."
 
   27:
     name: "Curated results report + repro bundle"

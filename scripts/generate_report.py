@@ -62,20 +62,24 @@ def generate_report(
         "",
         "## Aggregate runs (JSONL)",
         "",
-        "| Config | Dataset | n | SR (%) | CER (%) | Contradictions |",
-        "|--------|---------|---|--------|---------|----------------|",
+        "| Config | Dataset | n | SR (%) | CER (%) | Tokens | Latency (ms) | LLM calls | Est. USD | Contradictions |",
+        "|--------|---------|---|--------|---------|--------|--------------|-----------|----------|----------------|",
     ]
 
     for item in summaries:
         if "error" in item:
-            lines.append(f"| — | — | — | — | — | {item['error'][:40]} |")
+            lines.append(
+                f"| — | — | — | — | — | — | — | — | — | {item['error'][:40]} |"
+            )
             continue
         path = Path(item["trace_path"])
         config, dataset = _parse_config_dataset(path.stem)
         contradictions = item.get("contradictions", 0)
         lines.append(
             f"| {config} | {dataset} | {item['n']} | {item['sr']:.1f} | "
-            f"{item['cer']:.1f} | {contradictions} |"
+            f"{item['cer']:.1f} | {item.get('tokens_total', 0)} | "
+            f"{item.get('latency_ms_total', 0)} | {item.get('llm_calls', 0)} | "
+            f"{item.get('estimated_usd', 0.0):.4f} | {contradictions} |"
         )
 
     lines.extend(["", "## Self-check failure counts", ""])

@@ -37,6 +37,7 @@ from framework.control.ablation import AblationSettings
 from framework.orchestration.executor import ExecutorAgent
 from framework.orchestration.planner import PlannerAgent
 from framework.slm.client import SLMClient
+from framework.slm.usage import SLMUsageAccumulator, TrackingSLMClient
 from framework.slm.config import (
     active_provider_name,
     api_key_env_var_for_active_provider,
@@ -64,6 +65,10 @@ class SessionOutcome(BaseModel):
     checkpoint_path: str | None = None
     test_passed: bool = False
     error: str | None = None
+    tokens_total: int = 0
+    latency_ms_total: int = 0
+    llm_calls: int = 0
+    model_id: str = ""
 
 
 def require_slm_api_key() -> str:
@@ -191,13 +196,25 @@ def validate_openrouter_key() -> ProbeResult:
     return validate_slm_api_key()
 
 
+def _apply_session_usage(outcome: SessionOutcome, usage: SLMUsageAccumulator, model_id: str) -> None:
+    """Copy accumulated SLM usage into a session outcome."""
+    outcome.tokens_total = usage.tokens_total
+    outcome.latency_ms_total = usage.latency_ms_total
+    outcome.llm_calls = usage.llm_calls
+    outcome.model_id = model_id
+
+
 def _build_agents(
     memory: MemoryStores,
     workspace: Path,
     ablation: AblationSettings,
-) -> tuple[PlannerAgent, ExecutorAgent]:
-    planner_slm = client_for_role("planner")
-    executor_slm = client_for_role("executor")
+) -> tuple[PlannerAgent, ExecutorAgent, SLMUsageAccumulator, str]:
+    usage = SLMUsageAccumulator()
+    planner_inner = client_for_role("planner")
+    executor_inner = client_for_role("executor")
+    primary_model_id = planner_inner.profile.model_id
+    planner_slm = TrackingSLMClient(planner_inner, usage)
+    executor_slm = TrackingSLMClient(executor_inner, usage)
     bundle = ErrorControlBundle()
     planner = PlannerAgent(
         DecisionCycle(
@@ -226,7 +243,7 @@ def _build_agents(
         memory,
         workspace,
     )
-    return planner, executor
+    return planner, executor, usage, primary_model_id
 
 
 def _run_revise_reflection(
@@ -383,7 +400,7 @@ def run_full_session(
     )
 
     settings = ablation or AblationSettings()
-    planner, executor = _build_agents(memory, workspace, settings)
+    planner, executor, usage, primary_model_id = _build_agents(memory, workspace, settings)
 
     memory.state.write(
         StateEntry(
@@ -397,7 +414,23 @@ def run_full_session(
     )
 
     if engine == "graph":
-        return _run_full_session_graph(
+        outcome = _run_full_session_graph(
+            goal=goal,
+            constraints=constraints,
+            test_code=test_code,
+            workspace=workspace,
+            memory=memory,
+            planner=planner,
+            executor=executor,
+            settings=settings,
+            session_id=session_id,
+            max_steps=max_steps,
+            max_retries=max_retries,
+            checkpoint_dir=checkpoint_dir,
+            planner_enabled=planner_enabled,
+        )
+    else:
+        outcome = _run_full_session_loop(
             goal=goal,
             constraints=constraints,
             test_code=test_code,
@@ -413,21 +446,10 @@ def run_full_session(
             planner_enabled=planner_enabled,
         )
 
-    return _run_full_session_loop(
-        goal=goal,
-        constraints=constraints,
-        test_code=test_code,
-        workspace=workspace,
-        memory=memory,
-        planner=planner,
-        executor=executor,
-        settings=settings,
-        session_id=session_id,
-        max_steps=max_steps,
-        max_retries=max_retries,
-        checkpoint_dir=checkpoint_dir,
-        planner_enabled=planner_enabled,
-    )
+    _apply_session_usage(outcome, usage, primary_model_id)
+    planner._cycle._slm.close()  # noqa: SLF001 — release HTTP clients
+    executor._cycle._slm.close()
+    return outcome
 
 
 def _langgraph_sqlite_path(

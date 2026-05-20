@@ -16,6 +16,10 @@ class RunResult(BaseModel):
     retry_count: int = 0
     trace_path: str = ""
     session_id: str = ""
+    tokens_total: int = 0
+    latency_ms_total: int = 0
+    llm_calls: int = 0
+    model_id: str = ""
 
 
 def compute_sr(results: list[RunResult]) -> float:

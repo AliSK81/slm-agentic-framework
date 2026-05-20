@@ -233,6 +233,10 @@ def _run_single_task(
         retry_count=session.retry_count,
         trace_path=str(trace_path),
         session_id=session.session_id,
+        tokens_total=session.tokens_total,
+        latency_ms_total=session.latency_ms_total,
+        llm_calls=session.llm_calls,
+        model_id=session.model_id,
     )
     try:
         trace_path.parent.mkdir(parents=True, exist_ok=True)

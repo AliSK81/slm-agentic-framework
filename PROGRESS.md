@@ -160,10 +160,10 @@ phases:
 
   18:
     name: "True-SLM bundle (Qwen-7B + Devstral)"
-    status: NOT_STARTED
+    status: DONE
     test_gate: "pytest tests/unit/test_slm_profiles.py"
     commit: null
-    notes: "ROADMAP phase 18. [REQUIRES_USER_INPUT] API key."
+    notes: "4/4 unit tests pass. slm_small bundle; qwen 7B id fix; smoke_test --bundle slm_small. Live smoke/e2e pending OPENROUTER_API_KEY in .env."
 
   19:
     name: "Valid multi-seed A-D ablation"

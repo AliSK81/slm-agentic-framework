@@ -16,7 +16,13 @@ from aviona.project import load_project_rules
 from aviona.render import render_status
 from aviona.settings import load_settings
 from aviona.snapshots import SnapshotStore
-from aviona.store import SessionStore, aviona_project_dir, project_hash
+from aviona.store import (
+    SessionStore,
+    aviona_project_dir,
+    fork_session,
+    load_session,
+    project_hash,
+)
 from aviona.tools import bind_snapshot_tools
 from framework.control.ablation import AblationSettings
 from framework.error_control.truncation import get_compaction_ceiling, set_caps_profile
@@ -43,7 +49,13 @@ class TurnResult(BaseModel):
 class AvionaSession:
     """cwd-rooted session sharing persistent memory across REPL turns."""
 
-    def __init__(self, cwd: Path) -> None:
+    def __init__(
+        self,
+        cwd: Path,
+        *,
+        session_id: str | None = None,
+        fork_from: str | None = None,
+    ) -> None:
         apply_daily_driver_profiles()
         set_caps_profile("interactive")
         self.workspace = cwd.resolve()
@@ -51,9 +63,18 @@ class AvionaSession:
         self.session_root.mkdir(parents=True, exist_ok=True)
         self.checkpoint_dir = self.session_root / "checkpoints"
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
+
+        if fork_from is not None:
+            record = fork_session(self.workspace, fork_from)
+            self._session_id = record.session_id
+        elif session_id is not None:
+            record = load_session(self.workspace, session_id)
+            self._session_id = record.session_id
+        else:
+            self._session_id = f"aviona-{uuid.uuid4().hex[:8]}"
+
         db_path = self.session_root / "memory.db"
         self.memory = MemoryStores.sqlite(db_path)
-        self._session_id = f"aviona-{uuid.uuid4().hex[:8]}"
         self._verifier: Verifier = NoOpVerifier()
         self._project_rules = load_project_rules(self.workspace)
         self._store = SessionStore(self.workspace, self._session_id)

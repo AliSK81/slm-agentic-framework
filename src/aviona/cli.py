@@ -12,15 +12,12 @@ from aviona.doctor import run_doctor
 from aviona.env import load_aviona_env
 from aviona.repl import run_repl
 from aviona.session import AvionaSession
+from aviona.store import SessionNotFoundError, latest_session
 from framework.orchestration.session import validate_slm_api_key
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """Build the top-level ``aviona`` argument parser.
-
-    Returns:
-        Configured ``ArgumentParser`` with ``--version``, ``doctor``, and default REPL stub.
-    """
+    """Build the top-level ``aviona`` argument parser."""
     parser = argparse.ArgumentParser(
         prog="aviona",
         description="Terminal agent for project-local file edits (thesis framework).",
@@ -36,6 +33,23 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Permission mode: plan (read-only), default (ask shell), auto.",
     )
+    parser.add_argument(
+        "--continue",
+        dest="continue_session",
+        action="store_true",
+        help="Resume the latest session for this project.",
+    )
+    parser.add_argument(
+        "--resume",
+        metavar="SESSION_ID",
+        default=None,
+        help="Resume a specific session id.",
+    )
+    parser.add_argument(
+        "--fork-session",
+        action="store_true",
+        help="Start a new session linked to --resume id or the latest session.",
+    )
     subparsers = parser.add_subparsers(dest="command")
     subparsers.add_parser(
         "doctor",
@@ -48,18 +62,41 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _open_session(cwd: Path, args: argparse.Namespace) -> AvionaSession | None:
+    """Create or resume an ``AvionaSession`` from CLI flags."""
+    if args.fork_session:
+        parent_id = args.resume
+        if parent_id is None:
+            latest = latest_session(cwd)
+            if latest is None:
+                print("no prior session to fork")
+                return None
+            parent_id = latest.session_id
+        try:
+            return AvionaSession(cwd, fork_from=parent_id)
+        except SessionNotFoundError as exc:
+            print(str(exc))
+            return None
+
+    if args.continue_session:
+        latest = latest_session(cwd)
+        if latest is None:
+            print("no prior session to continue")
+            return None
+        return AvionaSession(cwd, session_id=latest.session_id)
+
+    if args.resume:
+        try:
+            return AvionaSession(cwd, session_id=args.resume)
+        except SessionNotFoundError as exc:
+            print(str(exc))
+            return None
+
+    return AvionaSession(cwd)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
-    """Run the Aviona CLI.
-
-    Loads ``~/.aviona/.env`` then project ``.env`` (secrets never echoed). Bare ``aviona``
-    probes once then starts the REPL; ``doctor`` probes only; ``undo`` restores snapshots.
-
-    Args:
-        argv: Optional argument list (defaults to ``sys.argv[1:]``).
-
-    Returns:
-        Process exit code (0 on success).
-    """
+    """Run the Aviona CLI."""
     cwd = Path.cwd()
     load_aviona_env(cwd)
     parser = build_parser()
@@ -81,7 +118,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
 
     validate_slm_api_key()
-    session = AvionaSession(cwd)
+    session = _open_session(cwd, args)
+    if session is None:
+        return 1
     if getattr(args, "mode", None):
         session.set_mode(args.mode)  # type: ignore[arg-type]
     return run_repl(session)

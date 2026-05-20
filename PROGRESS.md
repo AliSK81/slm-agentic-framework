@@ -9,10 +9,10 @@
 ## CURRENT STATE
 
 ```yaml
-current_phase: aviona-11
+current_phase: aviona-12
 phase_status: NOT_STARTED
-last_updated: "2026-05-20T21:00Z"
-last_commit: "08de041"
+last_updated: "2026-05-20T22:30Z"
+last_commit: "PENDING"
 blocker: null
 active_roadmap: ROADMAP_PRODUCTION_AVIONA.md
 thesis_track: paused_at_phase_39
@@ -345,8 +345,9 @@ aviona_phases:
   7:  { status: DONE, commit: "b15ff1e", gate: "pytest tests/unit/test_permissions.py", notes: "10/10 permission tests; plan/default/auto; .aviona/settings.yaml; --mode + /mode." }
   8:  { status: DONE, commit: "29e188d", gate: "pytest tests/unit/test_snapshots.py", notes: "7/7 snapshot tests; SnapshotStore + wrappers; aviona undo CLI; checkpoint on TurnResult." }
   9:  { status: DONE, commit: "bb569ff", gate: "pytest tests/unit/test_aviona_doctor.py", notes: "4/4 doctor tests; ~/.aviona/.env then project .env; probe-only exit codes." }
-  10: { status: DONE, commit: "TBD", gate: "pytest tests/unit/test_gitctx.py", notes: "5/5 gitctx; git in SAFE_COMMANDS; REPL + anchor summary." }
-  11-12: { status: NOT_STARTED, see ROADMAP_PRODUCTION_AVIONA.md }
+  10: { status: DONE, commit: "08de041", gate: "pytest tests/unit/test_gitctx.py", notes: "5/5 gitctx; git in SAFE_COMMANDS; REPL + anchor summary." }
+  11: { status: DONE, commit: "PENDING", gate: "pytest tests/unit/test_aviona_resume.py", notes: "7/7 resume; per-session meta; list/load/fork; --continue/--resume/--fork-session." }
+  12: { status: NOT_STARTED, see ROADMAP_PRODUCTION_AVIONA.md }
   thesis_resume: { status: PAUSED, requires_user_input: true }
 ```
 

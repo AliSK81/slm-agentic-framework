@@ -17,7 +17,7 @@ blocker: null
 active_roadmap: ROADMAP_PRODUCTION_AVIONA_V2.md
 thesis_track: paused_at_phase_39
 aviona_track: v2
-aviona_v2_phase: V2-2
+aviona_v2_phase: V2-3
 aviona_v2_status: NOT_STARTED
 pre_v2_tag: pre-v2
 pre_v2_baseline_version: "0.2.6"

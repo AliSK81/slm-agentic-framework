@@ -41,6 +41,10 @@ _TERMINATE_PAYLOAD_HINT = (
     "Benchmark/eval tasks may leave user_message empty."
 )
 
+_HANDOFF_PAYLOAD_HINT = (
+    'For handoff requesting full planning use payload {"reason":"needs_plan"}.'
+)
+
 
 def _json_format_block(agent_role: str, *, include_example: bool = True) -> str:
     """Append strict JSON instructions so SLMs emit parseable decisions.
@@ -53,6 +57,7 @@ def _json_format_block(agent_role: str, *, include_example: bool = True) -> str:
     if agent_role == "executor":
         hints.append(_EXECUTOR_PAYLOAD_HINT)
         hints.append(_TERMINATE_PAYLOAD_HINT)
+        hints.append(_HANDOFF_PAYLOAD_HINT)
     elif agent_role == "planner":
         hints.append(_TERMINATE_PAYLOAD_HINT)
     hint = "\n" + "\n".join(hints) if hints else ""

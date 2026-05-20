@@ -18,12 +18,14 @@ from pydantic import BaseModel
 from framework.env import load_project_env
 
 from framework.control.cycle import DecisionCycle
-from framework.control.models import ErrorControlBundle
+from framework.control.models import ErrorControlBundle, is_needs_plan_handoff, parse_terminate_payload
+from framework.orchestration.messages import DispatchMessage, save_dispatch
 from framework.control.ledger import build_progress_ledger
 from framework.control.workflow import (
     STATE_DONE,
     STATE_ESCALATE,
     STATE_EVALUATE,
+    STATE_EXECUTE,
     STATE_PLAN,
     STATE_REVISE,
     WorkflowState,
@@ -50,6 +52,8 @@ from framework.tools.test_runner import run_tests
 
 load_project_env()
 logger = logging.getLogger(__name__)
+
+_INTERACTIVE_NEEDS_PLAN = "NEEDS_PLAN"
 
 class SessionOutcome(BaseModel):
     """Result of a full planner/executor session."""
@@ -84,6 +88,9 @@ def _session_user_message_from_decisions(
         if entry.kind == "terminate":
             return parse_terminate_payload(entry.payload).user_message
     return ""
+
+
+def require_slm_api_key() -> str:
     """Return API key for the active SLM provider or raise with a clear message."""
     if not api_key_required_for_active_provider():
         return ""
@@ -376,6 +383,240 @@ def evaluate_workspace(workspace: Path, test_code: str) -> dict:
     }
 
 
+def _last_executor_decision(
+    memory: MemoryStores,
+    session_id: str,
+) -> DecisionEntry | None:
+    """Return the most recent executor decision for a session."""
+    for entry in reversed(memory.decisions.list_for_session(session_id)):
+        if entry.by_agent == "executor":
+            return entry
+    return None
+
+
+def _setup_interactive_dispatch(
+    memory: MemoryStores,
+    session_id: str,
+    goal: str,
+    constraints: list[str],
+) -> None:
+    """Register a single executor subtask and dispatch for interactive turns."""
+    _ensure_work_subtasks(memory, session_id, goal)
+    save_dispatch(
+        memory.backend,
+        DispatchMessage(
+            session_id=session_id,
+            task_id="st-main",
+            subtask_description=goal,
+            step_budget=20,
+            hard_constraints=constraints,
+        ),
+    )
+    memory.subtasks.set_status("st-main", "in_progress")
+
+
+def _interactive_initial_state(
+    session_id: str,
+    goal: str,
+    constraints: list[str],
+    *,
+    max_steps: int,
+    max_retries: int,
+) -> WorkflowState:
+    """Build workflow state for a single executor-first interactive turn."""
+    return {
+        "session_id": session_id,
+        "goal": goal,
+        "hard_constraints": constraints,
+        "current_state": STATE_EXECUTE,
+        "active_subtask_id": "st-main",
+        "step_count": 0,
+        "retry_count": 0,
+        "loop_count": 0,
+        "max_steps": max_steps,
+        "max_retries": max_retries,
+        "last_evaluation": None,
+        "reflection_guidance": None,
+        "planned": True,
+    }
+
+
+def _abandon_open_executor_subtasks(memory: MemoryStores, session_id: str) -> None:
+    """Mark in-flight executor work abandoned before planner promotion."""
+    rows = memory.backend.query("subtasks", {"parent_session_id": session_id})
+    for row in rows:
+        task_id = str(row.get("task_id", ""))
+        if task_id.startswith("root:"):
+            continue
+        if row.get("status") in ("open", "in_progress"):
+            memory.subtasks.set_status(task_id, "abandoned")
+
+
+def _run_interactive_executor_turn(
+    *,
+    goal: str,
+    constraints: list[str],
+    workspace: Path,
+    memory: MemoryStores,
+    executor: ExecutorAgent,
+    verifier: Verifier,
+    session_id: str,
+    max_steps: int,
+    max_retries: int,
+) -> SessionOutcome:
+    """Run one executor cycle; terminate, verify edits, or signal needs_plan."""
+    _setup_interactive_dispatch(memory, session_id, goal, constraints)
+    state = _interactive_initial_state(
+        session_id,
+        goal,
+        constraints,
+        max_steps=max_steps,
+        max_retries=max_retries,
+    )
+    executor.execute_node(state)
+    decision = _last_executor_decision(memory, session_id)
+    outcome = SessionOutcome(session_id=session_id, step_count=1)
+
+    if decision is not None and decision.kind == "terminate":
+        user_msg = parse_terminate_payload(decision.payload).user_message
+        outcome.user_message = user_msg
+        outcome.outcome = "solved" if user_msg else "unresolvable"
+        outcome.final_state = STATE_DONE
+        outcome.decision_count = len(memory.decisions.list_for_session(session_id))
+        return outcome
+
+    if decision is not None and is_needs_plan_handoff(decision):
+        outcome.final_state = _INTERACTIVE_NEEDS_PLAN
+        outcome.decision_count = len(memory.decisions.list_for_session(session_id))
+        return outcome
+
+    evaluation = verifier.evaluate(workspace).as_dict()
+    outcome.test_passed = bool(evaluation.get("passed"))
+    outcome.user_message = _session_user_message_from_decisions(memory, session_id)
+    if outcome.test_passed:
+        outcome.outcome = "solved"
+        outcome.final_state = STATE_DONE
+    else:
+        outcome.outcome = "unresolvable"
+        outcome.final_state = STATE_EXECUTE
+        outcome.error = evaluation.get("error_message") or evaluation.get("error")
+    outcome.decision_count = len(memory.decisions.list_for_session(session_id))
+    return outcome
+
+
+def run_turn(
+    goal: str,
+    constraints: list[str],
+    workspace: Path,
+    *,
+    memory: MemoryStores | None = None,
+    max_steps: int = 6,
+    max_retries: int = 3,
+    session_id: str | None = None,
+    checkpoint_dir: Path | None = None,
+    ablation: AblationSettings | None = None,
+    on_decision_append: Callable[[DecisionEntry], None] | None = None,
+    verifier: Verifier | None = None,
+    probe: bool = True,
+    permission_check: Callable[[str, str], bool] | None = None,
+    write_file_fn: WriteFileFn | None = None,
+    edit_file_fn: EditFileFn | None = None,
+    effect_sink: list[str] | None = None,
+) -> SessionOutcome:
+    """Run one interactive turn: executor-first, optional planner promotion.
+
+    Defaults to a single executor Decision Cycle. Terminates immediately on
+    ``terminate{user_message}``. Promotes to the full planner graph when the
+    executor emits ``handoff{reason:"needs_plan"}`` (Python transition only).
+    """
+    if probe:
+        validate_slm_api_key()
+    session_id = session_id or f"sess-{uuid.uuid4().hex[:8]}"
+    workspace = workspace.resolve()
+    effective_verifier = resolve_verifier("", verifier)
+    workspace.mkdir(parents=True, exist_ok=True)
+
+    if memory is None:
+        db_path = workspace.parent / "data" / f"{session_id}.db"
+        memory = MemoryStores.sqlite(db_path, on_decision=on_decision_append)
+    elif on_decision_append is not None:
+        memory.decisions._on_append = on_decision_append  # noqa: SLF001
+
+    memory.subtasks.register(
+        SubTask(
+            task_id=f"root:{session_id}",
+            parent_session_id=session_id,
+            description="session root",
+            status="open",
+            owner="planner",
+            original_goal=goal,
+            hard_constraints=constraints,
+        )
+    )
+
+    settings = ablation or AblationSettings()
+    planner, executor, usage, primary_model_id = _build_agents(
+        memory,
+        workspace,
+        settings,
+        permission_check=permission_check,
+        write_file_fn=write_file_fn,
+        edit_file_fn=edit_file_fn,
+        effect_sink=effect_sink,
+    )
+
+    memory.state.write(
+        StateEntry(
+            session_id=session_id,
+            step_index=0,
+            artifact_hash="session:interactive",
+            tests_status={"passed": 0, "failed": 0, "errors": 0},
+            open_subtasks=[],
+            timestamp=datetime.now(UTC),
+        )
+    )
+
+    outcome = _run_interactive_executor_turn(
+        goal=goal,
+        constraints=constraints,
+        workspace=workspace,
+        memory=memory,
+        executor=executor,
+        verifier=effective_verifier,
+        session_id=session_id,
+        max_steps=max_steps,
+        max_retries=max_retries,
+    )
+
+    if outcome.final_state == _INTERACTIVE_NEEDS_PLAN:
+        _abandon_open_executor_subtasks(memory, session_id)
+        promoted = _run_full_session_graph(
+            goal=goal,
+            constraints=constraints,
+            workspace=workspace,
+            memory=memory,
+            planner=planner,
+            executor=executor,
+            settings=settings,
+            session_id=session_id,
+            max_steps=max_steps,
+            max_retries=max_retries,
+            checkpoint_dir=checkpoint_dir,
+            planner_enabled=True,
+            verifier=effective_verifier,
+        )
+        promoted.user_message = _session_user_message_from_decisions(memory, session_id)
+        _apply_session_usage(promoted, usage, primary_model_id)
+        planner._cycle._slm.close()  # noqa: SLF001
+        executor._cycle._slm.close()
+        return promoted
+
+    _apply_session_usage(outcome, usage, primary_model_id)
+    planner._cycle._slm.close()  # noqa: SLF001
+    executor._cycle._slm.close()
+    return outcome
+
+
 def run_full_session(
     goal: str,
     constraints: list[str],
@@ -397,12 +638,34 @@ def run_full_session(
     write_file_fn: WriteFileFn | None = None,
     edit_file_fn: EditFileFn | None = None,
     effect_sink: list[str] | None = None,
+    interactive: bool = False,
 ) -> SessionOutcome:
     """Run PLAN → DISPATCH → EXECUTE until DONE, ESCALATE, or budget exhausted.
 
     ``engine='graph'`` (default) drives the LangGraph FSM with SqliteSaver; ``engine='loop'``
     uses the legacy imperative loop for parity testing.
+
+    When ``interactive=True``, delegates to :func:`run_turn` (planner-optional product path).
     """
+    if interactive:
+        return run_turn(
+            goal,
+            constraints,
+            workspace,  # type: ignore[arg-type]
+            memory=memory,
+            max_steps=max_steps,
+            max_retries=max_retries,
+            session_id=session_id,
+            checkpoint_dir=checkpoint_dir,
+            ablation=ablation,
+            on_decision_append=on_decision_append,
+            verifier=verifier,
+            probe=probe,
+            permission_check=permission_check,
+            write_file_fn=write_file_fn,
+            edit_file_fn=edit_file_fn,
+            effect_sink=effect_sink,
+        )
     if probe:
         validate_slm_api_key()  # raises ProbeFailedError before task loop on probe failure
     if workspace is None:

@@ -48,6 +48,19 @@ def user_message_from_payload(
     return fallback_rationale.strip()
 
 
+NEEDS_PLAN_REASON = "needs_plan"
+
+
+def is_needs_plan_handoff(decision: DecisionEntry | None) -> bool:
+    """Return True when an executor handoff requests full planner promotion."""
+    if decision is None or decision.kind != "handoff":
+        return False
+    reason = str(decision.payload.get("reason", "")).strip().lower()
+    if reason == NEEDS_PLAN_REASON:
+        return True
+    return decision.rationale.strip().lower() == NEEDS_PLAN_REASON
+
+
 class SLMProposal(BaseModel):
     """Parsed SLM JSON before self-check and log persistence."""
 

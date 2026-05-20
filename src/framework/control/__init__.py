@@ -9,6 +9,7 @@ from framework.control.models import (
     SLMProposal,
     TerminatePayload,
     TurnType,
+    is_needs_plan_handoff,
     parse_terminate_payload,
     user_message_from_payload,
 )
@@ -23,6 +24,7 @@ __all__ = [
     "SLMProposal",
     "TerminatePayload",
     "TurnType",
+    "is_needs_plan_handoff",
     "parse_terminate_payload",
     "user_message_from_payload",
     "StepBudgetLimiter",

@@ -9,10 +9,10 @@
 ## CURRENT STATE
 
 ```yaml
-current_phase: 14
+current_phase: 15
 phase_status: NOT_STARTED
-last_updated: "2026-05-20T20:00Z"
-last_commit: "fa24e04"
+last_updated: "2026-05-20T22:30Z"
+last_commit: "c71a0b0"
 blocker: null
 ```
 
@@ -127,15 +127,15 @@ phases:
     name: "Run Integrity (probe retry + run quality gate)"
     status: DONE
     test_gate: "pytest tests/unit/test_run_quality.py tests/unit/test_api_probe_retry.py"
-    commit: null
+    commit: "fa24e04"
     notes: "6/6 unit tests pass. ProbeResult + ProbeFailedError + exponential probe retry; eval/run_quality assess_run; run_eval quality sidecar + exit 1 on INVALID."
 
   14:
     name: "Eval CLI --task-id + run manifest"
-    status: NOT_STARTED
+    status: DONE
     test_gate: "pytest tests/unit/test_manifest.py"
     commit: null
-    notes: "ROADMAP phase 14."
+    notes: "3/3 unit tests + CLI dry-run gate pass. eval/manifest.py, --task-id/--config/--dataset, load_*_by_ids adapters."
 
   15:
     name: "HumanEval difficulty slices + hard ids"
@@ -287,7 +287,6 @@ decisions:
   - "2026-05-20: Phase 12 e2e runs A+D only (not B/C); full ablation is Phase 11 eval/scenarios/ablation.py."
 issues:
   - "Phases 14–29 merged into ROADMAP.md 2026-05-20; Phase 13 done."
-  - "eval.run_eval has no --task-id — addressed by Phase 14."
   - "scripts/run_phase12_staged.ps1 broken on Windows; use scripts/run_phase12_staged.py."
 ```
 

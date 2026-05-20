@@ -32,17 +32,8 @@ def _infer_entry_point(prompt: str, declared: str) -> str:
     return "candidate"
 
 
-def load_humaneval(
-    n: int = 50,
-    seed: int = 42,
-    *,
-    difficulty_split: dict[str, int] | None = None,
-) -> list[HumanEvalTask]:
-    """Load HumanEval from HuggingFace; sample ``n`` tasks with ``seed``.
-
-    When ``difficulty_split`` is set (e.g. from configs/eval.yaml), tasks are bucketed
-    by a deterministic hash of ``task_id`` into easy/medium/hard strata.
-    """
+def _load_humaneval_rows() -> list[HumanEvalTask]:
+    """Load the full HumanEval test split from HuggingFace."""
     try:
         from datasets import load_dataset
     except ImportError as exc:
@@ -63,6 +54,30 @@ def load_humaneval(
                 entry_point=entry_point,
             )
         )
+    return rows
+
+
+def load_humaneval_by_ids(task_ids: list[str]) -> list[HumanEvalTask]:
+    """Load specific HumanEval tasks by ``task_id`` (order preserved)."""
+    lookup = {task.task_id: task for task in _load_humaneval_rows()}
+    missing = [task_id for task_id in task_ids if task_id not in lookup]
+    if missing:
+        raise ValueError(f"Unknown HumanEval task_id(s): {missing}")
+    return [lookup[task_id] for task_id in task_ids]
+
+
+def load_humaneval(
+    n: int = 50,
+    seed: int = 42,
+    *,
+    difficulty_split: dict[str, int] | None = None,
+) -> list[HumanEvalTask]:
+    """Load HumanEval from HuggingFace; sample ``n`` tasks with ``seed``.
+
+    When ``difficulty_split`` is set (e.g. from configs/eval.yaml), tasks are bucketed
+    by a deterministic hash of ``task_id`` into easy/medium/hard strata.
+    """
+    rows = _load_humaneval_rows()
 
     sample_n, split = resolve_sample_count(n, difficulty_split)
     if split:

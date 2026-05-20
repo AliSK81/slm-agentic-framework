@@ -31,8 +31,8 @@ def _infer_entry_point(code: str, text: str) -> str:
     return "solution"
 
 
-def load_mbpp(n: int = 50, seed: int = 42) -> list[MBPPTask]:
-    """Load MBPP from HuggingFace; sample ``n`` tasks with ``seed``."""
+def _load_mbpp_rows() -> list[MBPPTask]:
+    """Load the full MBPP sanitized test split from HuggingFace."""
     try:
         from datasets import load_dataset
     except ImportError as exc:
@@ -54,7 +54,21 @@ def load_mbpp(n: int = 50, seed: int = 42) -> list[MBPPTask]:
                 entry_point=entry_point,
             )
         )
+    return rows
 
+
+def load_mbpp_by_ids(task_ids: list[str]) -> list[MBPPTask]:
+    """Load specific MBPP tasks by ``task_id`` (order preserved)."""
+    lookup = {str(task.task_id): task for task in _load_mbpp_rows()}
+    missing = [task_id for task_id in task_ids if task_id not in lookup]
+    if missing:
+        raise ValueError(f"Unknown MBPP task_id(s): {missing}")
+    return [lookup[task_id] for task_id in task_ids]
+
+
+def load_mbpp(n: int = 50, seed: int = 42) -> list[MBPPTask]:
+    """Load MBPP from HuggingFace; sample ``n`` tasks with ``seed``."""
+    rows = _load_mbpp_rows()
     sampled = sample_items(rows, n, seed)
     logger.info("Loaded %s MBPP tasks (requested n=%s)", len(sampled), n)
     return sampled

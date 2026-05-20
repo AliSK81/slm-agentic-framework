@@ -12,11 +12,17 @@ from typing import Any, Literal
 from eval.config import AblationFlags, EvalConfig, load_eval_config
 from eval.datasets.humaneval_adapter import (
     load_humaneval,
+    load_humaneval_by_ids,
     task_solution_stub,
     task_to_session,
 )
-from eval.datasets.mbpp_adapter import load_mbpp, task_to_session as mbpp_task_to_session
-from eval.datasets.swebench_adapter import load_swebench
+from eval.datasets.mbpp_adapter import (
+    load_mbpp,
+    load_mbpp_by_ids,
+    task_to_session as mbpp_task_to_session,
+)
+from eval.datasets.swebench_adapter import load_swebench, load_swebench_by_ids
+from eval.manifest import manifest_provider_and_profiles, resolve_git_sha, write_manifest
 from eval.metrics import RunResult, compute_cer, compute_sr
 from eval.paths import safe_task_slug
 from eval.run_quality import assess_run
@@ -71,6 +77,38 @@ def _load_tasks(
         for task in tasks:
             goal = f"Fix the issue in {task.repo} @ {task.base_commit}:\n\n{task.problem_statement}"
             constraints = ["SWE-bench execution requires Docker (not run in Phase 10 harness)"]
+            rows.append(
+                (task.task_id, goal, constraints, "assert False  # placeholder", None)
+            )
+        return rows
+    raise ValueError(f"Unknown dataset: {dataset_name}")
+
+
+def _load_tasks_by_ids(
+    dataset_name: DatasetName,
+    task_ids: list[str],
+) -> list[tuple[str, str, list[str], str, str | None]]:
+    """Load exactly the named tasks (no sampling)."""
+    if dataset_name == "humaneval":
+        return [
+            (task.task_id, *task_to_session(task), task_solution_stub(task))
+            for task in load_humaneval_by_ids(task_ids)
+        ]
+    if dataset_name == "mbpp":
+        return [
+            (task.task_id, *mbpp_task_to_session(task), None)
+            for task in load_mbpp_by_ids(task_ids)
+        ]
+    if dataset_name == "swebench":
+        rows: list[tuple[str, str, list[str], str, str | None]] = []
+        for task in load_swebench_by_ids(task_ids):
+            goal = (
+                f"Fix the issue in {task.repo} @ {task.base_commit}:\n\n"
+                f"{task.problem_statement}"
+            )
+            constraints = [
+                "SWE-bench execution requires Docker (not run in Phase 10 harness)"
+            ]
             rows.append(
                 (task.task_id, goal, constraints, "assert False  # placeholder", None)
             )
@@ -160,6 +198,7 @@ def run_eval(
     n: int | None = None,
     seed: int = 42,
     *,
+    task_ids: list[str] | None = None,
     dry_run: bool = False,
     planner_enabled: bool = True,
 ) -> dict[str, Any]:
@@ -183,10 +222,15 @@ def run_eval(
     max_retries = budget.max_retries if budget else 3
     flags = eval_config.ablation_configs[config_name]
 
-    tasks = _load_tasks(dataset_name, sample_n, sample_seed, eval_config)
+    if task_ids:
+        tasks = _load_tasks_by_ids(dataset_name, task_ids)
+        sample_n = len(tasks)
+    else:
+        tasks = _load_tasks(dataset_name, sample_n, sample_seed, eval_config)
     traces_root = _traces_dir()
     timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-    jsonl_path = traces_root / f"{config_name}_{dataset_name}_{timestamp}.jsonl"
+    run_id = f"{config_name}_{dataset_name}_{timestamp}"
+    jsonl_path = traces_root / f"{run_id}.jsonl"
 
     results: list[RunResult] = []
     for task_id, goal, constraints, test_code, solution_stub in tasks:
@@ -237,6 +281,25 @@ def run_eval(
     }
     summary["trace_file"] = str(jsonl_path)
     summary["dataset"] = dataset_name
+    summary["run_id"] = run_id
+
+    provider, planner_profile, executor_profile = manifest_provider_and_profiles()
+    manifest_path = write_manifest(
+        run_id,
+        traces_dir=traces_root,
+        config=config_name,
+        dataset=dataset_name,
+        n=sample_n,
+        seed=sample_seed,
+        provider=provider,
+        planner_profile=planner_profile,
+        executor_profile=executor_profile,
+        git_sha=resolve_git_sha(_PROJECT_ROOT),
+        task_ids=[task_id for task_id, *_ in tasks],
+        ablation_flags=flags.model_dump(),
+        created_at=datetime.now(UTC),
+    )
+    summary["manifest_file"] = str(manifest_path)
 
     if not dry_run:
         quality = assess_run(str(jsonl_path))
@@ -261,24 +324,53 @@ def run_eval(
 
 
 def main(argv: list[str] | None = None) -> int:
-    """CLI entry: ``python -m eval.run_eval D humaneval --n 5 --dry-run``."""
+    """CLI entry: ``python -m eval.run_eval --config D --dataset humaneval --dry-run``."""
     import argparse
 
     parser = argparse.ArgumentParser(description="Run SLM agent evaluation harness")
-    parser.add_argument("config", choices=["A", "B", "C", "D"])
-    parser.add_argument("dataset", choices=["humaneval", "mbpp", "swebench"])
+    parser.add_argument(
+        "config",
+        nargs="?",
+        choices=["A", "B", "C", "D"],
+        help="Ablation config (positional or use --config)",
+    )
+    parser.add_argument(
+        "dataset",
+        nargs="?",
+        choices=["humaneval", "mbpp", "swebench"],
+        help="Dataset name (positional or use --dataset)",
+    )
+    parser.add_argument("--config", dest="config_flag", choices=["A", "B", "C", "D"])
+    parser.add_argument(
+        "--dataset",
+        dest="dataset_flag",
+        choices=["humaneval", "mbpp", "swebench"],
+    )
     parser.add_argument("--n", type=int, default=None)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument(
+        "--task-id",
+        action="append",
+        dest="task_ids",
+        default=None,
+        help="Run only these task IDs (repeatable); bypasses sampling",
+    )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args(argv)
 
+    config_name = args.config_flag or args.config
+    dataset_name = args.dataset_flag or args.dataset
+    if not config_name or not dataset_name:
+        parser.error("config and dataset are required (positional or --config/--dataset)")
+
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO)
     summary = run_eval(
-        args.config,
-        args.dataset,
+        config_name,
+        dataset_name,
         n=args.n,
         seed=args.seed,
+        task_ids=args.task_ids,
         dry_run=args.dry_run,
     )
     print(json.dumps(summary, indent=2))

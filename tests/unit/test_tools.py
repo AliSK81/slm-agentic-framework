@@ -80,6 +80,15 @@ def test_run_tests_output_is_truncated(tmp_path: Path) -> None:
     assert len(result.stdout) <= cap
 
 
+def test_write_file_rejects_path_outside_workspace(tmp_path: Path) -> None:
+    """_resolve_path jail refuses writes that escape the workspace root."""
+    workspace = tmp_path / "proj"
+    workspace.mkdir()
+    result = write_file("../outside.txt", "x\n", workspace)
+    assert not result.ok
+    assert "outside" in result.message.lower()
+
+
 def test_write_file_creates_new_file(tmp_path: Path) -> None:
     result = write_file("new_module.py", "x = 1\n", tmp_path)
     assert result.ok

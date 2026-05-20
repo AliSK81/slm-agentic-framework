@@ -28,6 +28,7 @@ from framework.control.workflow import (
 from framework.memory.stores import MemoryStores
 from framework.orchestration.executor import ExecutorAgent
 from framework.orchestration.planner import PlannerAgent
+from framework.orchestration.verify import Verifier
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +104,7 @@ class SessionGraphDeps:
     executor: ExecutorAgent
     memory: MemoryStores
     workspace: Path
-    test_code: str
+    verifier: Verifier
     goal: str
     settings: AblationSettings
     planner_enabled: bool = True
@@ -111,11 +112,7 @@ class SessionGraphDeps:
 
 def _compile_session_graph(deps: SessionGraphDeps, checkpointer: Any) -> Any:
     """Compile LangGraph with session-faithful nodes (evaluate + revise + reflection)."""
-    from framework.orchestration.session import (
-        _ensure_work_subtasks,
-        _run_revise_reflection,
-        evaluate_workspace,
-    )
+    from framework.orchestration.session import _ensure_work_subtasks, _run_revise_reflection
 
     def plan_node(state: WorkflowState) -> WorkflowState:
         if not state.get("planned"):
@@ -133,7 +130,7 @@ def _compile_session_graph(deps: SessionGraphDeps, checkpointer: Any) -> Any:
         return deps.executor.execute_node(state)
 
     def evaluate_node(state: WorkflowState) -> WorkflowState:
-        evaluation = evaluate_workspace(deps.workspace, deps.test_code)
+        evaluation = deps.verifier.evaluate(deps.workspace).as_dict()
         updated: WorkflowState = {
             **state,
             "last_evaluation": evaluation,

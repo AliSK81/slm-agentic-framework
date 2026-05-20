@@ -36,6 +36,7 @@ from framework.memory.working_memory import WorkingMemoryBuilder
 from framework.control.ablation import AblationSettings
 from framework.orchestration.executor import ExecutorAgent
 from framework.orchestration.planner import PlannerAgent
+from framework.orchestration.verify import Verifier, resolve_verifier
 from framework.slm.client import SLMClient
 from framework.slm.usage import SLMUsageAccumulator, TrackingSLMClient
 from framework.slm.config import (
@@ -358,8 +359,8 @@ def evaluate_workspace(workspace: Path, test_code: str) -> dict:
 def run_full_session(
     goal: str,
     constraints: list[str],
-    test_code: str,
-    workspace: Path,
+    test_code: str = "",
+    workspace: Path | None = None,
     *,
     memory: MemoryStores | None = None,
     max_steps: int = 15,
@@ -370,15 +371,21 @@ def run_full_session(
     planner_enabled: bool = True,
     on_decision_append: Callable[[DecisionEntry], None] | None = None,
     engine: EngineName = "graph",
+    verifier: Verifier | None = None,
+    probe: bool = True,
 ) -> SessionOutcome:
     """Run PLAN → DISPATCH → EXECUTE until DONE, ESCALATE, or budget exhausted.
 
     ``engine='graph'`` (default) drives the LangGraph FSM with SqliteSaver; ``engine='loop'``
     uses the legacy imperative loop for parity testing.
     """
-    validate_slm_api_key()  # raises ProbeFailedError before task loop on probe failure
+    if probe:
+        validate_slm_api_key()  # raises ProbeFailedError before task loop on probe failure
+    if workspace is None:
+        raise ValueError("workspace is required")
     session_id = session_id or f"sess-{uuid.uuid4().hex[:8]}"
     workspace = workspace.resolve()
+    effective_verifier = resolve_verifier(test_code, verifier)
     workspace.mkdir(parents=True, exist_ok=True)
 
     if memory is None:
@@ -417,7 +424,6 @@ def run_full_session(
         outcome = _run_full_session_graph(
             goal=goal,
             constraints=constraints,
-            test_code=test_code,
             workspace=workspace,
             memory=memory,
             planner=planner,
@@ -428,12 +434,12 @@ def run_full_session(
             max_retries=max_retries,
             checkpoint_dir=checkpoint_dir,
             planner_enabled=planner_enabled,
+            verifier=effective_verifier,
         )
     else:
         outcome = _run_full_session_loop(
             goal=goal,
             constraints=constraints,
-            test_code=test_code,
             workspace=workspace,
             memory=memory,
             planner=planner,
@@ -444,6 +450,7 @@ def run_full_session(
             max_retries=max_retries,
             checkpoint_dir=checkpoint_dir,
             planner_enabled=planner_enabled,
+            verifier=effective_verifier,
         )
 
     _apply_session_usage(outcome, usage, primary_model_id)
@@ -467,7 +474,6 @@ def _run_full_session_graph(
     *,
     goal: str,
     constraints: list[str],
-    test_code: str,
     workspace: Path,
     memory: MemoryStores,
     planner: PlannerAgent,
@@ -478,6 +484,7 @@ def _run_full_session_graph(
     max_retries: int,
     checkpoint_dir: Path | None,
     planner_enabled: bool,
+    verifier: Verifier,
 ) -> SessionOutcome:
     """Production path: LangGraph FSM with durable SQLite checkpointing."""
     from framework.orchestration.graph import SessionGraphDeps, run_session_graph
@@ -502,7 +509,7 @@ def _run_full_session_graph(
         executor=executor,
         memory=memory,
         workspace=workspace,
-        test_code=test_code,
+        verifier=verifier,
         goal=goal,
         settings=settings,
         planner_enabled=planner_enabled,
@@ -557,7 +564,6 @@ def _run_full_session_loop(
     *,
     goal: str,
     constraints: list[str],
-    test_code: str,
     workspace: Path,
     memory: MemoryStores,
     planner: PlannerAgent,
@@ -568,6 +574,7 @@ def _run_full_session_loop(
     max_retries: int,
     checkpoint_dir: Path | None,
     planner_enabled: bool,
+    verifier: Verifier,
 ) -> SessionOutcome:
     """Legacy imperative loop (parity / fallback)."""
     state: WorkflowState = {
@@ -608,7 +615,7 @@ def _run_full_session_loop(
                 continue
 
             state = executor.execute_node(state)
-            evaluation = evaluate_workspace(workspace, test_code)
+            evaluation = verifier.evaluate(workspace).as_dict()
             state["last_evaluation"] = evaluation
             outcome.test_passed = bool(evaluation.get("passed"))
 

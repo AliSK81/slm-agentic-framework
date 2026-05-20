@@ -19,9 +19,11 @@ if str(_SRC) not in sys.path:
 from eval.curated import (
     CuratedReportError,
     build_curated_summaries,
+    iter_cite_entries,
     load_cite_allowlist,
 )
 from eval.metrics.ci import format_mean_pm_ci
+from eval.metrics.efficiency import format_efficiency_table, load_efficiency_from_project
 from scripts.analyze_traces import summarize_trace
 
 
@@ -50,7 +52,7 @@ def _curated_report_lines(
     """Build markdown section for cite-allowlist runs with multi-seed CIs."""
     allowlist = load_cite_allowlist(allowlist_path)
     groups = build_curated_summaries(allowlist, traces_dir=traces_dir)
-    cited_ids = {entry.run_id for entry in allowlist.runs} - set(
+    cited_ids = {entry.run_id for entry in iter_cite_entries(allowlist)} - set(
         allowlist.excluded_run_ids
     )
 
@@ -235,6 +237,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Validate curated runs only; do not write the report file",
     )
+    parser.add_argument(
+        "--efficiency",
+        action="store_true",
+        help="Append efficiency table (tokens/latency/cost per task) from cited runs",
+    )
     args = parser.parse_args(argv)
 
     traces_dir = args.traces_dir or (_PROJECT_ROOT / "traces")
@@ -250,6 +257,15 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         print(f"Curated validation OK: {len(groups)} group(s), "
               f"{sum(len(g.runs) for g in groups)} run(s)")
+        if args.dry_run and not args.efficiency:
+            return 0
+
+    if args.efficiency:
+        eff_rows = load_efficiency_from_project(
+            traces_dir=traces_dir,
+            allowlist_path=args.allowlist,
+        )
+        print(format_efficiency_table(eff_rows))
         if args.dry_run:
             return 0
 

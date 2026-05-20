@@ -285,7 +285,8 @@ def run_eval(
 
     dataset_block = getattr(eval_config, dataset_name, {})
     sample_n = n if n is not None else int(dataset_block.get("sample_size", 50))
-    sample_seed = int(dataset_block.get("seed", seed))
+    # CLI/ablation ``seed`` must override dataset YAML default (multi-seed ablations).
+    sample_seed = seed
     budget = eval_config.step_budgets.get(
         dataset_name,
         eval_config.step_budgets.get("humaneval"),

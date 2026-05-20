@@ -86,6 +86,9 @@ profiles:
 
   devstral-small:
     model_id: mistralai/devstral-small
+    price_per_1k_in: 0
+    price_per_1k_out: 0
+    price_known: false
     provider: openrouter
     context_limit: 32768
     effective_context: 16000

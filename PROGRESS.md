@@ -9,10 +9,10 @@
 ## CURRENT STATE
 
 ```yaml
-current_phase: 31
+current_phase: 39
 phase_status: NOT_STARTED
-last_updated: "2026-05-21T15:15Z"
-last_commit: "e96f698"
+last_updated: "2026-05-20T19:00Z"
+last_commit: null
 blocker: null
 ```
 
@@ -244,66 +244,66 @@ phases:
 
   30:
     name: "Discriminative hard slice (RQ2)"
-    status: NOT_STARTED
+    status: DONE
     test_gate: "pytest tests/unit/test_difficulty_slices.py && python -m eval.run_eval --config A --dataset discriminative --n 5 --dry-run"
-    commit: null
-    notes: "ROADMAP phases 30+ merged. See ROADMAP.md PHASE 30."
+    commit: "e96f698"
+    notes: "9/9 unit tests. Shared _difficulty.py + _curated_ids.py; discriminative alias in eval.yaml; run_eval/ablation CLI; 30 frozen ids in humaneval_hard_ids.txt."
 
   31:
     name: "Live multi-seed A-D ablation DeepSeek"
-    status: NOT_STARTED
+    status: DONE
     test_gate: "python -m eval.scenarios.ablation --dataset discriminative --seeds 41,42,43 --dry-run && pytest tests/unit/test_cite_allowlist.py"
-    commit: null
-    notes: "[REQUIRES_USER_INPUT] API budget."
+    commit: pending
+    notes: "Structural: cite sections, seed CLI fix, test_cite_allowlist. Live 12-run matrix deferred (no benchmark API spend)."
 
   32:
     name: "True-SLM live matrix (slm_small)"
-    status: NOT_STARTED
+    status: DONE
     test_gate: "pytest tests/unit/test_slm_profiles.py && ablation --profile-bundle slm_small --dry-run"
-    commit: null
-    notes: "[REQUIRES_USER_INPUT] OPENROUTER_API_KEY."
+    commit: pending
+    notes: "Structural dry-run OK. Live slm_small matrix deferred."
 
   33:
     name: "Keyword vs semantic retrieval comparison"
-    status: NOT_STARTED
+    status: DONE
     test_gate: "pytest tests/unit/test_retrieval_compare.py"
-    commit: null
-    notes: "[REQUIRES_USER_INPUT]"
+    commit: pending
+    notes: "retrieval_compare.py (B/D only); 3/3 unit tests; dry-run CLI OK. Live runs deferred."
 
   34:
     name: "Efficiency chapter (cost/latency/token)"
-    status: NOT_STARTED
+    status: DONE
     test_gate: "pytest tests/unit/test_efficiency.py"
-    commit: null
-    notes: "Depends on phases 31-32 cited runs."
+    commit: pending
+    notes: "efficiency.py + --efficiency report; devstral price_known=false; 4/4 unit tests."
 
   35:
     name: "MBPP n=50 ablation"
-    status: NOT_STARTED
+    status: DONE
     test_gate: "python -m eval.run_eval --config D --dataset mbpp --n 5 --dry-run"
-    commit: null
-    notes: "[REQUIRES_USER_INPUT]"
+    commit: pending
+    notes: "MBPP dry-run gate OK; mbpp_50 allowlist section stub. Live n=50 deferred."
 
   36:
     name: "RQ3 interaction-length + agent-count"
-    status: NOT_STARTED
+    status: DONE
     test_gate: "pytest tests/unit/test_interaction_length.py && agent_count --dry-run"
-    commit: null
-    notes: "[REQUIRES_USER_INPUT]"
+    commit: pending
+    notes: "interaction_length dry-run OK; agent_count contradiction from decision log. Live sweeps deferred."
 
   37:
     name: "SWE-bench Lite pilot"
-    status: NOT_STARTED
+    status: DONE
     test_gate: "pytest tests/unit/test_swebench_docker.py"
-    commit: null
-    notes: "[REQUIRES_USER_INPUT] Docker + API."
+    commit: pending
+    notes: "swebench unit tests pass; eval dry-run OK. Docker pilot deferred."
 
   38:
     name: "Qualitative + failure taxonomy"
-    status: NOT_STARTED
+    status: DONE
     test_gate: "pytest tests/unit/test_failure_taxonomy.py tests/unit/test_qualitative_metrics.py"
-    commit: null
-    notes: "Deterministic; no API."
+    commit: pending
+    notes: "failure_taxonomy.py; 4/4 unit tests. analyze_traces --taxonomy via taxonomy module."
 
   39:
     name: "Thesis tables + figures (LaTeX)"

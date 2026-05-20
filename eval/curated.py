@@ -18,6 +18,16 @@ from eval.run_quality import assess_run
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 _DEFAULT_ALLOWLIST = _PROJECT_ROOT / "configs" / "cite_allowlist.yaml"
 
+DEEPSEEK_DISCRIMINATIVE_SECTION = "humaneval_discriminative_deepseek"
+SLM_SMALL_DISCRIMINATIVE_SECTION = "humaneval_discriminative_slm_small"
+RETRIEVAL_KEYWORD_SECTION = "retrieval_keyword"
+RETRIEVAL_SEMANTIC_SECTION = "retrieval_semantic"
+MBPP_50_SECTION = "mbpp_50"
+RQ3_INTERACTION_LENGTH_SECTION = "rq3_interaction_length"
+RQ3_AGENT_COUNT_SECTION = "rq3_agent_count"
+SWEBENCH_PILOT_SECTION = "swebench_pilot"
+EXPECTED_DEEPSEEK_DISCRIMINATIVE_RUNS = 12  # 4 configs × 3 seeds
+
 _API_KEY_PATTERN = re.compile(r"sk-[a-zA-Z0-9]{10,}")
 _FORBIDDEN_VALUE_MARKERS = ("api_key", "bearer ", "password", "secret_key")
 
@@ -42,6 +52,20 @@ class CiteAllowlist(BaseModel):
     version: int = 1
     excluded_run_ids: list[str] = Field(default_factory=list)
     runs: list[CiteEntry] = Field(default_factory=list)
+    sections: dict[str, list[CiteEntry]] = Field(default_factory=dict)
+
+
+def iter_cite_entries(allowlist: CiteAllowlist) -> list[CiteEntry]:
+    """Return all allowlisted entries (top-level ``runs`` plus every ``sections`` block)."""
+    entries = list(allowlist.runs)
+    for section_runs in allowlist.sections.values():
+        entries.extend(section_runs)
+    return entries
+
+
+def entries_for_section(allowlist: CiteAllowlist, section: str) -> list[CiteEntry]:
+    """Return entries for a named section (empty when the section is absent)."""
+    return list(allowlist.sections.get(section, []))
 
 
 class CitedRunSummary(BaseModel):
@@ -165,7 +189,7 @@ def build_curated_summaries(
     """Validate all cited runs and aggregate SR/CER with 95% CIs per config/dataset."""
     excluded = set(allowlist.excluded_run_ids)
     cited: list[CitedRunSummary] = []
-    for entry in allowlist.runs:
+    for entry in iter_cite_entries(allowlist):
         if entry.run_id in excluded:
             continue
         cited.append(validate_cited_run(entry, traces_dir=traces_dir))

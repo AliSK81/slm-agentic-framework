@@ -1,5 +1,6 @@
 # Canonical eval runs to cite in the thesis results chapter.
 # Excluded ids are blocked even if present under traces/ (do-not-cite invalid runs).
+# Live benchmark sections stay empty until API budget runs; structural/dry-run gates still pass.
 version: 1
 
 excluded_run_ids:
@@ -27,5 +28,12 @@ runs:
     dataset: humaneval_hard
     note: "E2E ablation humaneval_hard n=10 seed=42 (2026-05-20)"
 
-# Add Phase-12 canonical 20-task runs (D_humaneval_20260520T082826Z, A_humaneval_20260520T083955Z)
-# when those trace files exist under traces/ — do not cite D_humaneval_20260520T085222Z (invalid).
+sections:
+  humaneval_discriminative_deepseek: []
+  humaneval_discriminative_slm_small: []
+  retrieval_keyword: []
+  retrieval_semantic: []
+  mbpp_50: []
+  rq3_interaction_length: []
+  rq3_agent_count: []
+  swebench_pilot: []

@@ -73,10 +73,13 @@ def estimate_cost(
     latency_ms_total = sum(row.latency_ms_total for row in rows)
     llm_calls = sum(row.llm_calls for row in rows)
     estimated_usd = 0.0
+    price_known = True
     for row in rows:
         if row.tokens_total <= 0:
             continue
         prices = price_table.get(row.model_id, {})
+        if not prices:
+            price_known = False
         estimated_usd += _row_cost_usd(row.tokens_total, prices)
 
     return {
@@ -86,4 +89,5 @@ def estimate_cost(
         "latency_ms_total": latency_ms_total,
         "llm_calls": llm_calls,
         "estimated_usd": round(estimated_usd, 6),
+        "price_known": price_known,
     }

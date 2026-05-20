@@ -1,46 +1,59 @@
-# Aviona user journey matrix
+# Aviona contract matrix (L2)
 
-Locked by `tests/unit/test_aviona_journeys.py`. Every user-reported REPL bug adds a row here first, then a failing test.
+Locked by `tests/unit/test_aviona_contract_matrix.py`. Add a matrix row first, then a failing test — not phrasing-regex journeys.
 
-## Journeys
+## Turn types
 
-| ID | User prompt | Goal kind | Required tools | REPL must show | Must NOT |
-|----|-------------|-----------|----------------|----------------|----------|
-| J1 | `hi` | local chat | none | greeting | API call, file edits |
-| J9 | `ok` | local chat | none | acknowledgment | API call, file edits |
-| J2 | `list files in this dir` | read | `list_dir` | file names | file edits |
-| J3 | `what is content of hello file?` | read_content | `read_file` | file body (`hi`) | directory listing only |
-| J4 | `read hello.txt` | read_content | `read_file` | file body | listing only |
-| J5 | `explain the codebase` | explain | read tools + `terminate` | prose answer | file edits |
-| J8 | `what is this project` | explain | read tools or fallback | project summary from README | vacuous meta answer, file edits |
-| J6 | `create foo.txt with "x"` | write | `write_file` / `code_edit` | `edited foo.txt` | — |
-| J7 | chat-like line + agent edits | general | none | failure / no false ok | unsolicited edits |
+| Type | LLM cycle cap | Read-only | Required invariants |
+|------|---------------|-----------|---------------------|
+| `local` | 0 | yes | canned `user_message`; no file writes |
+| `answer` | 1 | yes | non-empty `user_message`; no file writes |
+| `inspect` | 3 | yes | non-empty `user_message`; no file writes |
+| `edit` | 6 | no | `user_message` + at least one write + verify passed |
+| `build` | 15 | no | `user_message` + verify passed (after `needs_plan`) |
+
+## Contract matrix rows
+
+| ID | turn_type | user_message | writes | verify | contract | budget |
+|----|-----------|--------------|--------|--------|----------|--------|
+| local-greeting | local | yes | none | — | pass | ≤0 cycles |
+| local-empty | local | empty | none | — | fail | ≤0 cycles |
+| local-no-write | local | yes | unsolicited | — | fail | ≤0 cycles |
+| answer-ok | answer | yes | none | — | pass | ≤1 cycle |
+| answer-missing-message | answer | empty | none | — | fail | ≤1 cycle |
+| answer-no-unsolicited-edit | answer | yes | unsolicited | — | fail | ≤1 cycle |
+| answer-budget-exceeded | answer | yes | none | — | fail (budget) | >1 cycle |
+| inspect-read-only | inspect | yes | none | — | pass | ≤3 cycles |
+| inspect-no-write | inspect | yes | unsolicited | — | fail | ≤3 cycles |
+| inspect-budget-exceeded | inspect | yes | none | — | fail (budget) | >3 cycles |
+| edit-write-and-verify | edit | yes | required | pass | pass | ≤6 cycles |
+| edit-missing-write | edit | yes | none | pass | fail | ≤6 cycles |
+| edit-verify-failed | edit | yes | required | fail | fail | ≤6 cycles |
+| build-planned | build | yes | optional | pass | pass | ≤15 cycles |
+| build-missing-message | build | empty | optional | pass | fail | ≤15 cycles |
+| build-verify-failed | build | yes | optional | fail | fail | ≤15 cycles |
+
+## Declared turn_type (from decisions)
+
+| Case | Signal | Expected type |
+|------|--------|---------------|
+| terminate-answer | `terminate{turn_type: answer}` | `answer` |
+| terminate-edit | write + `terminate{turn_type: edit}` | `edit` |
+| needs-plan-handoff | `handoff{reason: needs_plan}` | `build` |
+| infer-edit-from-writes | terminate without type + file changes | `edit` |
 
 ## QA layers
 
 | Layer | Command | API key |
 |-------|---------|---------|
-| L1 | `pytest tests/unit/test_aviona_effects.py tests/unit/test_aviona_intent.py` | No |
-| L2 | `pytest tests/unit/test_aviona_journeys.py` | No |
+| L2 matrix | `pytest tests/unit/test_aviona_contract_matrix.py` | No |
 | L2 gate | `scripts/test-aviona.ps1` | No |
-| L3 | `scripts/test-aviona.ps1 -Live` | Yes |
+| L3 live | `scripts/test-aviona.ps1 -Live` | Yes |
 
 ## Fix loop
 
-1. Add row to this table.
-2. Write failing L2 test.
-3. Fix intent / verification / hints.
+1. Add row to the contract matrix table above.
+2. Extend `CONTRACT_MATRIX` or `DECLARED_TYPE_CASES` in the test file.
+3. Fix contract / budget / write-guard — not regex intent routing.
 4. Run `scripts/test-aviona.ps1`.
-5. Bump version (see below).
-6. Optional L3 manual check in `D:\thesis\aviona-test`.
-
-## Version policy
-
-Versions are manual in `src/aviona/__init__.py` and `pyproject.toml` (not auto from git).
-
-| Bump | When | Example |
-|------|------|---------|
-| Patch | Bugfix, intent, verification | `0.2.0` → `0.2.1` |
-| Minor | New REPL capability | `0.2.x` → `0.3.0` |
-
-After every bump: `pip install -e .` then `aviona --version`.
+5. Bump version when releasing (see `ROADMAP_PRODUCTION_AVIONA_V2.md`).

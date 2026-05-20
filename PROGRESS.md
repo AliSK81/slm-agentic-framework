@@ -9,10 +9,10 @@
 ## CURRENT STATE
 
 ```yaml
-current_phase: aviona-8
+current_phase: aviona-9
 phase_status: NOT_STARTED
-last_updated: "2026-05-20T18:00Z"
-last_commit: "b15ff1e"
+last_updated: "2026-05-20T19:00Z"
+last_commit: "TBD"
 blocker: null
 active_roadmap: ROADMAP_PRODUCTION_AVIONA.md
 thesis_track: paused_at_phase_39
@@ -343,7 +343,8 @@ aviona_phases:
   5:  { status: DONE, commit: "214818d", gate: "pytest tests/unit/test_token_efficiency.py && pytest tests/integration/test_decision_cycle.py", notes: "6/6 efficiency; compact JSON on self-check retry; aviona-daily profile; render.py." }
   6:  { status: DONE, commit: "9ff2984", gate: "pytest tests/unit/test_truncation_caps.py tests/unit/test_compaction.py", notes: "4+5 tests; configs/truncation.yaml; interactive caps; compact before turn." }
   7:  { status: DONE, commit: "b15ff1e", gate: "pytest tests/unit/test_permissions.py", notes: "10/10 permission tests; plan/default/auto; .aviona/settings.yaml; --mode + /mode." }
-  8-12: { status: NOT_STARTED, see ROADMAP_PRODUCTION_AVIONA.md }
+  8:  { status: DONE, commit: "TBD", gate: "pytest tests/unit/test_snapshots.py", notes: "7/7 snapshot tests; SnapshotStore + wrappers; aviona undo CLI; checkpoint on TurnResult." }
+  9-12: { status: NOT_STARTED, see ROADMAP_PRODUCTION_AVIONA.md }
   thesis_resume: { status: PAUSED, requires_user_input: true }
 ```
 

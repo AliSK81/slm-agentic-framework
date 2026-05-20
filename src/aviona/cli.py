@@ -6,10 +6,13 @@ import argparse
 import sys
 from typing import Sequence
 
-from aviona import __version__
-from framework.env import load_project_env
+from pathlib import Path
 
-_BANNER = f"Aviona {__version__} — interactive REPL ships in AVIONA-3."
+from aviona import __version__
+from aviona.repl import run_repl
+from aviona.session import AvionaSession
+from framework.env import load_project_env
+from framework.orchestration.session import validate_slm_api_key
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -38,8 +41,8 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the Aviona CLI.
 
-    Loads project ``.env`` via ``load_project_env`` (no secret I/O). Bare ``aviona`` prints a
-    REPL placeholder banner; ``doctor`` is a stub until later phases.
+    Loads project ``.env`` via ``load_project_env`` (no secret I/O). Bare ``aviona`` probes the
+    SLM once, then starts the interactive REPL; ``doctor`` is a stub until later phases.
 
     Args:
         argv: Optional argument list (defaults to ``sys.argv[1:]``).
@@ -58,8 +61,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("aviona doctor: not implemented yet (AVIONA-1 stub).")
         return 0
 
-    print(_BANNER)
-    return 0
+    validate_slm_api_key()
+    session = AvionaSession(Path.cwd())
+    return run_repl(session)
 
 
 if __name__ == "__main__":

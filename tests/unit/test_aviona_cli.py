@@ -40,8 +40,15 @@ def test_main_doctor_stub_exits_zero(capsys) -> None:
     assert "doctor" in capsys.readouterr().out.lower()
 
 
-def test_main_bare_invocation_prints_banner(capsys) -> None:
-    """Bare aviona prints the REPL placeholder banner."""
+def test_main_bare_invocation_starts_repl(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Bare aviona probes once and enters the REPL."""
+    monkeypatch.setattr(
+        "aviona.cli.validate_slm_api_key",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr("aviona.cli.run_repl", lambda _session: 0)
+    monkeypatch.setattr("aviona.cli.AvionaSession", lambda _cwd: object())
     code = main([])
     assert code == 0
-    assert __version__ in capsys.readouterr().out

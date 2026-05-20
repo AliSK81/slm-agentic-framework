@@ -38,7 +38,6 @@ from aviona.store import (
 )
 from aviona.tools import bind_snapshot_tools
 from aviona.fallbacks import try_explain_fallback, try_read_content_fallback
-from aviona.verify_turn import TurnOutcomeVerifier
 from framework.control.ablation import AblationSettings
 from framework.error_control.truncation import get_compaction_ceiling, set_caps_profile
 from framework.memory.stores import DecisionEntry, MemoryStores
@@ -252,15 +251,6 @@ class AvionaSession:
         if constraints:
             hard_constraints.extend(constraints)
         effective = verifier or self._verifier
-        turn_verifier = TurnOutcomeVerifier(
-            effective,
-            memory=self.memory,
-            session_id=self._session_id,
-            before_ids=frozenset(before_ids),
-            goal=goal,
-            before_files=before_files,
-            tool_outputs=effect_outputs,
-        )
         permission = self._permission_check
         if goal_kind in ("explain", "read_content") or requested_reply_text(goal):
             permission = self._read_only_permission_check(permission)
@@ -279,7 +269,7 @@ class AvionaSession:
                 ablation=AblationSettings(memory=True, control=True, error_control=True),
                 engine="graph",
                 probe=False,
-                verifier=turn_verifier,
+                verifier=effective,
                 planner_enabled=True,
                 max_steps=step_budget,
                 permission_check=permission,
@@ -292,7 +282,7 @@ class AvionaSession:
         self._last_checkpoint_path = session_outcome.checkpoint_path
         after_entries = self.memory.decisions.list_for_session(self._session_id)
         file_changes = changed_files(before_files, snapshot_files(self.workspace))
-        effects = turn_verifier.last_effects or analyze_turn_effects(
+        effects = analyze_turn_effects(
             goal=goal,
             new_entries=[
                 entry for entry in after_entries if entry.decision_id not in before_ids

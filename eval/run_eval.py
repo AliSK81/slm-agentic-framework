@@ -22,6 +22,7 @@ from eval.datasets.mbpp_adapter import (
     load_mbpp_by_ids,
     task_to_session as mbpp_task_to_session,
 )
+from eval.datasets.synthetic_multistep import generate_multistep, multistep_to_session
 from eval.datasets.swebench_adapter import load_swebench, load_swebench_by_ids
 from eval.manifest import manifest_provider_and_profiles, resolve_git_sha, write_manifest
 from eval.metrics import RunResult, compute_cer, compute_sr
@@ -33,7 +34,7 @@ logger = logging.getLogger(__name__)
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 _SRC_ROOT = _PROJECT_ROOT / "src"
 
-DatasetName = Literal["humaneval", "humaneval_hard", "mbpp", "swebench"]
+DatasetName = Literal["humaneval", "humaneval_hard", "multistep", "mbpp", "swebench"]
 ConfigName = Literal["A", "B", "C", "D"]
 
 
@@ -57,6 +58,23 @@ def _load_tasks(
     eval_config: EvalConfig | None = None,
 ) -> list[tuple[str, str, list[str], str, str | None]]:
     """Return list of (task_id, goal, constraints, test_code, solution_stub)."""
+    if dataset_name == "multistep":
+        block = eval_config.multistep if eval_config is not None else {}
+        levels = [int(value) for value in block.get("levels", [2, 4, 6, 8])]
+        per_level = int(block.get("per_level", 5))
+        generated = generate_multistep(levels=levels, per_level=per_level, seed=seed)
+        if n < len(generated):
+            from eval.datasets._sample import sample_items
+
+            generated = sample_items(generated, n, seed)
+        return [
+            (
+                task.task_id,
+                *multistep_to_session(task),
+                task.reference_solution,
+            )
+            for task in generated
+        ]
     if dataset_name == "humaneval_hard":
         block = eval_config.humaneval_hard if eval_config is not None else {}
         if block.get("curated_only", True):
@@ -285,11 +303,14 @@ def run_eval(
         for row in results:
             handle.write(json.dumps(row.model_dump(), default=str) + "\n")
 
+    n_valid_tasks = sum(1 for row in results if row.interaction_count > 0)
     summary: dict[str, Any] = {
         "sr": compute_sr(results),
         "cer": compute_cer(results),
         "n": len(results),
+        "n_valid_tasks": n_valid_tasks,
         "config": config_name,
+        "seed": sample_seed,
     }
     summary["trace_file"] = str(jsonl_path)
     summary["dataset"] = dataset_name
@@ -313,7 +334,10 @@ def run_eval(
     )
     summary["manifest_file"] = str(manifest_path)
 
-    if not dry_run:
+    if dry_run:
+        summary["run_valid"] = True
+        summary["run_invalid_reason"] = None
+    elif not dry_run:
         quality = assess_run(str(jsonl_path))
         quality_path = jsonl_path.with_name(f"{jsonl_path.stem}.quality.json")
         quality_payload = {

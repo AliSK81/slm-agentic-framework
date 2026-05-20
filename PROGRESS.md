@@ -9,10 +9,10 @@
 ## CURRENT STATE
 
 ```yaml
-current_phase: 19
+current_phase: 20
 phase_status: NOT_STARTED
-last_updated: "2026-05-21T01:00Z"
-last_commit: "a183368"
+last_updated: "2026-05-21T02:00Z"
+last_commit: "ce2a7f1"
 blocker: null
 ```
 
@@ -162,15 +162,15 @@ phases:
     name: "True-SLM bundle (Qwen-7B + Devstral)"
     status: DONE
     test_gate: "pytest tests/unit/test_slm_profiles.py"
-    commit: null
+    commit: "ce2a7f1"
     notes: "4/4 unit tests pass. slm_small bundle; qwen 7B id fix; smoke_test --bundle slm_small. Live smoke/e2e pending OPENROUTER_API_KEY in .env."
 
   19:
     name: "Valid multi-seed A-D ablation"
-    status: NOT_STARTED
-    test_gate: "python eval/scenarios/ablation.py --dataset humaneval_hard --seeds 41,42,43 --dry-run"
+    status: DONE
+    test_gate: "python -m eval.scenarios.ablation --dataset humaneval_hard --seeds 41,42,43 --dry-run"
     commit: null
-    notes: "ROADMAP phase 19. [REQUIRES_USER_INPUT] API budget."
+    notes: "5/5 unit tests + CLI dry-run gate. Multi-seed ablation, quality abort, mean±std table; --profile-bundle deepseek; e2e test_ablation_hard_slice (skip-honest). Live full ablation: user runs with DeepSeek budget."
 
   20:
     name: "MBPP ablation + traces"

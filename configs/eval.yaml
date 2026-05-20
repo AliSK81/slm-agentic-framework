@@ -19,9 +19,15 @@ swebench:
   seed: 42
   docker_required: true
 
+multistep:
+  per_level: 5
+  seed: 42
+  levels: [2, 4, 6, 8]
+
 step_budgets:
   humaneval: {max_steps: 10, max_retries: 3}
   humaneval_hard: {max_steps: 10, max_retries: 3}
+  multistep: {max_steps: 15, max_retries: 3}
   mbpp:      {max_steps: 15, max_retries: 3}
   swebench:  {max_steps: 25, max_retries: 3}
 

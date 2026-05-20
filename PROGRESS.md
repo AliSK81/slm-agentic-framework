@@ -9,10 +9,10 @@
 ## CURRENT STATE
 
 ```yaml
-current_phase: 27
+current_phase: 28
 phase_status: NOT_STARTED
-last_updated: "2026-05-20T20:00Z"
-last_commit: null
+last_updated: "2026-05-20T22:00Z"
+last_commit: "a3243e6"
 blocker: null
 ```
 
@@ -218,15 +218,15 @@ phases:
     name: "Cost/latency/token accounting"
     status: DONE
     test_gate: "pytest tests/unit/test_cost_accounting.py"
-    commit: null
+    commit: "a3243e6"
     notes: "5/5 unit tests. TrackingSLMClient, RunResult usage fields, eval/metrics/cost.py, report cost columns."
 
   27:
     name: "Curated results report + repro bundle"
-    status: NOT_STARTED
-    test_gate: "pytest tests/unit/test_report_curated.py"
+    status: DONE
+    test_gate: "pytest tests/unit/test_report_curated.py && python scripts/generate_report.py --curated --dry-run"
     commit: null
-    notes: "ROADMAP phase 27."
+    notes: "6/6 unit tests. cite_allowlist.yaml, eval/curated.py, --curated report + CI, make_repro_bundle.py."
 
   28:
     name: "Hardening (registry, parser, ThinkingBudget)"

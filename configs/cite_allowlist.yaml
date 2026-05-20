@@ -1,0 +1,31 @@
+# Canonical eval runs to cite in the thesis results chapter.
+# Excluded ids are blocked even if present under traces/ (do-not-cite invalid runs).
+version: 1
+
+excluded_run_ids:
+  - D_humaneval_20260520T085222Z  # INVALID: 70% SR, 6× interaction_count=0 (network)
+
+runs:
+  - run_id: A_humaneval_hard_20260520T125039Z
+    seed: 42
+    config: A
+    dataset: humaneval_hard
+    note: "E2E ablation humaneval_hard n=10 seed=42 (2026-05-20)"
+  - run_id: B_humaneval_hard_20260520T125743Z
+    seed: 42
+    config: B
+    dataset: humaneval_hard
+    note: "E2E ablation humaneval_hard n=10 seed=42 (2026-05-20)"
+  - run_id: C_humaneval_hard_20260520T130606Z
+    seed: 42
+    config: C
+    dataset: humaneval_hard
+    note: "E2E ablation humaneval_hard n=10 seed=42 (2026-05-20)"
+  - run_id: D_humaneval_hard_20260520T131220Z
+    seed: 42
+    config: D
+    dataset: humaneval_hard
+    note: "E2E ablation humaneval_hard n=10 seed=42 (2026-05-20)"
+
+# Add Phase-12 canonical 20-task runs (D_humaneval_20260520T082826Z, A_humaneval_20260520T083955Z)
+# when those trace files exist under traces/ — do not cite D_humaneval_20260520T085222Z (invalid).

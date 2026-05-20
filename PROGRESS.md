@@ -371,7 +371,7 @@ aviona_v2_phases:
   V2-3: { status: DONE, commit: "bc776c3", gate: "pytest tests/unit/test_aviona_contract.py", notes: "TurnContract verify_turn; deleted TurnOutcomeVerifier; session uses inner verifier only." }
   V2-4: { status: DONE, commit: "be8b979", gate: "scripts/test-aviona.ps1 + grep no classify_goal/fallbacks", notes: "Deleted effects/fallbacks; thin run_turn via framework_run_turn + TurnContract; turn_io.py." }
   V2-5: { status: DONE, commit: "9f61b4f", gate: "pytest tests/unit/test_turn_budgets.py", notes: "budgets.py cycle caps; interactive_read_only write-guard; interactive loop until terminate; 68/68 aviona gate." }
-  V2-6: { status: NOT_STARTED, gate: "pytest tests/unit/test_aviona_contract_matrix.py", notes: "contract matrix replaces phrasing journeys" }
+  V2-6: { status: DONE, commit: "0826e24", gate: "pytest tests/unit/test_aviona_contract_matrix.py", notes: "20-row contract matrix; JOURNEYS.md rewritten; deleted test_aviona_journeys.py; 84/84 aviona gate." }
   V2-7: { status: NOT_STARTED, gate: "pytest tests/unit/test_runtime_answer.py", notes: "runtime self-knowledge via anchor" }
   V2-8: { status: NOT_STARTED, requires_user_input: true, gate: "scripts/test-aviona.ps1 -Live", notes: "locked live journey gate" }
   V2-9: { status: NOT_STARTED, gate: "scripts/install-aviona.ps1 dry-run", notes: "windows install hardening carry-over" }

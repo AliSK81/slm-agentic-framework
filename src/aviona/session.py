@@ -20,7 +20,7 @@ from aviona.permissions import Mode, PermissionAction, PermissionGate
 from aviona.profiles import apply_daily_driver_profiles
 from aviona.project import load_project_rules
 from aviona.render import render_status, render_turn_detail
-from aviona.runtime import runtime_anchor_segment
+from aviona.runtime import runtime_anchor_segment, runtime_answer_constraint
 from aviona.settings import load_settings
 from aviona.snapshots import SnapshotStore
 from aviona.store import (
@@ -100,7 +100,7 @@ class AvionaSession:
             anchor_text = anchor_text + "\n" + git_seg
         if self._project_rules:
             anchor_text = anchor_text + "\n" + self._project_rules[0]
-        anchor_text = anchor_text + "\n" + runtime_anchor_segment()
+        anchor_text = anchor_text + "\n" + runtime_anchor_segment(cwd=self.workspace)
         self._history: list[HistoryBlock] = [
             HistoryBlock(kind="anchor", text=anchor_text),
         ]
@@ -139,6 +139,7 @@ class AvionaSession:
     ) -> list[str]:
         """Assemble anchor-first hard constraints for one interactive turn."""
         hard_constraints = list(self._project_rules)
+        hard_constraints.append(runtime_answer_constraint())
         context_segment = history_to_constraint(self._history)
         if context_segment:
             hard_constraints.append(context_segment)

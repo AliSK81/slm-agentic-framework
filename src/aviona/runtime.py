@@ -1,8 +1,15 @@
 """Runtime facts injected into the session anchor for every agent turn."""
 
+from __future__ import annotations
 
-def runtime_anchor_segment() -> str:
-    """Provider and model identity — agents answer from this, not repo files.
+from pathlib import Path
+
+
+def runtime_anchor_segment(*, cwd: Path | None = None) -> str:
+    """Provider, model, version, and cwd — agents answer self-questions from this block.
+
+    Args:
+        cwd: Optional workspace path included as a runtime fact (not repo file reads).
 
     Returns:
         One-line runtime segment for the rolling anchor block.
@@ -18,4 +25,22 @@ def runtime_anchor_segment() -> str:
         models = planner.model_id
     else:
         models = f"planner={planner.model_id}, executor={executor.model_id}"
-    return f"runtime: aviona {__version__} | provider {provider} | model {models}"
+    parts = [
+        f"product=aviona",
+        f"version={__version__}",
+        f"provider={provider}",
+        f"model={models}",
+    ]
+    if cwd is not None:
+        parts.append(f"cwd={cwd.resolve()}")
+    return "runtime: " + " | ".join(parts)
+
+
+def runtime_answer_constraint() -> str:
+    """Hard constraint instructing meta answers from anchor runtime facts."""
+    return (
+        "[AVIONA] Questions about Aviona itself (version, provider, model, working directory) "
+        "must be answered only from the runtime: facts in [CONSTRAINTS] — do not read repository "
+        "files for self-knowledge. Respond with terminate{user_message, turn_type:answer} in one "
+        "cycle without tools."
+    )

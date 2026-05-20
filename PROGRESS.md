@@ -9,10 +9,10 @@
 ## CURRENT STATE
 
 ```yaml
-current_phase: 29
-phase_status: DONE
-last_updated: "2026-05-21T00:00Z"
-last_commit: "1735ad8"
+current_phase: 30
+phase_status: NOT_STARTED
+last_updated: "2026-05-21T12:00Z"
+last_commit: "88c1a50"
 blocker: null
 ```
 
@@ -239,8 +239,92 @@ phases:
     name: "Retrieval ablation + Redis backend (RQ1)"
     status: DONE
     test_gate: "pytest tests/unit/test_retrieval_semantic.py tests/unit/test_redis_backend.py"
-    commit: null
+    commit: "1735ad8"
     notes: "4/5 unit tests (Redis live skipped). SemanticRetriever+Chroma, RedisBackend, ablation --retrieval-mode."
+
+  30:
+    name: "Discriminative hard slice (RQ2)"
+    status: NOT_STARTED
+    test_gate: "pytest tests/unit/test_difficulty_slices.py && python -m eval.run_eval --config A --dataset discriminative --n 5 --dry-run"
+    commit: null
+    notes: "ROADMAP phases 30+ merged. See ROADMAP.md PHASE 30."
+
+  31:
+    name: "Live multi-seed A-D ablation DeepSeek"
+    status: NOT_STARTED
+    test_gate: "python -m eval.scenarios.ablation --dataset discriminative --seeds 41,42,43 --dry-run && pytest tests/unit/test_cite_allowlist.py"
+    commit: null
+    notes: "[REQUIRES_USER_INPUT] API budget."
+
+  32:
+    name: "True-SLM live matrix (slm_small)"
+    status: NOT_STARTED
+    test_gate: "pytest tests/unit/test_slm_profiles.py && ablation --profile-bundle slm_small --dry-run"
+    commit: null
+    notes: "[REQUIRES_USER_INPUT] OPENROUTER_API_KEY."
+
+  33:
+    name: "Keyword vs semantic retrieval comparison"
+    status: NOT_STARTED
+    test_gate: "pytest tests/unit/test_retrieval_compare.py"
+    commit: null
+    notes: "[REQUIRES_USER_INPUT]"
+
+  34:
+    name: "Efficiency chapter (cost/latency/token)"
+    status: NOT_STARTED
+    test_gate: "pytest tests/unit/test_efficiency.py"
+    commit: null
+    notes: "Depends on phases 31-32 cited runs."
+
+  35:
+    name: "MBPP n=50 ablation"
+    status: NOT_STARTED
+    test_gate: "python -m eval.run_eval --config D --dataset mbpp --n 5 --dry-run"
+    commit: null
+    notes: "[REQUIRES_USER_INPUT]"
+
+  36:
+    name: "RQ3 interaction-length + agent-count"
+    status: NOT_STARTED
+    test_gate: "pytest tests/unit/test_interaction_length.py && agent_count --dry-run"
+    commit: null
+    notes: "[REQUIRES_USER_INPUT]"
+
+  37:
+    name: "SWE-bench Lite pilot"
+    status: NOT_STARTED
+    test_gate: "pytest tests/unit/test_swebench_docker.py"
+    commit: null
+    notes: "[REQUIRES_USER_INPUT] Docker + API."
+
+  38:
+    name: "Qualitative + failure taxonomy"
+    status: NOT_STARTED
+    test_gate: "pytest tests/unit/test_failure_taxonomy.py tests/unit/test_qualitative_metrics.py"
+    commit: null
+    notes: "Deterministic; no API."
+
+  39:
+    name: "Thesis tables + figures (LaTeX)"
+    status: NOT_STARTED
+    test_gate: "pytest tests/unit/test_report_latex.py tests/unit/test_figures.py"
+    commit: null
+    notes: "Curated-only export."
+
+  40:
+    name: "Docs + zipped repro bundle"
+    status: NOT_STARTED
+    test_gate: "pytest tests/unit/test_repro_package.py && make_repro_bundle --zip --dry-run"
+    commit: null
+    notes: "No API."
+
+  41:
+    name: "E2E regression smoke + Redis pilot"
+    status: NOT_STARTED
+    test_gate: "pytest tests/e2e/test_regression_smoke.py --collect-only"
+    commit: null
+    notes: "[REQUIRES_USER_INPUT optional]"
 ```
 
 ---
@@ -287,6 +371,7 @@ decisions:
   - "2026-05-20: Phase 12 e2e runs A+D only (not B/C); full ablation is Phase 11 eval/scenarios/ablation.py."
 issues:
   - "Phases 14–29 merged into ROADMAP.md 2026-05-20; Phase 13 done."
+  - "2026-05-21: ROADMAP_PHASES_NEXT.md merged; phases 30–41 in ROADMAP.md; handoff at 88c1a50."
   - "scripts/run_phase12_staged.ps1 broken on Windows; use scripts/run_phase12_staged.py."
 ```
 

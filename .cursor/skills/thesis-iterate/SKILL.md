@@ -90,7 +90,7 @@ Proceed to the next phase without stopping.
 **Stop only when:**
 
 - Phase has `[REQUIRES_USER_INPUT]` and prerequisite is unmet
-- All 12 phases are `DONE`
+- All phases in `ROADMAP.md` Phase Overview are `DONE` → then run **`thesis-handoff-report`** skill for Claude/next-phase planning
 - Blocker unresolved after 3 attempts
 
 ---

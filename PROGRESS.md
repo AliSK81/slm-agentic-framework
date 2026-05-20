@@ -9,10 +9,10 @@
 ## CURRENT STATE
 
 ```yaml
-current_phase: 12
-phase_status: DONE
-last_updated: "2026-05-20T12:45Z"
-last_commit: "072fbf2"
+current_phase: 13
+phase_status: NOT_STARTED
+last_updated: "2026-05-20T18:00Z"
+last_commit: null
 blocker: null
 ```
 
@@ -122,6 +122,125 @@ phases:
       Framework fixes: SLM json_object prompt, executor edit_file aliases/full replace, planner string
       subtasks + str(task_id), e2e logging (logs/e2e_*.log). Optional: full A/B/C/D table via
       eval/scenarios/ablation.py (Phase 11 harness, not Phase 12 e2e).
+
+  13:
+    name: "Run Integrity (probe retry + run quality gate)"
+    status: NOT_STARTED
+    test_gate: "pytest tests/unit/test_run_quality.py tests/unit/test_api_probe_retry.py"
+    commit: null
+    notes: "ROADMAP phase 13. Zero-interaction runs flagged INVALID."
+
+  14:
+    name: "Eval CLI --task-id + run manifest"
+    status: NOT_STARTED
+    test_gate: "pytest tests/unit/test_manifest.py"
+    commit: null
+    notes: "ROADMAP phase 14."
+
+  15:
+    name: "HumanEval difficulty slices + hard ids"
+    status: NOT_STARTED
+    test_gate: "pytest tests/unit/test_difficulty_slices.py"
+    commit: null
+    notes: "ROADMAP phase 15."
+
+  16:
+    name: "Multi-step interaction-length scenarios (RQ3)"
+    status: NOT_STARTED
+    test_gate: "pytest tests/unit/test_interaction_length.py"
+    commit: null
+    notes: "ROADMAP phase 16."
+
+  17:
+    name: "Reflection on REVISE"
+    status: NOT_STARTED
+    test_gate: "pytest tests/integration/test_reflection_revise.py"
+    commit: null
+    notes: "ROADMAP phase 17. error_control-gated."
+
+  18:
+    name: "True-SLM bundle (Qwen-7B + Devstral)"
+    status: NOT_STARTED
+    test_gate: "pytest tests/unit/test_slm_profiles.py"
+    commit: null
+    notes: "ROADMAP phase 18. [REQUIRES_USER_INPUT] API key."
+
+  19:
+    name: "Valid multi-seed A-D ablation"
+    status: NOT_STARTED
+    test_gate: "python eval/scenarios/ablation.py --dataset humaneval_hard --seeds 41,42,43 --dry-run"
+    commit: null
+    notes: "ROADMAP phase 19. [REQUIRES_USER_INPUT] API budget."
+
+  20:
+    name: "MBPP ablation + traces"
+    status: NOT_STARTED
+    test_gate: "python -m eval.run_eval --config D --dataset mbpp --n 5 --dry-run"
+    commit: null
+    notes: "ROADMAP phase 20. [REQUIRES_USER_INPUT]."
+
+  21:
+    name: "SWE-bench lite Docker runner"
+    status: NOT_STARTED
+    test_gate: "pytest tests/unit/test_swebench_docker.py"
+    commit: null
+    notes: "ROADMAP phase 21. [REQUIRES_USER_INPUT] Docker + API."
+
+  22:
+    name: "Agent-count experiment (RQ3)"
+    status: NOT_STARTED
+    test_gate: "python -m eval.scenarios.agent_count --dataset multistep --dry-run"
+    commit: null
+    notes: "ROADMAP phase 22. [REQUIRES_USER_INPUT]."
+
+  23:
+    name: "Decision-log JSONL + task_id linking"
+    status: NOT_STARTED
+    test_gate: "pytest tests/unit/test_decision_jsonl.py tests/unit/test_analyze_traces.py"
+    commit: null
+    notes: "ROADMAP phase 23."
+
+  24:
+    name: "Qualitative metrics (RQ1/RQ2)"
+    status: NOT_STARTED
+    test_gate: "pytest tests/unit/test_qualitative_metrics.py"
+    commit: null
+    notes: "ROADMAP phase 24."
+
+  25:
+    name: "LangGraph production OR deprecation"
+    status: NOT_STARTED
+    test_gate: "pytest tests/integration/test_workflow.py or tests/unit/test_deprecation.py"
+    commit: null
+    notes: "ROADMAP phase 25. [REQUIRES_USER_INPUT] advisor choice."
+
+  26:
+    name: "Cost/latency/token accounting"
+    status: NOT_STARTED
+    test_gate: "pytest tests/unit/test_cost_accounting.py"
+    commit: null
+    notes: "ROADMAP phase 26."
+
+  27:
+    name: "Curated results report + repro bundle"
+    status: NOT_STARTED
+    test_gate: "pytest tests/unit/test_report_curated.py"
+    commit: null
+    notes: "ROADMAP phase 27."
+
+  28:
+    name: "Hardening (registry, parser, ThinkingBudget)"
+    status: NOT_STARTED
+    test_gate: "pytest tests/unit/test_slm_registry.py tests/unit/test_error_control.py tests/unit/test_thinking_budget.py"
+    commit: null
+    notes: "ROADMAP phase 28."
+
+  29:
+    name: "Retrieval ablation + Redis backend (RQ1)"
+    status: NOT_STARTED
+    test_gate: "pytest tests/unit/test_retrieval_semantic.py tests/unit/test_redis_backend.py"
+    commit: null
+    notes: "ROADMAP phase 29. [REQUIRES_USER_INPUT] optional."
 ```
 
 ---
@@ -167,8 +286,9 @@ decisions:
   - "2026-05-20: Planner coerces SLM numeric task_id/depends_on to str (tests/unit/test_planner.py)."
   - "2026-05-20: Phase 12 e2e runs A+D only (not B/C); full ablation is Phase 11 eval/scenarios/ablation.py."
 issues:
-  - "validate_slm_api_key() at session start has no retry — transient SSL/connection errors can zero-out tasks."
-  - "eval.run_eval has no --task-id; single-task reruns need script calling _run_single_task."
+  - "Phases 13–29 merged into ROADMAP.md 2026-05-20; implementation not started."
+  - "validate_slm_api_key() at session start has no retry — addressed by Phase 13."
+  - "eval.run_eval has no --task-id — addressed by Phase 14."
   - "scripts/run_phase12_staged.ps1 broken on Windows; use scripts/run_phase12_staged.py."
 ```
 

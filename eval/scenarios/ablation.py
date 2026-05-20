@@ -85,6 +85,18 @@ def _parse_seeds(raw: str | None, fallback: int) -> list[int]:
     return values
 
 
+def _apply_retrieval_mode(mode: str | None) -> None:
+    """Set ``MEMORY_RETRIEVAL_MODE`` for keyword vs semantic retrieval (RQ1 axis)."""
+    if not mode:
+        return
+    normalized = mode.strip().lower()
+    if normalized not in ("keyword", "semantic"):
+        raise ValueError(
+            f"retrieval_mode must be 'keyword' or 'semantic', got {mode!r}"
+        )
+    os.environ["MEMORY_RETRIEVAL_MODE"] = normalized
+
+
 def _apply_profile_bundle(bundle_name: str | None) -> None:
     """Apply optional SLM profile bundle or provider override (e.g. deepseek)."""
     if not bundle_name:
@@ -156,8 +168,10 @@ def print_comparison_table(
             f"{_yn(flags.memory):<8} {_yn(flags.control):<9} {_yn(flags.error_control):<10}"
         )
     seed_label = ",".join(str(value) for value in result.seeds) or str(result.seed)
+    retrieval_label = os.getenv("MEMORY_RETRIEVAL_MODE", "keyword")
     print(
-        f"\nDataset: {result.dataset}  n={result.n_tasks}  seeds={seed_label}"
+        f"\nDataset: {result.dataset}  n={result.n_tasks}  seeds={seed_label}  "
+        f"retrieval={retrieval_label}"
     )
     print(f"Timestamp: {result.timestamp}")
 
@@ -170,6 +184,7 @@ def run_ablation(
     seeds: list[int] | None = None,
     dry_run: bool = False,
     profile_bundle: str | None = None,
+    retrieval_mode: str | None = None,
 ) -> AblationResult:
     """Run configs A–D on the same sample across one or more seeds.
 
@@ -180,6 +195,7 @@ def run_ablation(
         seeds: Optional list of seeds (e.g. ``[41, 42, 43]``).
         dry_run: Build manifests and traces without API calls.
         profile_bundle: Optional bundle (``slm_small``) or provider (``deepseek``).
+        retrieval_mode: ``keyword`` or ``semantic`` — sets ``MEMORY_RETRIEVAL_MODE`` for RQ1.
 
     Outputs:
         AblationResult with per-config mean±std metrics.
@@ -189,6 +205,7 @@ def run_ablation(
         when any non-dry run fails the quality gate.
     """
     _apply_profile_bundle(profile_bundle)
+    _apply_retrieval_mode(retrieval_mode)
     dataset_name: AblationDatasetName = dataset  # type: ignore[assignment]
     eval_config = load_eval_config()
     flags_map = eval_config.ablation_configs
@@ -277,6 +294,12 @@ def main(argv: list[str] | None = None) -> int:
         help="Profile bundle (slm_small) or provider key (deepseek); default uses models.yaml active_provider",
     )
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--retrieval-mode",
+        choices=["keyword", "semantic"],
+        default=None,
+        help="Memory retrieval mechanism for configs with memory enabled (RQ1)",
+    )
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args(argv)
 
@@ -294,6 +317,7 @@ def main(argv: list[str] | None = None) -> int:
             seeds=_parse_seeds(args.seeds, args.seed),
             dry_run=args.dry_run,
             profile_bundle=args.profile_bundle,
+            retrieval_mode=args.retrieval_mode,
         )
     except AblationRunInvalidError as exc:
         logger.error("%s", exc)

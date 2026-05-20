@@ -1,7 +1,12 @@
 """Memory stores, retrieval, reflection, and checkpoints."""
 
 from framework.memory.backend import MemoryBackend, RedisBackend, SQLiteBackend
-from framework.memory.retrieval import retrieve_top_k, score
+from framework.memory.retrieval import (
+    SemanticRetriever,
+    get_retrieval_mode,
+    retrieve_top_k,
+    score,
+)
 from framework.memory.stores import (
     DecisionEntry,
     DecisionLog,
@@ -39,6 +44,8 @@ __all__ = [
     "WorkingMemory",
     "WorkingMemoryBudgetError",
     "WorkingMemoryBuilder",
+    "SemanticRetriever",
+    "get_retrieval_mode",
     "retrieve_top_k",
     "score",
 ]

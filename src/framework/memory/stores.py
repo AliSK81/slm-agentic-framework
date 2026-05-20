@@ -408,13 +408,11 @@ def create_backend_from_env() -> MemoryBackend:
 
     from dotenv import load_dotenv
 
+    from framework.memory.backend import RedisBackend
+
     load_dotenv()
     backend_name = os.getenv("MEMORY_BACKEND", "sqlite").lower()
     if backend_name == "redis":
-        return RedisBackend()  # type: ignore[return-value]
+        return RedisBackend()
     path = os.getenv("SQLITE_PATH", "./data/framework.db")
     return SQLiteBackend(path)
-
-
-# Late import avoids circular dependency at class body time
-from framework.memory.backend import RedisBackend  # noqa: E402

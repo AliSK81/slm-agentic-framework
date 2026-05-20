@@ -9,9 +9,9 @@
 ## CURRENT STATE
 
 ```yaml
-current_phase: 29
+current_phase: 30
 phase_status: NOT_STARTED
-last_updated: "2026-05-20T23:00Z"
+last_updated: "2026-05-21T00:00Z"
 last_commit: "cda296e"
 blocker: null
 ```
@@ -232,15 +232,15 @@ phases:
     name: "Hardening (registry, parser, ThinkingBudget)"
     status: DONE
     test_gate: "pytest tests/unit/test_slm_registry.py tests/unit/test_error_control.py tests/unit/test_thinking_budget.py"
-    commit: null
+    commit: "cda296e"
     notes: "28/28 tests. ProfileResolutionError, parser literal-newline repair, ThinkingBudget unit tests."
 
   29:
     name: "Retrieval ablation + Redis backend (RQ1)"
-    status: NOT_STARTED
+    status: DONE
     test_gate: "pytest tests/unit/test_retrieval_semantic.py tests/unit/test_redis_backend.py"
     commit: null
-    notes: "ROADMAP phase 29. [REQUIRES_USER_INPUT] optional."
+    notes: "4/5 unit tests (Redis live skipped). SemanticRetriever+Chroma, RedisBackend, ablation --retrieval-mode."
 ```
 
 ---

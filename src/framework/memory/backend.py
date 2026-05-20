@@ -1,11 +1,17 @@
-"""Memory persistence backends (SQLite primary, Redis stub)."""
+"""Memory persistence backends (SQLite primary, Redis optional)."""
 
 from __future__ import annotations
 
 import json
-import sqlite3
+import os
+import uuid
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
+
+import yaml
+
+_PROJECT_ROOT = Path(__file__).resolve().parents[3]
+_MEMORY_CONFIG = _PROJECT_ROOT / "configs" / "memory.yaml"
 
 
 @runtime_checkable
@@ -29,11 +35,26 @@ class MemoryBackend(Protocol):
         ...
 
 
+def _load_memory_config() -> dict[str, Any]:
+    return yaml.safe_load(_MEMORY_CONFIG.read_text(encoding="utf-8")) or {}
+
+
+def _redis_defaults() -> tuple[str, int]:
+    block = _load_memory_config().get("redis", {})
+    return (
+        str(block.get("url", "redis://localhost:6379")),
+        int(block.get("ttl_seconds", 86400)),
+    )
+
+
 class SQLiteBackend:
     """SQLite-backed memory store."""
 
     def __init__(self, db_path: Path | str) -> None:
         """Open or create database at db_path."""
+        import sqlite3
+
+        self._sqlite3 = sqlite3
         self._db_path = Path(db_path)
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_schema()
@@ -42,9 +63,9 @@ class SQLiteBackend:
     def db_path(self) -> Path:
         return self._db_path
 
-    def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self._db_path)
-        conn.row_factory = sqlite3.Row
+    def _connect(self) -> Any:
+        conn = self._sqlite3.connect(self._db_path)
+        conn.row_factory = self._sqlite3.Row
         return conn
 
     def _init_schema(self) -> None:
@@ -100,7 +121,7 @@ class SQLiteBackend:
         results: list[dict[str, Any]] = []
         for row in rows:
             payload = json.loads(row["payload"])
-            if all(payload.get(k) == v for k, v in filters.items()):
+            if all(payload.get(field) == val for field, val in filters.items()):
                 results.append(payload)
         return results
 
@@ -117,21 +138,50 @@ class SQLiteBackend:
 
 
 class RedisBackend:
-    """Redis backend stub — not required for sqlite-only deployments."""
+    """Redis-backed memory store with per-key TTL (default 24 h)."""
 
-    def __init__(self, *_args: object, **_kwargs: object) -> None:
-        raise NotImplementedError(
-            "RedisBackend is not implemented; set MEMORY_BACKEND=sqlite"
-        )
+    def __init__(
+        self,
+        url: str | None = None,
+        *,
+        ttl_seconds: int | None = None,
+    ) -> None:
+        """Connect to Redis; uses configs/memory.yaml when args omitted."""
+        import redis
+
+        default_url, default_ttl = _redis_defaults()
+        self._ttl = ttl_seconds if ttl_seconds is not None else default_ttl
+        redis_url = url or os.getenv("REDIS_URL", default_url)
+        self._client = redis.from_url(redis_url, decode_responses=True)
+
+    def _row_key(self, store: str, key: str | None) -> str:
+        if key is None:
+            return f"memory:{store}:append:{uuid.uuid4().hex}"
+        return f"memory:{store}:key:{key}"
 
     def write(self, store: str, key: str, value: dict[str, Any]) -> None:
-        raise NotImplementedError
+        redis_key = self._row_key(store, key)
+        self._client.setex(redis_key, self._ttl, json.dumps(value))
 
     def read(self, store: str, key: str) -> dict[str, Any] | None:
-        raise NotImplementedError
+        redis_key = self._row_key(store, key)
+        raw = self._client.get(redis_key)
+        if raw is None:
+            return None
+        return json.loads(raw)
 
     def query(self, store: str, filters: dict[str, Any]) -> list[dict[str, Any]]:
-        raise NotImplementedError
+        pattern = f"memory:{store}:*"
+        results: list[dict[str, Any]] = []
+        for redis_key in self._client.scan_iter(match=pattern, count=200):
+            raw = self._client.get(redis_key)
+            if not raw:
+                continue
+            payload = json.loads(raw)
+            if all(payload.get(field) == val for field, val in filters.items()):
+                results.append(payload)
+        return results
 
     def append(self, store: str, value: dict[str, Any]) -> None:
-        raise NotImplementedError
+        redis_key = self._row_key(store, None)
+        self._client.setex(redis_key, self._ttl, json.dumps(value))

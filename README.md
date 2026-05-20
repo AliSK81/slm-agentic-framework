@@ -36,7 +36,23 @@ pytest tests/ -m "not e2e"
 
 ```
 src/framework/   # core library
+src/aviona/      # terminal agent (Aviona)
 eval/            # benchmarks and ablation
 tests/           # unit, integration, e2e
 configs/         # models, memory, eval YAML
 ```
+
+## Aviona (v1)
+
+Terminal agent for project-local edits. Install the package, `cd` into a small repo, and run `aviona`:
+
+```bash
+pip install -e .
+cd tests/fixtures/sample_repo   # or any project with optional AVIONA.md rules
+aviona
+> create hello.txt with "hi"
+```
+
+After a successful turn, `hello.txt` exists under the current directory and a session JSONL line is written under `~/.aviona/projects/<hash>/`. No live API key is required for unit tests — see `tests/unit/test_aviona_session.py`.
+
+Other useful commands: `aviona doctor` (SLM probe), `aviona undo` (restore last snapshotted edits), `aviona --continue` / `--resume <id>` / `--fork-session`.

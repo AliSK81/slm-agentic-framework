@@ -7,11 +7,13 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
+from aviona.compaction import HistoryBlock, compact, history_to_constraint
 from aviona.profiles import apply_daily_driver_profiles
 from aviona.project import load_project_rules
 from aviona.render import render_status
 from aviona.store import SessionStore, aviona_project_dir, project_hash
 from framework.control.ablation import AblationSettings
+from framework.error_control.truncation import get_compaction_ceiling, set_caps_profile
 from framework.memory.stores import DecisionEntry, MemoryStores
 from framework.orchestration.session import SessionOutcome, run_full_session
 from framework.orchestration.verify import NoOpVerifier, Verifier
@@ -36,6 +38,7 @@ class AvionaSession:
 
     def __init__(self, cwd: Path) -> None:
         apply_daily_driver_profiles()
+        set_caps_profile("interactive")
         self.workspace = cwd.resolve()
         self.session_root = aviona_project_dir(self.workspace)
         self.session_root.mkdir(parents=True, exist_ok=True)
@@ -47,6 +50,13 @@ class AvionaSession:
         self._verifier: Verifier = NoOpVerifier()
         self._project_rules = load_project_rules(self.workspace)
         self._store = SessionStore(self.workspace, self._session_id)
+        self._context_ceiling = get_compaction_ceiling()
+        anchor_text = f"workspace: {self.workspace}"
+        if self._project_rules:
+            anchor_text = anchor_text + "\n" + self._project_rules[0]
+        self._history: list[HistoryBlock] = [
+            HistoryBlock(kind="anchor", text=anchor_text),
+        ]
 
     def run_turn(
         self,
@@ -68,11 +78,15 @@ class AvionaSession:
             ``TurnResult`` with a one-line-friendly status string.
         """
         goal = text.strip()
+        self._history = compact(self._history, self._context_ceiling)
         before_ids = {
             entry.decision_id
             for entry in self.memory.decisions.list_for_session(self._session_id)
         }
         hard_constraints = list(self._project_rules)
+        context_segment = history_to_constraint(self._history)
+        if context_segment:
+            hard_constraints.append(context_segment)
         if constraints:
             hard_constraints.extend(constraints)
         effective = verifier or self._verifier
@@ -105,6 +119,19 @@ class AvionaSession:
             tokens_total=session_outcome.tokens_total,
             decision_refs=new_refs,
         )
+        self._history.append(
+            HistoryBlock(
+                kind="turn",
+                text=f"user: {goal}\nstatus: {status}",
+            )
+        )
+        for entry in after_entries:
+            if entry.decision_id not in before_ids:
+                tool_text = _decision_tool_text(entry)
+                if tool_text:
+                    self._history.append(
+                        HistoryBlock(kind="tool_output", text=tool_text)
+                    )
         return TurnResult(
             status=status,
             outcome=session_outcome.outcome,
@@ -114,6 +141,17 @@ class AvionaSession:
             error=session_outcome.error,
             session_id=session_outcome.session_id,
         )
+
+
+def _decision_tool_text(entry: DecisionEntry) -> str | None:
+    """Extract a compact tool-output line from a decision entry."""
+    if entry.kind == "tool_call":
+        tool = entry.payload.get("tool", "tool")
+        return f"{tool}: {entry.rationale}"
+    if entry.kind == "code_edit":
+        path = entry.payload.get("file_path") or entry.payload.get("path") or "file"
+        return f"code_edit {path}: {entry.rationale}"
+    return None
 
 
 def _last_edited_path(entries: list[DecisionEntry]) -> str | None:

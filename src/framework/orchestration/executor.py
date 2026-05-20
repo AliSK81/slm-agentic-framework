@@ -172,8 +172,12 @@ class ExecutorAgent:
 
         last_error: str | None = None
         if int(state.get("retry_count", 0)) > 0:
+            reflection = state.get("reflection_guidance")
             evaluation = state.get("last_evaluation") or {}
-            last_error = evaluation.get("error_message") or evaluation.get("error")
+            if reflection:
+                last_error = str(reflection)
+            else:
+                last_error = evaluation.get("error_message") or evaluation.get("error")
 
         result = self._cycle.run(
             session_id,

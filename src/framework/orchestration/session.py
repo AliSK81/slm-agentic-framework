@@ -27,11 +27,13 @@ from framework.control.workflow import (
     next_state,
 )
 from framework.memory.checkpoint import save_checkpoint
+from framework.memory.reflection import _reflection_config, write_reflection
 from framework.memory.stores import MemoryStores, StateEntry, SubTask
 from framework.memory.working_memory import WorkingMemoryBuilder
 from framework.control.ablation import AblationSettings
 from framework.orchestration.executor import ExecutorAgent
 from framework.orchestration.planner import PlannerAgent
+from framework.slm.client import SLMClient
 from framework.slm.config import (
     active_provider_name,
     api_key_env_var_for_active_provider,
@@ -224,6 +226,70 @@ def _build_agents(
     return planner, executor
 
 
+def _run_revise_reflection(
+    state: WorkflowState,
+    memory: MemoryStores,
+    goal: str,
+    planner_slm: SLMClient,
+    settings: AblationSettings,
+) -> WorkflowState:
+    """On REVISE, write verbal reflection (error_control only) for the next attempt.
+
+    Inputs:
+        state: Current workflow state after a failed evaluation.
+        memory: Session memory stores.
+        goal: Session root goal text.
+        planner_slm: Planner-role SLM client (single bounded call).
+        settings: Ablation toggles; reflection runs only when ``error_control`` is on.
+
+    Outputs:
+        Updated state with ``reflection_guidance`` for the executor cycle.
+
+    Side effects:
+        Appends a DecisionEntry(kind=reflection) when under the per-subtask cap.
+    """
+    if not settings.error_control:
+        return {**state, "reflection_guidance": None}
+
+    retry_count = int(state.get("retry_count", 0))
+    threshold = int(_reflection_config().get("trigger_retry_threshold", 1))
+    if retry_count < threshold:
+        return {**state, "reflection_guidance": None}
+
+    session_id = state["session_id"]
+    subtask_id = state.get("active_subtask_id") or "st-main"
+    evaluation = state.get("last_evaluation") or {}
+    failure_reason = (
+        evaluation.get("error_message")
+        or evaluation.get("error")
+        or "tests did not pass"
+    )
+
+    subtask_desc = subtask_id
+    rows = memory.backend.query("subtasks", {"task_id": subtask_id})
+    if rows:
+        subtask_desc = str(rows[0].get("description", subtask_id))
+
+    text = write_reflection(
+        planner_slm,
+        session_id,
+        int(state.get("step_count", 0)),
+        goal,
+        subtask_desc,
+        retry_count,
+        str(failure_reason),
+        memory,
+        subtask_id=subtask_id,
+    )
+
+    updated: WorkflowState = {**state, "reflection_guidance": text or None}
+    if text and isinstance(updated.get("last_evaluation"), dict):
+        evaluation_copy = dict(updated["last_evaluation"])
+        evaluation_copy["reflection_guidance"] = text
+        updated["last_evaluation"] = evaluation_copy
+    return updated
+
+
 def _ensure_work_subtasks(memory: MemoryStores, session_id: str, goal: str) -> None:
     """Ensure at least one open executor subtask exists after planning."""
     rows = memory.backend.query("subtasks", {"parent_session_id": session_id})
@@ -319,6 +385,7 @@ def run_full_session(
         "max_steps": max_steps,
         "max_retries": max_retries,
         "last_evaluation": None,
+        "reflection_guidance": None,
     }
 
     outcome: SessionOutcome = SessionOutcome(session_id=session_id)
@@ -390,6 +457,13 @@ def run_full_session(
             if transition == STATE_REVISE:
                 state["current_state"] = STATE_REVISE
                 state["retry_count"] = int(state.get("retry_count", 0)) + 1
+                state = _run_revise_reflection(
+                    state,
+                    memory,
+                    goal,
+                    planner._cycle._slm,
+                    settings,
+                )
                 continue
 
             state["active_subtask_id"] = None

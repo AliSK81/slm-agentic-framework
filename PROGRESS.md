@@ -9,10 +9,10 @@
 ## CURRENT STATE
 
 ```yaml
-current_phase: aviona-4
+current_phase: aviona-5
 phase_status: NOT_STARTED
-last_updated: "2026-05-20T14:00Z"
-last_commit: "21a07ad"
+last_updated: "2026-05-20T15:00Z"
+last_commit: "7c6f835"
 blocker: null
 active_roadmap: ROADMAP_PRODUCTION_AVIONA.md
 thesis_track: paused_at_phase_39
@@ -338,8 +338,8 @@ phases:
 aviona_phases:
   1:  { status: DONE, commit: "5a52fbf", gate: "pip install -e . && aviona --version && pytest tests/unit/test_aviona_cli.py", notes: "5/5 CLI tests; editable install + console script." }
   2:  { status: DONE, commit: "d60dd5b", gate: "pytest tests/unit/test_verifier.py tests/unit/test_aviona_session.py", notes: "5 verifier + 3 session tests; workflow regression 15/15." }
-  3:  { status: DONE, commit: "TBD", gate: "pytest tests/unit/test_aviona_repl.py", notes: "3/3 REPL tests; cli wires probe+run_repl; per-turn KeyboardInterrupt." }
-  4:  { status: NOT_STARTED, gate: "v1 DoD — REPL + AVIONA.md + session store" }
+  3:  { status: DONE, commit: "21a07ad", gate: "pytest tests/unit/test_aviona_repl.py", notes: "3/3 REPL tests; cli wires probe+run_repl; per-turn KeyboardInterrupt." }
+  4:  { status: DONE, commit: "TBD", gate: "pytest tests/unit/test_aviona_project.py tests/unit/test_aviona_store.py", notes: "4+5 tests; AVIONA.md→constraints; JSONL+meta; secret guard. v1 DoD met." }
   5-12: { status: NOT_STARTED, see ROADMAP_PRODUCTION_AVIONA.md }
   thesis_resume: { status: PAUSED, requires_user_input: true }
 ```

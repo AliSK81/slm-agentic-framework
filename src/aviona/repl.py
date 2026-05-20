@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable, Iterator, Sequence
 
-from aviona.permissions import Mode
 from aviona.session import AvionaSession, TurnResult
 
 logger = logging.getLogger(__name__)

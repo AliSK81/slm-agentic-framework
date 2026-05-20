@@ -9,10 +9,10 @@
 ## CURRENT STATE
 
 ```yaml
-current_phase: 25
+current_phase: 26
 phase_status: NOT_STARTED
-last_updated: "2026-05-21T16:00Z"
-last_commit: "8440df4"
+last_updated: "2026-05-20T18:00Z"
+last_commit: "3fbaf7f"
 blocker: null
 ```
 
@@ -204,15 +204,15 @@ phases:
     name: "Qualitative metrics (RQ1/RQ2)"
     status: DONE
     test_gate: "pytest tests/unit/test_qualitative_metrics.py"
-    commit: null
+    commit: "8440df4"
     notes: "6/6 unit tests. qualitative.py + analyze_traces --qualitative/--compare-a-d; decision log streams issue_kinds + payload_hash."
 
   25:
     name: "LangGraph production OR deprecation"
-    status: NOT_STARTED
-    test_gate: "pytest tests/integration/test_workflow.py or tests/unit/test_deprecation.py"
-    commit: null
-    notes: "ROADMAP phase 25. [REQUIRES_USER_INPUT] advisor choice."
+    status: DONE
+    test_gate: "pytest tests/integration/test_workflow.py"
+    commit: "3fbaf7f"
+    notes: "Option A. SqliteSaver checkpointer; run_full_session engine=graph (default) + loop parity; 15/15 integration tests."
 
   26:
     name: "Cost/latency/token accounting"

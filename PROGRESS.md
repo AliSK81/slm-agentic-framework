@@ -9,10 +9,10 @@
 ## CURRENT STATE
 
 ```yaml
-current_phase: 20
+current_phase: 21
 phase_status: NOT_STARTED
-last_updated: "2026-05-21T02:00Z"
-last_commit: "ce2a7f1"
+last_updated: "2026-05-21T13:40Z"
+last_commit: "64a0f97"
 blocker: null
 ```
 
@@ -169,15 +169,15 @@ phases:
     name: "Valid multi-seed A-D ablation"
     status: DONE
     test_gate: "python -m eval.scenarios.ablation --dataset humaneval_hard --seeds 41,42,43 --dry-run"
-    commit: null
+    commit: "64a0f97"
     notes: "5/5 unit tests + CLI dry-run gate. Multi-seed ablation, quality abort, mean±std table; --profile-bundle deepseek; e2e test_ablation_hard_slice (skip-honest). Live full ablation: user runs with DeepSeek budget."
 
   20:
     name: "MBPP ablation + traces"
-    status: NOT_STARTED
+    status: DONE
     test_gate: "python -m eval.run_eval --config D --dataset mbpp --n 5 --dry-run"
     commit: null
-    notes: "ROADMAP phase 20. [REQUIRES_USER_INPUT]."
+    notes: "8/8 unit tests (MBPP session shape + pytest compile). difficulty_of on MBPPTask. Dry-run eval + ablation mbpp n=5. Live n=50 A-D: [REQUIRES_USER_INPUT] API budget."
 
   21:
     name: "SWE-bench lite Docker runner"

@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import argparse
 import sys
+from pathlib import Path
 from typing import Sequence
 
-from pathlib import Path
-
 from aviona import __version__
+from aviona.doctor import run_doctor
+from aviona.env import load_aviona_env
 from aviona.repl import run_repl
 from aviona.session import AvionaSession
-from framework.env import load_project_env
 from framework.orchestration.session import validate_slm_api_key
 
 
@@ -39,7 +39,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command")
     subparsers.add_parser(
         "doctor",
-        help="Check environment and API connectivity (stub in AVIONA-1).",
+        help="Probe SLM connectivity (no session, no REPL).",
     )
     subparsers.add_parser(
         "undo",
@@ -51,8 +51,8 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the Aviona CLI.
 
-    Loads project ``.env`` via ``load_project_env`` (no secret I/O). Bare ``aviona`` probes the
-    SLM once, then starts the interactive REPL; ``doctor`` is a stub until later phases.
+    Loads ``~/.aviona/.env`` then project ``.env`` (secrets never echoed). Bare ``aviona``
+    probes once then starts the REPL; ``doctor`` probes only; ``undo`` restores snapshots.
 
     Args:
         argv: Optional argument list (defaults to ``sys.argv[1:]``).
@@ -60,7 +60,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     Returns:
         Process exit code (0 on success).
     """
-    load_project_env()
+    cwd = Path.cwd()
+    load_aviona_env(cwd)
     parser = build_parser()
     try:
         args = parser.parse_args(list(argv) if argv is not None else None)
@@ -68,11 +69,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         return int(exc.code) if isinstance(exc.code, int) else 0
 
     if args.command == "doctor":
-        print("aviona doctor: not implemented yet (AVIONA-1 stub).")
-        return 0
+        return run_doctor()
 
     if args.command == "undo":
-        session = AvionaSession(Path.cwd())
+        session = AvionaSession(cwd)
         restored = session.undo_last()
         if not restored:
             print("nothing to undo")
@@ -81,7 +81,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
 
     validate_slm_api_key()
-    session = AvionaSession(Path.cwd())
+    session = AvionaSession(cwd)
     if getattr(args, "mode", None):
         session.set_mode(args.mode)  # type: ignore[arg-type]
     return run_repl(session)

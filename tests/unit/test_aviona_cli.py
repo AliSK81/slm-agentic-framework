@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import argparse
 
+import pytest
+
 from aviona import __version__
 from aviona.cli import build_parser, main
 
@@ -33,11 +35,11 @@ def test_main_version_exits_zero(capsys) -> None:
     assert __version__ in captured.out
 
 
-def test_main_doctor_stub_exits_zero(capsys) -> None:
-    """doctor subcommand runs the AVIONA-1 stub without error."""
-    code = main(["doctor"])
-    assert code == 0
-    assert "doctor" in capsys.readouterr().out.lower()
+def test_main_doctor_delegates_to_run_doctor(monkeypatch: pytest.MonkeyPatch) -> None:
+    """doctor subcommand runs probe-only diagnostics."""
+    monkeypatch.setattr("aviona.cli.load_aviona_env", lambda _cwd=None: None)
+    monkeypatch.setattr("aviona.cli.run_doctor", lambda: 0)
+    assert main(["doctor"]) == 0
 
 
 def test_main_bare_invocation_starts_repl(
@@ -48,6 +50,7 @@ def test_main_bare_invocation_starts_repl(
         "aviona.cli.validate_slm_api_key",
         lambda *args, **kwargs: None,
     )
+    monkeypatch.setattr("aviona.cli.load_aviona_env", lambda _cwd=None: None)
     monkeypatch.setattr("aviona.cli.run_repl", lambda _session: 0)
     monkeypatch.setattr("aviona.cli.AvionaSession", lambda _cwd: object())
     code = main([])

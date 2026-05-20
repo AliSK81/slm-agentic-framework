@@ -141,7 +141,7 @@ phases:
     name: "HumanEval difficulty slices + hard ids"
     status: DONE
     test_gate: "pytest tests/unit/test_difficulty_slices.py"
-    commit: null
+    commit: "a04c070"
     notes: "4/4 unit tests pass. difficulty_of heuristics + configs/humaneval_hard_ids.txt (30 ids); humaneval_hard alias in eval.yaml and run_eval."
 
   16:

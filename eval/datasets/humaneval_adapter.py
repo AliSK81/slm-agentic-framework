@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import logging
 import re
+from functools import lru_cache
+from pathlib import Path
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -12,6 +15,17 @@ from eval.datasets._sample import resolve_sample_count, sample_items, sample_str
 logger = logging.getLogger(__name__)
 
 _ENTRY_POINT_RE = re.compile(r"def\s+([a-zA-Z_][\w]*)\s*\(")
+_HARD_KEYWORDS = re.compile(
+    r"(dynamic programming|nested loop|O\(n\^2\)|O\(n\*\*2\)|memoization|"
+    r"topological sort|dijkstra|backtrack)",
+    re.IGNORECASE,
+)
+_NESTED_LOOP = re.compile(r"for\b[^\n]*:\s*\n\s*for\b", re.MULTILINE)
+
+DifficultyLabel = Literal["easy", "medium", "hard"]
+
+_CONFIGS_DIR = Path(__file__).resolve().parents[2] / "configs"
+_CURATED_HARD_IDS_PATH = _CONFIGS_DIR / "humaneval_hard_ids.txt"
 
 
 class HumanEvalTask(BaseModel):
@@ -21,6 +35,49 @@ class HumanEvalTask(BaseModel):
     prompt: str
     test_code: str
     entry_point: str
+
+
+@lru_cache(maxsize=1)
+def _curated_hard_ids() -> frozenset[str]:
+    """Load version-controlled HumanEval ids that are always treated as hard."""
+    if not _CURATED_HARD_IDS_PATH.is_file():
+        return frozenset()
+    ids: set[str] = set()
+    for line in _CURATED_HARD_IDS_PATH.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        ids.add(stripped)
+    return frozenset(ids)
+
+
+def _count_assertions(test_code: str) -> int:
+    """Count assertion statements in HumanEval test harness code."""
+    return len(re.findall(r"\bassert\b", test_code))
+
+
+def _has_hard_keyword_signals(task: HumanEvalTask) -> bool:
+    """Detect nested-loop or DP-style signals in prompt or tests."""
+    blob = f"{task.prompt}\n{task.test_code}"
+    return bool(_HARD_KEYWORDS.search(blob)) or bool(_NESTED_LOOP.search(task.prompt))
+
+
+def difficulty_of(task: HumanEvalTask) -> DifficultyLabel:
+    """Assign a deterministic difficulty label from prompt/test heuristics.
+
+    Curated ids in ``configs/humaneval_hard_ids.txt`` always return ``hard``.
+    """
+    if task.task_id in _curated_hard_ids():
+        return "hard"
+
+    prompt_loc = len(task.prompt.splitlines())
+    n_assertions = _count_assertions(task.test_code)
+
+    if prompt_loc > 12 or n_assertions >= 8 or _has_hard_keyword_signals(task):
+        return "hard"
+    if 6 <= prompt_loc <= 12 or 4 <= n_assertions <= 7:
+        return "medium"
+    return "easy"
 
 
 def _infer_entry_point(prompt: str, declared: str) -> str:
@@ -57,6 +114,15 @@ def _load_humaneval_rows() -> list[HumanEvalTask]:
     return rows
 
 
+def load_humaneval_curated_hard(n: int = 30, seed: int = 42) -> list[HumanEvalTask]:
+    """Load the frozen curated hard slice from ``configs/humaneval_hard_ids.txt``."""
+    curated = sorted(_curated_hard_ids())
+    if not curated:
+        raise ValueError("configs/humaneval_hard_ids.txt is empty")
+    tasks = load_humaneval_by_ids(curated)
+    return sample_items(tasks, min(n, len(tasks)), seed)
+
+
 def load_humaneval_by_ids(task_ids: list[str]) -> list[HumanEvalTask]:
     """Load specific HumanEval tasks by ``task_id`` (order preserved)."""
     lookup = {task.task_id: task for task in _load_humaneval_rows()}
@@ -70,14 +136,29 @@ def load_humaneval(
     n: int = 50,
     seed: int = 42,
     *,
+    difficulty: str | None = None,
     difficulty_split: dict[str, int] | None = None,
 ) -> list[HumanEvalTask]:
     """Load HumanEval from HuggingFace; sample ``n`` tasks with ``seed``.
 
-    When ``difficulty_split`` is set (e.g. from configs/eval.yaml), tasks are bucketed
-    by a deterministic hash of ``task_id`` into easy/medium/hard strata.
+    When ``difficulty`` is set (e.g. ``\"hard\"``), only tasks in that stratum are
+    sampled. When ``difficulty_split`` is set and ``difficulty`` is None, tasks are
+    bucketed by a deterministic hash of ``task_id`` (legacy stratified behaviour).
     """
     rows = _load_humaneval_rows()
+
+    if difficulty is not None:
+        rows = [task for task in rows if difficulty_of(task) == difficulty]
+        if not rows:
+            raise ValueError(f"No HumanEval tasks with difficulty={difficulty!r}")
+        sampled = sample_items(rows, min(n, len(rows)), seed)
+        logger.info(
+            "Loaded %s HumanEval tasks (difficulty=%s, requested n=%s)",
+            len(sampled),
+            difficulty,
+            n,
+        )
+        return sampled
 
     sample_n, split = resolve_sample_count(n, difficulty_split)
     if split:

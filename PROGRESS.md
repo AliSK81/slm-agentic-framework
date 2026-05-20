@@ -9,10 +9,10 @@
 ## CURRENT STATE
 
 ```yaml
-current_phase: 15
+current_phase: 16
 phase_status: NOT_STARTED
-last_updated: "2026-05-20T22:30Z"
-last_commit: "c71a0b0"
+last_updated: "2026-05-20T23:00Z"
+last_commit: "ecc3eda"
 blocker: null
 ```
 
@@ -134,15 +134,15 @@ phases:
     name: "Eval CLI --task-id + run manifest"
     status: DONE
     test_gate: "pytest tests/unit/test_manifest.py"
-    commit: null
+    commit: "ecc3eda"
     notes: "3/3 unit tests + CLI dry-run gate pass. eval/manifest.py, --task-id/--config/--dataset, load_*_by_ids adapters."
 
   15:
     name: "HumanEval difficulty slices + hard ids"
-    status: NOT_STARTED
+    status: DONE
     test_gate: "pytest tests/unit/test_difficulty_slices.py"
     commit: null
-    notes: "ROADMAP phase 15."
+    notes: "4/4 unit tests pass. difficulty_of heuristics + configs/humaneval_hard_ids.txt (30 ids); humaneval_hard alias in eval.yaml and run_eval."
 
   16:
     name: "Multi-step interaction-length scenarios (RQ3)"

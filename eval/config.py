@@ -28,6 +28,7 @@ class EvalConfig(BaseModel):
     """Parsed configs/eval.yaml."""
 
     humaneval: dict[str, Any] = Field(default_factory=dict)
+    humaneval_hard: dict[str, Any] = Field(default_factory=dict)
     mbpp: dict[str, Any] = Field(default_factory=dict)
     swebench: dict[str, Any] = Field(default_factory=dict)
     step_budgets: dict[str, StepBudget] = Field(default_factory=dict)
@@ -50,6 +51,7 @@ def load_eval_config(path: Path | None = None) -> EvalConfig:
         ablations[name] = AblationFlags.model_validate(values)
     return EvalConfig(
         humaneval=raw.get("humaneval") or {},
+        humaneval_hard=raw.get("humaneval_hard") or {},
         mbpp=raw.get("mbpp") or {},
         swebench=raw.get("swebench") or {},
         step_budgets=budgets,

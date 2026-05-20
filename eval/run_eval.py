@@ -10,7 +10,11 @@ from pathlib import Path
 from typing import Any, Literal
 
 from eval.config import AblationFlags, EvalConfig, load_eval_config
-from eval.datasets.humaneval_adapter import load_humaneval, task_to_session
+from eval.datasets.humaneval_adapter import (
+    load_humaneval,
+    task_solution_stub,
+    task_to_session,
+)
 from eval.datasets.mbpp_adapter import load_mbpp, task_to_session as mbpp_task_to_session
 from eval.datasets.swebench_adapter import load_swebench
 from eval.metrics import RunResult, compute_cer, compute_sr
@@ -43,8 +47,8 @@ def _load_tasks(
     n: int,
     seed: int,
     eval_config: EvalConfig | None = None,
-) -> list[tuple[str, str, list[str], str]]:
-    """Return list of (task_id, goal, constraints, test_code)."""
+) -> list[tuple[str, str, list[str], str, str | None]]:
+    """Return list of (task_id, goal, constraints, test_code, solution_stub)."""
     if dataset_name == "humaneval":
         split = None
         if eval_config is not None:
@@ -52,21 +56,23 @@ def _load_tasks(
             if isinstance(raw_split, dict):
                 split = {str(k): int(v) for k, v in raw_split.items()}
         return [
-            (task.task_id, *task_to_session(task))
+            (task.task_id, *task_to_session(task), task_solution_stub(task))
             for task in load_humaneval(n=n, seed=seed, difficulty_split=split)
         ]
     if dataset_name == "mbpp":
         return [
-            (task.task_id, *mbpp_task_to_session(task))
+            (task.task_id, *mbpp_task_to_session(task), None)
             for task in load_mbpp(n=n, seed=seed)
         ]
     if dataset_name == "swebench":
         tasks = load_swebench(n=n, seed=seed)
-        rows: list[tuple[str, str, list[str], str]] = []
+        rows: list[tuple[str, str, list[str], str, str | None]] = []
         for task in tasks:
             goal = f"Fix the issue in {task.repo} @ {task.base_commit}:\n\n{task.problem_statement}"
             constraints = ["SWE-bench execution requires Docker (not run in Phase 10 harness)"]
-            rows.append((task.task_id, goal, constraints, "assert False  # placeholder"))
+            rows.append(
+                (task.task_id, goal, constraints, "assert False  # placeholder", None)
+            )
         return rows
     raise ValueError(f"Unknown dataset: {dataset_name}")
 
@@ -85,6 +91,7 @@ def _run_single_task(
     traces_root: Path,
     dry_run: bool,
     planner_enabled: bool = True,
+    solution_stub: str | None = None,
 ) -> RunResult:
     """Execute one task and return a typed result row."""
     slug = safe_task_slug(task_id)
@@ -109,6 +116,10 @@ def _run_single_task(
 
     load_project_env()
     workspace.mkdir(parents=True, exist_ok=True)
+    if solution_stub:
+        stub_path = workspace / "solution.py"
+        if not stub_path.is_file():
+            stub_path.write_text(solution_stub, encoding="utf-8")
     ablation = AblationSettings(**flags.model_dump())
     session = run_full_session(
         goal,
@@ -177,7 +188,7 @@ def run_eval(
     jsonl_path = traces_root / f"{config_name}_{dataset_name}_{timestamp}.jsonl"
 
     results: list[RunResult] = []
-    for task_id, goal, constraints, test_code in tasks:
+    for task_id, goal, constraints, test_code, solution_stub in tasks:
         logger.info("Evaluating %s / %s", dataset_name, task_id)
         try:
             row = _run_single_task(
@@ -193,6 +204,7 @@ def run_eval(
                 traces_root=traces_root,
                 dry_run=dry_run,
                 planner_enabled=planner_enabled,
+                solution_stub=solution_stub,
             )
         except Exception as exc:  # noqa: BLE001 — eval must continue across tasks
             logger.exception("Task %s failed: %s", task_id, exc)

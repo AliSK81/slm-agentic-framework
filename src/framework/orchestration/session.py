@@ -162,15 +162,17 @@ def _ensure_work_subtasks(memory: MemoryStores, session_id: str, goal: str) -> N
 
 
 def evaluate_workspace(workspace: Path, test_code: str) -> dict:
-    """Run provided assertion code against the first solution module in workspace."""
-    py_files = [
-        p
-        for p in workspace.glob("*.py")
-        if not p.name.startswith("test_")
-    ]
-    if not py_files:
-        return {"passed": False, "error": "no solution file in workspace"}
-    module = py_files[0].stem
+    """Run provided assertion code against the solution module in workspace."""
+    preferred = workspace / "solution.py"
+    if preferred.is_file():
+        module = preferred.stem
+    else:
+        py_files = sorted(
+            p for p in workspace.glob("*.py") if not p.name.startswith("test_")
+        )
+        if not py_files:
+            return {"passed": False, "error": "no solution file in workspace"}
+        module = py_files[0].stem
     test_path = workspace / "test_session.py"
     indented = "\n    ".join(line for line in test_code.strip().splitlines())
     test_path.write_text(
@@ -291,8 +293,10 @@ def run_full_session(
                 transition = next_state(state, memory)
             elif evaluation.get("passed"):
                 transition = STATE_DONE
-            else:
+            elif int(state.get("retry_count", 0)) >= int(state.get("max_retries", 3)):
                 transition = STATE_ESCALATE
+            else:
+                transition = STATE_REVISE
             state["step_count"] = int(state.get("step_count", 0)) + 1
 
             if transition == STATE_DONE:

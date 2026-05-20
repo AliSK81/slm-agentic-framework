@@ -38,8 +38,14 @@ def _parse_pytest_output(stdout: str, stderr: str, exit_code: int) -> TestResult
     total = int(passed_match.group(1)) if passed_match else 0
     failed = _FAILED_LINE_RE.findall(combined)
     error_message = None
-    if exit_code != 0 and not failed:
-        error_message = stderr.strip() or stdout.strip() or "pytest failed"
+    if exit_code != 0:
+        if failed:
+            error_message = f"Failed tests: {', '.join(failed[:5])}"
+        else:
+            error_message = stderr.strip() or stdout.strip() or "pytest failed"
+        if stdout.strip() and error_message:
+            tail = truncate(stdout.strip(), "pytest_run")
+            error_message = f"{error_message}\n{tail}"
     return TestResult(
         passed=exit_code == 0,
         total_tests=total,

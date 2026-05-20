@@ -22,10 +22,15 @@ providers:
     api_key_env: OLLAMA_API_KEY
     api_key_required: false
 
+  mohaymen:
+    base_url: https://ai-gateway.mohaymen.ir/v1
+    base_url_env: MOHAYMEN_BASE_URL
+    api_key_env: MOHAYMEN_API_KEY
+
 # Role → profile key (override with PLANNER_PROFILE / EXECUTOR_PROFILE in .env)
 defaults:
-  planner: default
-  executor: default
+  planner: deepseek-v4-flash
+  executor: deepseek-v4-flash
 
 profiles:
   default:
@@ -106,6 +111,25 @@ profiles:
       planner: 60
       executor: 75
       tool_call: 30
+    tool_call_format: json
+
+  mohaymen-gpt-oss-20b:
+    model_id: mohaymen/gpt-oss-20b
+    provider: mohaymen
+    context_limit: 32768
+    effective_context: 16000
+    thinking_budget: null
+    max_working_memory_tokens: 750
+    tool_output_caps:
+      pytest_run: 5000
+      py_compile: 2000
+      read_file: 12000
+      search_codebase: 2000
+    skill_budget_tokens: 150
+    timeout_by_role:
+      planner: 90
+      executor: 120
+      tool_call: 45
     tool_call_format: json
 
   ollama-local:

@@ -90,3 +90,22 @@ def test_self_check_no_contradiction_same_key_same_value(memory: MemoryStores) -
     proposal = _entry(decision_id="d-new", payload={"tool": "pytest"})
     result = self_check(proposal, memory, "sess-sc")
     assert result.verdict == "pass"
+
+
+def test_self_check_allows_varying_old_string_on_code_edit_retry(
+    memory: MemoryStores,
+) -> None:
+    """Retry edits may change old_string/new_string without contradiction."""
+    prior = _entry(
+        decision_id="d-old",
+        kind="code_edit",
+        payload={"old_string": "return 1", "new_string": "return 2"},
+    )
+    memory.decisions.append(prior)
+    proposal = _entry(
+        decision_id="d-new",
+        kind="code_edit",
+        payload={"old_string": "return 2", "new_string": "return 3"},
+    )
+    result = self_check(proposal, memory, "sess-sc")
+    assert result.verdict == "pass"

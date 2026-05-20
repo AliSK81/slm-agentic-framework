@@ -52,6 +52,20 @@ def test_run_tests_fails_wrong_code(tmp_path: Path) -> None:
     )
     result = run_tests("tests/test_bad.py", tmp_path)
     assert not result.passed
+    assert result.error_message
+
+
+def test_run_tests_sets_error_message_on_failure(tmp_path: Path) -> None:
+    tests_dir = tmp_path / "tests"
+    tests_dir.mkdir()
+    (tests_dir / "test_named.py").write_text(
+        "def test_named():\n    assert False\n",
+        encoding="utf-8",
+    )
+    result = run_tests("tests/test_named.py", tmp_path)
+    assert not result.passed
+    assert result.error_message
+    assert "FAILED" in result.error_message or "failed" in result.error_message.lower()
 
 
 def test_run_tests_output_is_truncated(tmp_path: Path) -> None:

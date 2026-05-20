@@ -35,11 +35,20 @@ def _payload_text(payload: dict) -> str:
 
 def _resolve_file_path(payload: dict, default: str = "solution.py") -> str:
     """Resolve target path from alternate SLM payload keys."""
-    for key in ("file_path", "file", "path"):
+    for key in ("file_path", "filePath", "file", "path"):
         value = payload.get(key)
         if isinstance(value, str) and value.strip():
             return value.strip()
     return default
+
+
+def _resolve_old_string(payload: dict) -> str:
+    """Read old_string from common SLM payload spellings."""
+    for key in ("old_string", "oldString"):
+        value = payload.get(key)
+        if isinstance(value, str):
+            return value
+    return ""
 
 
 def _verify_python_file(file_path: str, workspace: Path) -> FileResult:
@@ -76,7 +85,8 @@ class ExecutorAgent:
         file_path = _resolve_file_path(payload)
         target = (self._workspace / file_path).resolve()
         body = _payload_text(payload)
-        old_string = payload.get("old_string", "")
+        old_string = _resolve_old_string(payload)
+        new_raw = payload.get("new_string", payload.get("newString", body))
 
         if not body and not old_string:
             return FileResult(ok=False, message="empty code_edit payload")
@@ -84,7 +94,7 @@ class ExecutorAgent:
         if not target.is_file():
             result = write_file(file_path, body, self._workspace)
         elif old_string:
-            new_body = sanitize_python_source(str(payload.get("new_string", body)))
+            new_body = sanitize_python_source(str(new_raw))
             result = edit_file(file_path, old_string, new_body, self._workspace)
         elif body:
             original = target.read_text(encoding="utf-8")
@@ -92,7 +102,8 @@ class ExecutorAgent:
                 target.unlink(missing_ok=True)
                 result = write_file(file_path, body, self._workspace)
             else:
-                result = edit_file(file_path, original, body, self._workspace)
+                new_body = sanitize_python_source(str(new_raw))
+                result = edit_file(file_path, original, new_body, self._workspace)
         else:
             result = edit_file(file_path, old_string, "", self._workspace)
 
@@ -181,8 +192,6 @@ class ExecutorAgent:
             passed = bool(self.last_tool_result.passed)
         elif self.last_edit_result is not None:
             passed = bool(self.last_edit_result.ok)
-        elif result.decision is not None and not result.exhausted:
-            passed = True
 
         report = ReportMessage(
             session_id=session_id,
@@ -193,18 +202,17 @@ class ExecutorAgent:
         )
         save_report(self._memory.backend, report)
 
-        if passed and self.last_handback is None:
-            existing = self._memory.subtasks.get(subtask_id)
-            if existing is not None and existing.status == "in_progress":
-                self._memory.subtasks.set_status(subtask_id, "done")
-
         evaluation: dict[str, Any] = {"passed": passed}
-        if not passed and self.last_edit_result is not None and not self.last_edit_result.ok:
-            evaluation["error_message"] = self.last_edit_result.message
+        if not passed:
+            if self.last_edit_result is not None and not self.last_edit_result.ok:
+                evaluation["error_message"] = self.last_edit_result.message
+            elif self.last_tool_result is not None:
+                err = getattr(self.last_tool_result, "error_message", None)
+                if err:
+                    evaluation["error_message"] = str(err)
 
         return {
             **state,
             "current_state": STATE_EXECUTE,
-            "step_count": int(state.get("step_count", 0)) + 1,
             "last_evaluation": evaluation,
         }

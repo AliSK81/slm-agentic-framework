@@ -35,6 +35,9 @@ Thumbs.db
 # Generated reports
 thesis_evaluation_report.md
 
+# E2E / eval run logs (framework logging)
+logs/*.log
+
 # Testing and coverage
 .pytest_cache/
 .coverage

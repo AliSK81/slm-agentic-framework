@@ -41,7 +41,6 @@ def _repair_json(text: str) -> str:
     repaired = text.strip()
     repaired = _TRAILING_COMMA_RE.sub(r"\1", repaired)
     repaired = _SINGLE_QUOTED_KEY_RE.sub(r'"\1":', repaired)
-    repaired = repaired.replace("\r\n", "\\n").replace("\n", "\\n")
     open_braces = repaired.count("{") - repaired.count("}")
     open_brackets = repaired.count("[") - repaired.count("]")
     if open_braces > 0:

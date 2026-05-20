@@ -29,10 +29,17 @@ _FORMAT_BY_ROLE: dict[str, str] = {
     "executor": "code_edit, tool_call, terminate, handoff",
 }
 
+_EXECUTOR_PAYLOAD_HINT = (
+    'For code_edit use file_path "solution.py" unless editing another file. '
+    "For existing files, include old_string for partial edits, or send a full "
+    'replacement function in content/code/new_string.'
+)
+
 
 def _json_format_block(agent_role: str) -> str:
     """Append strict JSON instructions so SLMs emit parseable decisions."""
     kinds = _FORMAT_BY_ROLE.get(agent_role, "terminate")
+    hint = f"\n{_EXECUTOR_PAYLOAD_HINT}" if agent_role == "executor" else ""
     return (
         "\n[FORMAT]: Respond with a single JSON object only. "
         "Do not use markdown fences or prose outside the JSON.\n"
@@ -40,7 +47,7 @@ def _json_format_block(agent_role: str) -> str:
         '"rationale" (non-empty string), "payload" (object), '
         '"references" (array of strings, optional).\n'
         'Example: {"kind":"plan_step","rationale":"because ...",'
-        '"payload":{"subtasks":[]},"references":[]}'
+        f'"payload":{{"subtasks":[]}},"references":[]}}{hint}'
     )
 
 

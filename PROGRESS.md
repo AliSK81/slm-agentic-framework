@@ -11,8 +11,8 @@
 ```yaml
 current_phase: 12
 phase_status: DONE
-last_updated: "2026-05-18"
-last_commit: "6edc6aa"
+last_updated: "2026-05-20T12:45Z"
+last_commit: "6edc6aa"   # uncommitted: planner int task_id fix, framework e2e fixes, staged runner
 blocker: null
 ```
 
@@ -111,7 +111,17 @@ phases:
     status: DONE
     test_gate: "pytest tests/e2e/ -m e2e"
     commit: "PLACEHOLDER"
-    notes: "analyze_traces.py, generate_report.py, humaneval e2e tests. E2E skip on HTTP 402 when credits exhausted. Config D 20-task run reached 90% SR before budget limit."
+    notes: >
+      2026-05-20 staged gate (scripts/run_phase12_staged.py) exit 0: session 6/6;
+      test_humaneval_20_tasks_config_D PASSED. Provider: DeepSeek V4 Flash (configs/models.yaml).
+      HumanEval 20-task seed=42 — config D: D_humaneval_20260520T082826Z SR 100% CER 0% (canonical).
+      Second D pass in same pytest run: D_humaneval_20260520T085222Z SR 70% — INVALID (6 tasks, network
+      http_error, interaction_count 0); do not cite. Rerun: D_humaneval_20260520T090933Z initially 95%
+      (HumanEval/2 planner int task_id bug); single-task rerun + trace patch → 20/20 100%. Config A:
+      A_humaneval_20260520T083955Z SR 100%. test_ablation_d_beats_a_on_humaneval SKIPPED (A=D, no +5pp).
+      Framework fixes: SLM json_object prompt, executor edit_file aliases/full replace, planner string
+      subtasks + str(task_id), e2e logging (logs/e2e_*.log). Optional: full A/B/C/D table via
+      eval/scenarios/ablation.py (Phase 11 harness, not Phase 12 e2e).
 ```
 
 ---
@@ -152,8 +162,14 @@ blocker: "Describe the blocker in one sentence here."
 
 ```yaml
 # Agent appends here when making non-obvious decisions or encountering issues.
-decisions: []
-issues: []
+decisions:
+  - "2026-05-20: Thesis HumanEval D SR uses 082826Z or corrected 090933Z; discard 085222Z (network)."
+  - "2026-05-20: Planner coerces SLM numeric task_id/depends_on to str (tests/unit/test_planner.py)."
+  - "2026-05-20: Phase 12 e2e runs A+D only (not B/C); full ablation is Phase 11 eval/scenarios/ablation.py."
+issues:
+  - "validate_slm_api_key() at session start has no retry — transient SSL/connection errors can zero-out tasks."
+  - "eval.run_eval has no --task-id; single-task reruns need script calling _run_single_task."
+  - "scripts/run_phase12_staged.ps1 broken on Windows; use scripts/run_phase12_staged.py."
 ```
 
 ---
@@ -165,7 +181,9 @@ issues: []
 env_checks:
   - python_version: "3.14.2 (>=3.11)"
   - venv_active: true
-  - openrouter_key_set: true
+  - active_provider: "deepseek (deepseek-v4-flash)"
+  - deepseek_key_set: true
+  - openrouter_key_set: true    # optional fallback
   - sqlite_path_exists: true    # ./data/framework.db on first use
   - workspace_dir_exists: false # created on first tool run
 ```

@@ -117,6 +117,24 @@ def test_client_json_mode_sets_response_format() -> None:
     client.close()
 
 
+def test_client_injects_json_keyword_for_json_object_mode() -> None:
+    """Prompts without 'json' get a suffix so DeepSeek json_object mode is accepted."""
+    captured: dict[str, Any] = {}
+
+    def capture_handler(request: httpx.Request) -> httpx.Response:
+        captured["body"] = json.loads(request.content.decode())
+        return _success_handler(request)
+
+    client = SLMClient(
+        "default",
+        http_client=httpx.Client(transport=httpx.MockTransport(capture_handler)),
+    )
+    client.call([{"role": "user", "content": "ping"}], role="planner", json_mode=True)
+    content = captured["body"]["messages"][0]["content"].lower()
+    assert "json" in content
+    client.close()
+
+
 def test_client_deepseek_thinking_payload() -> None:
     """Profile with api_thinking sends thinking and reasoning_effort in the request."""
     captured: dict[str, Any] = {}

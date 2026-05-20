@@ -30,15 +30,32 @@ class PlannerAgent:
             subtasks = decision.payload.get("subtasks", [])
             count = 0
             for raw in subtasks:
-                task_id = raw.get("task_id") or f"st-{count}"
+                owner = "executor"
+                depends_on: list[str] = []
+                if isinstance(raw, str):
+                    task_id = f"st-{count}"
+                    description = raw.strip() or task_id
+                elif isinstance(raw, dict):
+                    task_id = str(raw.get("task_id") or raw.get("id") or f"st-{count}")
+                    description = str(
+                        raw.get("description")
+                        or raw.get("name")
+                        or raw.get("action")
+                        or task_id
+                    ).strip() or task_id
+                    owner = str(raw.get("owner", "executor"))
+                    depends_on = [str(d) for d in raw.get("depends_on", [])]
+                else:
+                    logger.warning("Skipping invalid subtask entry: %r", raw)
+                    continue
                 self._memory.subtasks.register(
                     SubTask(
                         task_id=task_id,
                         parent_session_id=session_id,
-                        description=raw.get("description", task_id),
+                        description=description,
                         status="open",
-                        owner=raw.get("owner", "executor"),
-                        depends_on=raw.get("depends_on", []),
+                        owner=owner,
+                        depends_on=depends_on,
                         result_ref=None,
                         attempt_count=0,
                     )

@@ -33,6 +33,19 @@ _MAX_RETRIES = 3
 _BACKOFF_BASE_S = 0.5
 
 
+def _ensure_json_keyword_in_messages(
+    messages: list[dict[str, str]],
+) -> list[dict[str, str]]:
+    """DeepSeek requires the word 'json' in the prompt when using json_object mode."""
+    adjusted: list[dict[str, str]] = []
+    for message in messages:
+        content = message.get("content", "")
+        if "json" not in content.lower():
+            content = f"{content}\n\nRespond in json format."
+        adjusted.append({**message, "content": content})
+    return adjusted
+
+
 class SLMResponse(BaseModel):
     """Result of a single SLM completion call."""
 
@@ -109,9 +122,13 @@ class SLMClient:
                 model=self._profile.model_id,
             )
 
+        outbound_messages = messages
+        if json_mode and self._profile.tool_call_format == "json":
+            outbound_messages = _ensure_json_keyword_in_messages(messages)
+
         payload: dict[str, Any] = {
             "model": self._profile.model_id,
-            "messages": messages,
+            "messages": outbound_messages,
         }
         if json_mode and self._profile.tool_call_format == "json":
             payload["response_format"] = {"type": "json_object"}
@@ -165,7 +182,14 @@ class SLMClient:
         choices = data.get("choices") or []
         if choices:
             message = choices[0].get("message") or {}
-            content = message.get("content") or ""
+            raw_content = message.get("content")
+            raw_reasoning = message.get("reasoning_content")
+            if isinstance(raw_content, str) and raw_content.strip():
+                content = raw_content
+            elif isinstance(raw_reasoning, str) and "{" in raw_reasoning:
+                content = raw_reasoning
+            elif isinstance(raw_reasoning, str):
+                content = raw_reasoning
 
         usage = data.get("usage") or {}
         tokens = int(usage.get("total_tokens") or 0)

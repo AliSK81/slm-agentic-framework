@@ -78,6 +78,11 @@ def load_humaneval(
     return sampled
 
 
+def task_solution_stub(task: HumanEvalTask) -> str:
+    """Return the HumanEval prompt as an initial ``solution.py`` skeleton."""
+    return task.prompt if task.prompt.endswith("\n") else f"{task.prompt}\n"
+
+
 def task_to_session(task: HumanEvalTask) -> tuple[str, list[str], str]:
     """Map a HumanEval row to session goal, constraints, and pytest body."""
     goal = (

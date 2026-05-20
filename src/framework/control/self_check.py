@@ -16,6 +16,20 @@ _EXECUTOR_ONLY_KINDS = frozenset(
     {"code_edit", "tool_call", "reflection", "quality_failure"}
 )
 _SHARED_KINDS = frozenset({"handoff"})
+# Payload keys that may change between retries (not logical contradictions).
+_RETRY_VARYING_KEYS = frozenset(
+    {
+        "old_string",
+        "new_string",
+        "content",
+        "code",
+        "target",
+        "path",
+        "file_path",
+        "file",
+        "rationale",
+    }
+)
 
 
 def _schema_issues(proposal: DecisionEntry) -> list[Issue]:
@@ -42,6 +56,8 @@ def _contradiction_issues(
         if entry.kind != proposal.kind:
             continue
         for key, value in proposal.payload.items():
+            if key in _RETRY_VARYING_KEYS:
+                continue
             if key in entry.payload and entry.payload[key] != value:
                 issues.append(
                     Issue(

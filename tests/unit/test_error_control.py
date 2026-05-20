@@ -86,6 +86,14 @@ def test_parser_returns_none_on_unrecoverable() -> None:
     assert parsed is None
 
 
+def test_parser_preserves_escaped_newline_in_rationale() -> None:
+    """Repair must not double-escape \\n inside JSON string values."""
+    raw = '{"kind": "code_edit", "rationale": "line one\\nline two"}'
+    parsed = parse_decision(raw, SampleDecision)
+    assert parsed is not None
+    assert parsed.rationale == "line one\nline two"
+
+
 # --- Quality gate ---
 
 

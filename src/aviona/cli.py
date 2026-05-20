@@ -30,6 +30,12 @@ def build_parser() -> argparse.ArgumentParser:
         action="version",
         version=f"%(prog)s {__version__}",
     )
+    parser.add_argument(
+        "--mode",
+        choices=["plan", "default", "auto"],
+        default=None,
+        help="Permission mode: plan (read-only), default (ask shell), auto.",
+    )
     subparsers = parser.add_subparsers(dest="command")
     subparsers.add_parser(
         "doctor",
@@ -63,6 +69,8 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     validate_slm_api_key()
     session = AvionaSession(Path.cwd())
+    if getattr(args, "mode", None):
+        session.set_mode(args.mode)  # type: ignore[arg-type]
     return run_repl(session)
 
 

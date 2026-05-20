@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -70,6 +71,8 @@ class ExecutorAgent:
         cycle: DecisionCycle,
         memory: MemoryStores,
         workspace: Path,
+        *,
+        permission_check: Callable[[str, str], bool] | None = None,
     ) -> None:
         self._cycle = cycle
         self._memory = memory
@@ -78,6 +81,15 @@ class ExecutorAgent:
         self.last_handback: HandbackMessage | None = None
         self.last_tool_result: Any = None
         self.last_edit_result: FileResult | None = None
+        self._permission_check = permission_check
+
+    def _require_permission(self, kind: str, detail: str) -> FileResult | None:
+        """Return a denial ``FileResult`` when Aviona permission gate blocks the action."""
+        if self._permission_check is None:
+            return None
+        if self._permission_check(kind, detail):
+            return None
+        return FileResult(ok=False, message=f"permission denied: {kind} {detail}")
 
     def _apply_code_edit(self, decision: DecisionEntry) -> FileResult:
         """Write or edit a Python file from a code_edit decision."""
@@ -90,6 +102,11 @@ class ExecutorAgent:
 
         if not body and not old_string:
             return FileResult(ok=False, message="empty code_edit payload")
+
+        op_kind = "edit_file" if target.is_file() else "write_file"
+        blocked = self._require_permission(op_kind, file_path)
+        if blocked is not None:
+            return blocked
 
         if not target.is_file():
             result = write_file(file_path, body, self._workspace)
@@ -132,6 +149,10 @@ class ExecutorAgent:
                 tool = decision.payload.get("tool", "")
                 if tool == "pytest":
                     target = decision.payload.get("target", "tests/")
+                    blocked = self._require_permission("shell", f"pytest {target}")
+                    if blocked is not None:
+                        self.last_tool_result = blocked
+                        return blocked
                     self.last_tool_result = run_tests(
                         target, self._workspace, timeout_s=30
                     )
@@ -144,6 +165,10 @@ class ExecutorAgent:
                     return self.last_tool_result
                 if tool == "write_file":
                     file_path = _resolve_file_path(decision.payload)
+                    blocked = self._require_permission("write_file", file_path)
+                    if blocked is not None:
+                        self.last_edit_result = blocked
+                        return blocked
                     content = sanitize_python_source(
                         str(decision.payload.get("content", ""))
                     )

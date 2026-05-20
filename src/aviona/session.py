@@ -3,14 +3,17 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Callable
 from pathlib import Path
 
 from pydantic import BaseModel
 
 from aviona.compaction import HistoryBlock, compact, history_to_constraint
+from aviona.permissions import Mode, PermissionAction, PermissionGate
 from aviona.profiles import apply_daily_driver_profiles
 from aviona.project import load_project_rules
 from aviona.render import render_status
+from aviona.settings import load_settings
 from aviona.store import SessionStore, aviona_project_dir, project_hash
 from framework.control.ablation import AblationSettings
 from framework.error_control.truncation import get_compaction_ceiling, set_caps_profile
@@ -50,6 +53,11 @@ class AvionaSession:
         self._verifier: Verifier = NoOpVerifier()
         self._project_rules = load_project_rules(self.workspace)
         self._store = SessionStore(self.workspace, self._session_id)
+        settings = load_settings(self.workspace)
+        self.permission_gate = PermissionGate(
+            mode=settings.mode,
+            allowlist=settings.commands,
+        )
         self._context_ceiling = get_compaction_ceiling()
         anchor_text = f"workspace: {self.workspace}"
         if self._project_rules:
@@ -57,6 +65,23 @@ class AvionaSession:
         self._history: list[HistoryBlock] = [
             HistoryBlock(kind="anchor", text=anchor_text),
         ]
+
+    def set_mode(self, mode: Mode) -> None:
+        """Switch permission mode for subsequent turns."""
+        self.permission_gate.set_mode(mode)
+
+    def set_confirm_reader(self, reader: Callable[[str], str]) -> None:
+        """Wire REPL ``reader`` for permission prompts (``ask`` verdict)."""
+        self.permission_gate.set_confirm(
+            lambda prompt: reader(prompt).strip().lower() in ("y", "yes")
+        )
+
+    def _permission_check(self, kind: str, detail: str) -> bool:
+        if kind not in ("write_file", "edit_file", "shell"):
+            return True
+        return self.permission_gate.ensure(
+            PermissionAction(kind=kind, detail=detail)  # type: ignore[arg-type]
+        )
 
     def run_turn(
         self,
@@ -103,6 +128,7 @@ class AvionaSession:
             verifier=effective,
             planner_enabled=True,
             max_steps=max_steps,
+            permission_check=self._permission_check,
         )
         after_entries = self.memory.decisions.list_for_session(self._session_id)
         edited_path = _last_edited_path(after_entries)

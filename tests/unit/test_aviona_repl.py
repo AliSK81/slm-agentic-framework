@@ -90,3 +90,17 @@ def test_repl_survives_keyboard_interrupt_during_turn(project_dir: Path) -> None
     assert calls == 2
     assert any("cancelled" in line for line in output)
     assert any("steps" in line for line in output)
+
+
+def test_repl_mode_command_changes_session_mode(project_dir: Path) -> None:
+    """/mode auto switches permission mode without running a turn."""
+    session = AvionaSession(project_dir)
+    output: list[str] = []
+    run_repl(
+        session,
+        reader=ScriptedReader(["/mode auto", "/exit"]),
+        writer=output.append,
+        run_turn=MagicMock(),
+    )
+    assert session.permission_gate.mode == "auto"
+    assert any("mode: auto" in line for line in output)

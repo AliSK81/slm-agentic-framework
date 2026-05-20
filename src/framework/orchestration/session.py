@@ -209,6 +209,8 @@ def _build_agents(
     memory: MemoryStores,
     workspace: Path,
     ablation: AblationSettings,
+    *,
+    permission_check: Callable[[str, str], bool] | None = None,
 ) -> tuple[PlannerAgent, ExecutorAgent, SLMUsageAccumulator, str]:
     usage = SLMUsageAccumulator()
     planner_inner = client_for_role("planner")
@@ -243,6 +245,7 @@ def _build_agents(
         ),
         memory,
         workspace,
+        permission_check=permission_check,
     )
     return planner, executor, usage, primary_model_id
 
@@ -373,6 +376,7 @@ def run_full_session(
     engine: EngineName = "graph",
     verifier: Verifier | None = None,
     probe: bool = True,
+    permission_check: Callable[[str, str], bool] | None = None,
 ) -> SessionOutcome:
     """Run PLAN → DISPATCH → EXECUTE until DONE, ESCALATE, or budget exhausted.
 
@@ -407,7 +411,9 @@ def run_full_session(
     )
 
     settings = ablation or AblationSettings()
-    planner, executor, usage, primary_model_id = _build_agents(memory, workspace, settings)
+    planner, executor, usage, primary_model_id = _build_agents(
+        memory, workspace, settings, permission_check=permission_check
+    )
 
     memory.state.write(
         StateEntry(

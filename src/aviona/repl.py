@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable, Iterator, Sequence
+
+from aviona.permissions import Mode
 from aviona.session import AvionaSession, TurnResult
 
 logger = logging.getLogger(__name__)
@@ -12,9 +14,12 @@ Reader = Callable[[str], str]
 Writer = Callable[[str], object]
 
 _HELP_TEXT = """Aviona commands:
-  /help   — show this help
-  /exit   — leave the REPL
-  /mode   — execution mode (wired in AVIONA-7)
+  /help          — show this help
+  /exit          — leave the REPL
+  /mode          — show current permission mode
+  /mode plan     — read-only (no writes / side-effect shell)
+  /mode default  — ask before side-effect shell
+  /mode auto     — allow cwd writes and allowlisted shell
 Type any other line to run one bounded agent turn."""
 
 
@@ -50,6 +55,7 @@ def _handle_meta(
     line: str,
     *,
     writer: Writer,
+    session: AvionaSession,
 ) -> bool:
     """Handle ``/help``, ``/exit``, ``/mode``. Return True when the REPL should stop."""
     lowered = line.strip().lower()
@@ -58,8 +64,17 @@ def _handle_meta(
         return False
     if lowered == "/exit":
         return True
-    if lowered == "/mode":
-        writer("mode: default (AVIONA-7 will add selectable modes)")
+    if lowered == "/mode" or lowered.startswith("/mode "):
+        parts = line.strip().split(maxsplit=1)
+        if len(parts) == 1:
+            writer(f"mode: {session.permission_gate.mode}")
+            return False
+        mode = parts[1].strip().lower()
+        if mode in ("plan", "default", "auto"):
+            session.set_mode(mode)  # type: ignore[arg-type]
+            writer(f"mode: {mode}")
+        else:
+            writer("usage: /mode plan|default|auto")
         return False
     return False
 
@@ -87,8 +102,10 @@ def run_repl(
     read = reader or default_reader
     write = writer or print
     turn = run_turn or session.run_turn
+    session.set_confirm_reader(read)
 
     write(f"Aviona — workspace: {session.workspace}")
+    write(f"mode: {session.permission_gate.mode}")
     write("Type /help for commands.")
 
     while True:
@@ -102,7 +119,7 @@ def run_repl(
             continue
 
         if line.startswith("/"):
-            if _handle_meta(line, writer=write):
+            if _handle_meta(line, writer=write, session=session):
                 return 0
             continue
 

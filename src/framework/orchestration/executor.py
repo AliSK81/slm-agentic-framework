@@ -81,6 +81,7 @@ class ExecutorAgent:
         write_file_fn: WriteFileFn | None = None,
         edit_file_fn: EditFileFn | None = None,
         effect_sink: list[str] | None = None,
+        interactive_read_only: bool = False,
     ) -> None:
         self._cycle = cycle
         self._memory = memory
@@ -93,13 +94,30 @@ class ExecutorAgent:
         self._write_file = write_file_fn or write_file
         self._edit_file = edit_file_fn or edit_file
         self._effect_sink = effect_sink
+        self.interactive_read_only = interactive_read_only
 
     def _record_effect(self, text: str) -> None:
         if self._effect_sink is not None and text.strip():
             self._effect_sink.append(text.strip())
 
-    def _require_permission(self, kind: str, detail: str) -> FileResult | None:
-        """Return a denial ``FileResult`` when Aviona permission gate blocks the action."""
+    def _write_permitted(self, decision: DecisionEntry) -> bool:
+        """Allow writes on interactive read-only turns only when turn_type is edit/build."""
+        if not self.interactive_read_only:
+            return True
+        turn_type = str((decision.payload or {}).get("turn_type", "")).lower()
+        return turn_type in ("edit", "build")
+
+    def _require_permission(
+        self,
+        kind: str,
+        detail: str,
+        *,
+        decision: DecisionEntry | None = None,
+    ) -> FileResult | None:
+        """Return a denial ``FileResult`` when the permission gate blocks the action."""
+        if kind in ("write_file", "edit_file") and decision is not None:
+            if self.interactive_read_only and not self._write_permitted(decision):
+                return FileResult(ok=False, message="permission denied: read-only turn")
         if self._permission_check is None:
             return None
         if self._permission_check(kind, detail):
@@ -119,7 +137,7 @@ class ExecutorAgent:
             return FileResult(ok=False, message="empty code_edit payload")
 
         op_kind = "edit_file" if target.is_file() else "write_file"
-        blocked = self._require_permission(op_kind, file_path)
+        blocked = self._require_permission(op_kind, file_path, decision=decision)
         if blocked is not None:
             return blocked
 
@@ -181,7 +199,9 @@ class ExecutorAgent:
                     return self.last_tool_result
                 if tool == "write_file":
                     file_path = _resolve_file_path(decision.payload)
-                    blocked = self._require_permission("write_file", file_path)
+                    blocked = self._require_permission(
+                        "write_file", file_path, decision=decision
+                    )
                     if blocked is not None:
                         self.last_edit_result = blocked
                         return blocked

@@ -168,8 +168,13 @@ def test_edit_goal_writes_file_and_verifies(
     memory: MemoryStores,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Edit goal applies one write and passes workspace verification."""
-    executor = MockSLMClient([_write_file_json("foo.txt", "hello")])
+    """Edit goal applies write then terminate within the interactive loop."""
+    executor = MockSLMClient(
+        [
+            _write_file_json("foo.txt", "hello"),
+            _terminate_json("Created foo.txt.", turn_type="edit"),
+        ]
+    )
     planner = MockSLMClient([])
     _patch_slm_clients(monkeypatch, planner=planner, executor=executor)
 
@@ -180,14 +185,15 @@ def test_edit_goal_writes_file_and_verifies(
         memory=memory,
         session_id="sess-edit",
         probe=False,
+        max_steps=6,
         ablation=AblationSettings(memory=False, control=False, error_control=False),
     )
 
     assert (workspace / "foo.txt").read_text(encoding="utf-8") == "hello"
     assert outcome.outcome == "solved"
     assert outcome.test_passed
-    assert outcome.step_count == 1
-    assert executor.call_count == 1
+    assert outcome.step_count == 2
+    assert executor.call_count == 2
 
 
 def test_needs_plan_promotes_to_planner(

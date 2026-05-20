@@ -232,6 +232,7 @@ def _build_agents(
     write_file_fn: WriteFileFn | None = None,
     edit_file_fn: EditFileFn | None = None,
     effect_sink: list[str] | None = None,
+    interactive_read_only: bool = False,
 ) -> tuple[PlannerAgent, ExecutorAgent, SLMUsageAccumulator, str]:
     usage = SLMUsageAccumulator()
     planner_inner = client_for_role("planner")
@@ -270,6 +271,7 @@ def _build_agents(
         write_file_fn=write_file_fn,
         edit_file_fn=edit_file_fn,
         effect_sink=effect_sink,
+        interactive_read_only=interactive_read_only,
     )
     return planner, executor, usage, primary_model_id
 
@@ -466,7 +468,7 @@ def _run_interactive_executor_turn(
     max_steps: int,
     max_retries: int,
 ) -> SessionOutcome:
-    """Run one executor cycle; terminate, verify edits, or signal needs_plan."""
+    """Run executor cycles until terminate, needs_plan, or cycle budget exhausted."""
     _setup_interactive_dispatch(memory, session_id, goal, constraints)
     state = _interactive_initial_state(
         session_id,
@@ -475,27 +477,39 @@ def _run_interactive_executor_turn(
         max_steps=max_steps,
         max_retries=max_retries,
     )
-    executor.execute_node(state)
-    decision = _last_executor_decision(memory, session_id)
-    outcome = SessionOutcome(session_id=session_id, step_count=1)
+    cycles = 0
+    decision: DecisionEntry | None = None
 
-    if decision is not None and decision.kind == "terminate":
-        parsed = parse_terminate_payload(decision.payload)
-        user_msg = parsed.user_message
-        outcome.user_message = user_msg
-        if parsed.turn_type in ("edit", "build"):
-            evaluation = verifier.evaluate(workspace).as_dict()
-            outcome.test_passed = bool(evaluation.get("passed"))
-        outcome.outcome = "solved" if user_msg else "unresolvable"
-        outcome.final_state = STATE_DONE
-        outcome.decision_count = len(memory.decisions.list_for_session(session_id))
-        return outcome
+    while cycles < max_steps:
+        executor.execute_node(state)
+        cycles += 1
+        decision = _last_executor_decision(memory, session_id)
 
-    if decision is not None and is_needs_plan_handoff(decision):
-        outcome.final_state = _INTERACTIVE_NEEDS_PLAN
-        outcome.decision_count = len(memory.decisions.list_for_session(session_id))
-        return outcome
+        if decision is not None and decision.kind == "terminate":
+            parsed = parse_terminate_payload(decision.payload)
+            user_msg = parsed.user_message
+            outcome = SessionOutcome(session_id=session_id, step_count=cycles)
+            outcome.user_message = user_msg
+            if parsed.turn_type in ("edit", "build"):
+                evaluation = verifier.evaluate(workspace).as_dict()
+                outcome.test_passed = bool(evaluation.get("passed"))
+            outcome.outcome = "solved" if user_msg else "unresolvable"
+            outcome.final_state = STATE_DONE
+            outcome.decision_count = len(memory.decisions.list_for_session(session_id))
+            return outcome
 
+        if decision is not None and is_needs_plan_handoff(decision):
+            outcome = SessionOutcome(session_id=session_id, step_count=cycles)
+            outcome.final_state = _INTERACTIVE_NEEDS_PLAN
+            outcome.decision_count = len(memory.decisions.list_for_session(session_id))
+            return outcome
+
+        if decision is not None and decision.kind in ("tool_call", "code_edit"):
+            continue
+
+        break
+
+    outcome = SessionOutcome(session_id=session_id, step_count=cycles)
     evaluation = verifier.evaluate(workspace).as_dict()
     outcome.test_passed = bool(evaluation.get("passed"))
     outcome.user_message = _session_user_message_from_decisions(memory, session_id)
@@ -528,6 +542,8 @@ def run_turn(
     write_file_fn: WriteFileFn | None = None,
     edit_file_fn: EditFileFn | None = None,
     effect_sink: list[str] | None = None,
+    interactive_read_only: bool = False,
+    build_max_steps: int = 15,
 ) -> SessionOutcome:
     """Run one interactive turn: executor-first, optional planner promotion.
 
@@ -569,6 +585,7 @@ def run_turn(
         write_file_fn=write_file_fn,
         edit_file_fn=edit_file_fn,
         effect_sink=effect_sink,
+        interactive_read_only=interactive_read_only,
     )
 
     memory.state.write(
@@ -605,7 +622,7 @@ def run_turn(
             executor=executor,
             settings=settings,
             session_id=session_id,
-            max_steps=max_steps,
+            max_steps=build_max_steps,
             max_retries=max_retries,
             checkpoint_dir=checkpoint_dir,
             planner_enabled=True,
@@ -671,6 +688,7 @@ def run_full_session(
             write_file_fn=write_file_fn,
             edit_file_fn=edit_file_fn,
             effect_sink=effect_sink,
+            interactive_read_only=False,
         )
     if probe:
         validate_slm_api_key()  # raises ProbeFailedError before task loop on probe failure

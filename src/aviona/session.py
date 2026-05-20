@@ -8,6 +8,11 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
+from aviona.budgets import (
+    BUILD_CYCLE_CEILING,
+    INTERACTIVE_CYCLE_CEILING,
+    verify_turn_budget,
+)
 from aviona.compaction import HistoryBlock, compact, history_to_constraint
 from aviona.contract import TurnFileObs, verify_turn
 from aviona.gitctx import git_anchor_segment, git_status
@@ -182,10 +187,12 @@ class AvionaSession:
                 ablation=AblationSettings(memory=True, control=True, error_control=True),
                 probe=False,
                 verifier=effective,
-                max_steps=max_steps,
+                max_steps=INTERACTIVE_CYCLE_CEILING,
                 permission_check=self._permission_check,
                 write_file_fn=self._write_file_fn,
                 edit_file_fn=self._edit_file_fn,
+                interactive_read_only=True,
+                build_max_steps=BUILD_CYCLE_CEILING,
             )
         finally:
             self.snapshots.end_turn()
@@ -210,6 +217,9 @@ class AvionaSession:
                 verify_passed=session_outcome.test_passed,
             ),
         )
+        budget = verify_turn_budget(turn_type, session_outcome)
+        if not budget.passed:
+            contract = budget
         if not contract.passed:
             session_outcome = session_outcome.model_copy(
                 update={

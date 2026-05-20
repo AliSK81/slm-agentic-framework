@@ -12,7 +12,7 @@
 current_phase: thesis-39
 phase_status: PAUSED
 last_updated: "2026-05-21T00:00Z"
-last_commit: "pending-v2-0"
+last_commit: "52ef2da"
 blocker: null
 active_roadmap: ROADMAP_PRODUCTION_AVIONA_V2.md
 thesis_track: paused_at_phase_39
@@ -365,7 +365,7 @@ aviona_phases:
 product_definition: "Chat-first assistant that can edit files, rooted in cwd (Claude Code model)."
 turn_types: [local, answer, inspect, edit, build]
 aviona_v2_phases:
-  V2-0: { status: DONE, commit: pending, gate: "git tag pre-v2 && aviona --version == 0.2.6 && scripts/test-aviona.ps1", notes: "Baseline 0.2.x patch stack committed; pre-v2 tag; product sign-off in CURRENT STATE." }
+  V2-0: { status: DONE, commit: "52ef2da", tag: pre-v2, gate: "git tag pre-v2 && aviona --version == 0.2.6 && scripts/test-aviona.ps1", notes: "Baseline 0.2.x patch stack committed; pre-v2 tag; product sign-off in CURRENT STATE." }
   V2-1: { status: NOT_STARTED, gate: "pytest tests/unit/test_terminate_contract.py tests/integration/test_decision_cycle.py", notes: "typed terminate.user_message + SessionOutcome.user_message" }
   V2-2: { status: NOT_STARTED, gate: "pytest tests/integration/test_interactive_turn.py", notes: "interactive turn mode; needs_plan promotion" }
   V2-3: { status: NOT_STARTED, gate: "pytest tests/unit/test_aviona_contract.py", notes: "TurnContract replaces dual verification" }

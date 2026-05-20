@@ -9,10 +9,10 @@
 ## CURRENT STATE
 
 ```yaml
-current_phase: aviona-10
+current_phase: aviona-11
 phase_status: NOT_STARTED
-last_updated: "2026-05-20T20:00Z"
-last_commit: "bb569ff"
+last_updated: "2026-05-20T21:00Z"
+last_commit: "08de041"
 blocker: null
 active_roadmap: ROADMAP_PRODUCTION_AVIONA.md
 thesis_track: paused_at_phase_39
@@ -344,8 +344,9 @@ aviona_phases:
   6:  { status: DONE, commit: "9ff2984", gate: "pytest tests/unit/test_truncation_caps.py tests/unit/test_compaction.py", notes: "4+5 tests; configs/truncation.yaml; interactive caps; compact before turn." }
   7:  { status: DONE, commit: "b15ff1e", gate: "pytest tests/unit/test_permissions.py", notes: "10/10 permission tests; plan/default/auto; .aviona/settings.yaml; --mode + /mode." }
   8:  { status: DONE, commit: "29e188d", gate: "pytest tests/unit/test_snapshots.py", notes: "7/7 snapshot tests; SnapshotStore + wrappers; aviona undo CLI; checkpoint on TurnResult." }
-  9:  { status: DONE, commit: "TBD", gate: "pytest tests/unit/test_aviona_doctor.py", notes: "4/4 doctor tests; ~/.aviona/.env then project .env; probe-only exit codes." }
-  10-12: { status: NOT_STARTED, see ROADMAP_PRODUCTION_AVIONA.md }
+  9:  { status: DONE, commit: "bb569ff", gate: "pytest tests/unit/test_aviona_doctor.py", notes: "4/4 doctor tests; ~/.aviona/.env then project .env; probe-only exit codes." }
+  10: { status: DONE, commit: "TBD", gate: "pytest tests/unit/test_gitctx.py", notes: "5/5 gitctx; git in SAFE_COMMANDS; REPL + anchor summary." }
+  11-12: { status: NOT_STARTED, see ROADMAP_PRODUCTION_AVIONA.md }
   thesis_resume: { status: PAUSED, requires_user_input: true }
 ```
 

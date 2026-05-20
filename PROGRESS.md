@@ -10,9 +10,9 @@
 
 ```yaml
 current_phase: 21
-phase_status: NOT_STARTED
-last_updated: "2026-05-21T13:40Z"
-last_commit: "64a0f97"
+phase_status: IN_PROGRESS
+last_updated: "2026-05-21T14:00Z"
+last_commit: "70c09da"
 blocker: null
 ```
 
@@ -176,7 +176,7 @@ phases:
     name: "MBPP ablation + traces"
     status: DONE
     test_gate: "python -m eval.run_eval --config D --dataset mbpp --n 5 --dry-run"
-    commit: null
+    commit: "70c09da"
     notes: "8/8 unit tests (MBPP session shape + pytest compile). difficulty_of on MBPPTask. Dry-run eval + ablation mbpp n=5. Live n=50 A-D: [REQUIRES_USER_INPUT] API budget."
 
   21:

@@ -25,6 +25,7 @@ SAFE_COMMANDS: frozenset[str] = frozenset(
         "diff",
         "echo",
         "ast",
+        "docker",
     }
 )
 

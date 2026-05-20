@@ -23,7 +23,14 @@ from eval.datasets.mbpp_adapter import (
     task_to_session as mbpp_task_to_session,
 )
 from eval.datasets.synthetic_multistep import generate_multistep, multistep_to_session
-from eval.datasets.swebench_adapter import load_swebench, load_swebench_by_ids
+from eval.datasets.swebench_adapter import (
+    SWEBenchTask,
+    load_swebench,
+    load_swebench_by_ids,
+    materialize_instance_workspace,
+    task_to_session as swebench_task_to_session,
+)
+from eval.swe_docker import DockerNotAvailableError, require_docker, run_swe_instance_tests
 from eval.manifest import manifest_provider_and_profiles, resolve_git_sha, write_manifest
 from eval.metrics import RunResult, compute_cer, compute_sr
 from eval.paths import safe_task_slug
@@ -56,6 +63,8 @@ def _load_tasks(
     n: int,
     seed: int,
     eval_config: EvalConfig | None = None,
+    *,
+    dry_run: bool = False,
 ) -> list[tuple[str, str, list[str], str, str | None]]:
     """Return list of (task_id, goal, constraints, test_code, solution_stub)."""
     if dataset_name == "multistep":
@@ -102,15 +111,12 @@ def _load_tasks(
             for task in load_mbpp(n=n, seed=seed)
         ]
     if dataset_name == "swebench":
-        tasks = load_swebench(n=n, seed=seed)
-        rows: list[tuple[str, str, list[str], str, str | None]] = []
-        for task in tasks:
-            goal = f"Fix the issue in {task.repo} @ {task.base_commit}:\n\n{task.problem_statement}"
-            constraints = ["SWE-bench execution requires Docker (not run in Phase 10 harness)"]
-            rows.append(
-                (task.task_id, goal, constraints, "assert False  # placeholder", None)
-            )
-        return rows
+        block = eval_config.swebench if eval_config is not None else {}
+        docker_required = bool(block.get("docker_required", True)) and not dry_run
+        return [
+            (task.task_id, *swebench_task_to_session(task), None)
+            for task in load_swebench(n=n, seed=seed, docker_required=docker_required)
+        ]
     raise ValueError(f"Unknown dataset: {dataset_name}")
 
 
@@ -130,19 +136,10 @@ def _load_tasks_by_ids(
             for task in load_mbpp_by_ids(task_ids)
         ]
     if dataset_name == "swebench":
-        rows: list[tuple[str, str, list[str], str, str | None]] = []
-        for task in load_swebench_by_ids(task_ids):
-            goal = (
-                f"Fix the issue in {task.repo} @ {task.base_commit}:\n\n"
-                f"{task.problem_statement}"
-            )
-            constraints = [
-                "SWE-bench execution requires Docker (not run in Phase 10 harness)"
-            ]
-            rows.append(
-                (task.task_id, goal, constraints, "assert False  # placeholder", None)
-            )
-        return rows
+        return [
+            (task.task_id, *swebench_task_to_session(task), None)
+            for task in load_swebench_by_ids(task_ids)
+        ]
     raise ValueError(f"Unknown dataset: {dataset_name}")
 
 
@@ -161,6 +158,7 @@ def _run_single_task(
     dry_run: bool,
     planner_enabled: bool = True,
     solution_stub: str | None = None,
+    swe_task: SWEBenchTask | None = None,
 ) -> RunResult:
     """Execute one task and return a typed result row."""
     slug = safe_task_slug(task_id)
@@ -202,6 +200,19 @@ def _run_single_task(
         planner_enabled=planner_enabled,
     )
     solved = session.test_passed and session.outcome == "solved"
+    if swe_task is not None:
+        try:
+            repo_dir = materialize_instance_workspace(swe_task, workspace)
+            docker_result = run_swe_instance_tests(
+                instance_id=swe_task.task_id,
+                workspace=repo_dir,
+                fail_to_pass=swe_task.fail_to_pass,
+                pass_to_pass=swe_task.pass_to_pass,
+            )
+            solved = docker_result.passed
+        except Exception as exc:  # noqa: BLE001 — materialize/docker must not crash eval
+            logger.exception("SWE Docker grading failed for %s: %s", task_id, exc)
+            solved = False
     row = RunResult(
         task_id=task_id,
         solved=solved,
@@ -252,11 +263,30 @@ def run_eval(
     max_retries = budget.max_retries if budget else 3
     flags = eval_config.ablation_configs[config_name]
 
+    if dataset_name == "swebench" and not dry_run:
+        require_docker(bool(dataset_block.get("docker_required", True)))
+
     if task_ids:
         tasks = _load_tasks_by_ids(dataset_name, task_ids)
         sample_n = len(tasks)
     else:
-        tasks = _load_tasks(dataset_name, sample_n, sample_seed, eval_config)
+        tasks = _load_tasks(
+            dataset_name, sample_n, sample_seed, eval_config, dry_run=dry_run
+        )
+
+    swe_lookup: dict[str, SWEBenchTask] = {}
+    if dataset_name == "swebench":
+        swe_rows = (
+            load_swebench_by_ids(task_ids)
+            if task_ids
+            else load_swebench(
+                n=sample_n,
+                seed=sample_seed,
+                docker_required=False,
+            )
+        )
+        swe_lookup = {row.task_id: row for row in swe_rows}
+
     traces_root = _traces_dir()
     timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     run_id = f"{config_name}_{dataset_name}_{timestamp}"
@@ -280,7 +310,10 @@ def run_eval(
                 dry_run=dry_run,
                 planner_enabled=planner_enabled,
                 solution_stub=solution_stub,
+                swe_task=swe_lookup.get(task_id),
             )
+        except DockerNotAvailableError:
+            raise
         except Exception as exc:  # noqa: BLE001 — eval must continue across tasks
             logger.exception("Task %s failed: %s", task_id, exc)
             slug = safe_task_slug(task_id)

@@ -20,6 +20,7 @@ if str(_SRC) not in sys.path:
 from eval.decision_log import StreamedDecisionLine, load_streamed_decisions
 from eval.manifest import RunManifest
 from eval.metrics import RunResult, compute_cer, compute_sr
+from eval.metrics.qualitative import compare_qualitative, compute_qualitative
 from datetime import UTC, datetime
 
 from framework.memory.stores import DecisionEntry, SelfCheckRecord
@@ -323,7 +324,52 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Task id (e.g. HumanEval/0) or session id for interpretability dump",
     )
+    parser.add_argument(
+        "--qualitative",
+        action="store_true",
+        help="Emit QualitativeReport from decision JSONL (requires manifest decisions_file)",
+    )
+    parser.add_argument(
+        "--compare-a-d",
+        nargs=2,
+        metavar=("TRACE_A", "TRACE_D"),
+        help="Compare qualitative metrics for config A vs D trace JSONL paths",
+    )
     args = parser.parse_args(argv)
+
+    if args.compare_a_d:
+        reports = []
+        for label, trace_path in zip(("A", "D"), args.compare_a_d, strict=True):
+            manifest = load_run_manifest(trace_path)
+            decisions_file = manifest.decisions_file if manifest else ""
+            if not decisions_file:
+                path = _decisions_jsonl_path(trace_path)
+                decisions_file = str(path) if path else ""
+            report = compute_qualitative(decisions_file, trace_path=trace_path)
+            reports.append((label, report))
+            print(f"=== Qualitative {label} ({trace_path}) ===")
+            print(json.dumps(report.model_dump(), indent=2))
+        comparison = compare_qualitative(reports[0][1], reports[1][1])
+        print("\n=== A vs D comparison ===")
+        print(json.dumps(comparison, indent=2))
+        return 0
+
+    if args.qualitative:
+        manifest = load_run_manifest(args.trace)
+        decisions_file = manifest.decisions_file if manifest else ""
+        if not decisions_file:
+            path = _decisions_jsonl_path(args.trace)
+            decisions_file = str(path) if path else ""
+        report = compute_qualitative(decisions_file, trace_path=args.trace)
+        print(json.dumps(report.model_dump(), indent=2))
+        if args.session:
+            print()
+            check_behavioral_interpretability(
+                args.trace,
+                args.session,
+                checkpoint_dir=args.checkpoint_dir,
+            )
+        return 0
 
     summary = summarize_trace(args.trace, checkpoint_dir=args.checkpoint_dir)
     print(json.dumps({k: v for k, v in summary.items() if k != "retry_curves"}, indent=2))

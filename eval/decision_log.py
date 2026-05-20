@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 from pathlib import Path
@@ -24,6 +25,14 @@ class StreamedDecisionLine(BaseModel):
     decision_id: str = ""
     by_agent: str = ""
     rationale: str = ""
+    self_check_issues: list[str] = Field(default_factory=list)
+    payload_hash: str = ""
+
+
+def _payload_hash(payload: dict[str, object]) -> str:
+    """Stable short hash of decision payload for oscillation detection."""
+    raw = json.dumps(payload, sort_keys=True, default=str)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
 
 
 class DecisionLogWriter:
@@ -48,6 +57,8 @@ class DecisionLogWriter:
             decision_id=entry.decision_id,
             by_agent=entry.by_agent,
             rationale=entry.rationale[:500],
+            self_check_issues=[issue.kind for issue in entry.self_check.issues],
+            payload_hash=_payload_hash(entry.payload),
         )
         try:
             with self._path.open("a", encoding="utf-8") as handle:

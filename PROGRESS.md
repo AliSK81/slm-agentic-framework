@@ -9,10 +9,10 @@
 ## CURRENT STATE
 
 ```yaml
-current_phase: 24
+current_phase: 25
 phase_status: NOT_STARTED
-last_updated: "2026-05-21T15:10Z"
-last_commit: "8655943"
+last_updated: "2026-05-21T16:00Z"
+last_commit: "1c50d28"
 blocker: null
 ```
 
@@ -202,10 +202,10 @@ phases:
 
   24:
     name: "Qualitative metrics (RQ1/RQ2)"
-    status: NOT_STARTED
+    status: DONE
     test_gate: "pytest tests/unit/test_qualitative_metrics.py"
     commit: null
-    notes: "ROADMAP phase 24."
+    notes: "6/6 unit tests. qualitative.py + analyze_traces --qualitative/--compare-a-d; decision log streams issue_kinds + payload_hash."
 
   25:
     name: "LangGraph production OR deprecation"

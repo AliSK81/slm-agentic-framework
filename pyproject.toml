@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "slm-agentic-framework"
-version = "0.1.0"
+version = "0.2.6"
 description = "SLM-based multi-agent programming framework (MSc thesis)"
 requires-python = ">=3.11"
 

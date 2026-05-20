@@ -123,3 +123,18 @@ def test_repl_mode_command_changes_session_mode(project_dir: Path) -> None:
     )
     assert session.permission_gate.mode == "auto"
     assert any("mode: auto" in line for line in output)
+
+
+def test_repl_conversational_line_skips_agent_turn(project_dir: Path) -> None:
+    """Greetings get a local reply and never call run_turn."""
+    session = AvionaSession(project_dir)
+    run_turn = MagicMock()
+    output: list[str] = []
+    run_repl(
+        session,
+        reader=ScriptedReader(["hi", "/exit"]),
+        writer=output.append,
+        run_turn=run_turn,
+    )
+    run_turn.assert_not_called()
+    assert any("explain" in line.lower() for line in output)

@@ -11,13 +11,18 @@
 ```yaml
 current_phase: thesis-39
 phase_status: PAUSED
-last_updated: "2026-05-20T22:45Z"
-last_commit: "4c638b3"
+last_updated: "2026-05-21T00:00Z"
+last_commit: "pending-v2-0"
 blocker: null
-active_roadmap: ROADMAP_PRODUCTION_AVIONA.md
+active_roadmap: ROADMAP_PRODUCTION_AVIONA_V2.md
 thesis_track: paused_at_phase_39
-aviona_track: DONE
-replan_note: "Aviona v1 complete (AVIONA-1..12). Thesis ROADMAP 39-41 + live benchmarks frozen until THESIS-RESUME approval."
+aviona_track: v2
+aviona_v2_phase: V2-1
+aviona_v2_status: NOT_STARTED
+pre_v2_tag: pre-v2
+pre_v2_baseline_version: "0.2.6"
+product_sign_off: "2026-05-21: Chat-first assistant that can edit files (ROADMAP_PRODUCTION_AVIONA_V2.md §2.0). Additive framework terminate.user_message + interactive turn mode approved for V2-1+."
+replan_note: "V2-0 baselines 0.2.x patch stack at tag pre-v2. v1 (AVIONA-1..12) frozen at 4c638b3. Thesis 39-41 frozen until THESIS-RESUME."
 ```
 
 ---
@@ -348,8 +353,29 @@ aviona_phases:
   9:  { status: DONE, commit: "bb569ff", gate: "pytest tests/unit/test_aviona_doctor.py", notes: "4/4 doctor tests; ~/.aviona/.env then project .env; probe-only exit codes." }
   10: { status: DONE, commit: "08de041", gate: "pytest tests/unit/test_gitctx.py", notes: "5/5 gitctx; git in SAFE_COMMANDS; REPL + anchor summary." }
   11: { status: DONE, commit: "d2e23a3", gate: "pytest tests/unit/test_aviona_resume.py", notes: "7/7 resume; per-session meta; list/load/fork; --continue/--resume/--fork-session." }
-  12: { status: DONE, commit: "PENDING", gate: "pytest tests/unit/test_aviona_session.py", notes: "5/5 session tests incl. v1 sample_repo REPL e2e; fixtures/sample_repo; README Aviona section." }
+  12: { status: DONE, commit: "4c638b3", gate: "pytest tests/unit/test_aviona_session.py", notes: "5/5 session tests incl. v1 sample_repo REPL e2e; fixtures/sample_repo; README Aviona section." }
   thesis_resume: { status: PAUSED, requires_user_input: true }
+```
+
+---
+
+## AVIONA V2 TRACK (`ROADMAP_PRODUCTION_AVIONA_V2.md`)
+
+```yaml
+product_definition: "Chat-first assistant that can edit files, rooted in cwd (Claude Code model)."
+turn_types: [local, answer, inspect, edit, build]
+aviona_v2_phases:
+  V2-0: { status: DONE, commit: pending, gate: "git tag pre-v2 && aviona --version == 0.2.6 && scripts/test-aviona.ps1", notes: "Baseline 0.2.x patch stack committed; pre-v2 tag; product sign-off in CURRENT STATE." }
+  V2-1: { status: NOT_STARTED, gate: "pytest tests/unit/test_terminate_contract.py tests/integration/test_decision_cycle.py", notes: "typed terminate.user_message + SessionOutcome.user_message" }
+  V2-2: { status: NOT_STARTED, gate: "pytest tests/integration/test_interactive_turn.py", notes: "interactive turn mode; needs_plan promotion" }
+  V2-3: { status: NOT_STARTED, gate: "pytest tests/unit/test_aviona_contract.py", notes: "TurnContract replaces dual verification" }
+  V2-4: { status: NOT_STARTED, gate: "scripts/test-aviona.ps1 + grep no classify_goal/fallbacks", notes: "delete patch stack" }
+  V2-5: { status: NOT_STARTED, gate: "pytest tests/unit/test_turn_budgets.py", notes: "per-turn budgets + read-only enforcement" }
+  V2-6: { status: NOT_STARTED, gate: "pytest tests/unit/test_aviona_contract_matrix.py", notes: "contract matrix replaces phrasing journeys" }
+  V2-7: { status: NOT_STARTED, gate: "pytest tests/unit/test_runtime_answer.py", notes: "runtime self-knowledge via anchor" }
+  V2-8: { status: NOT_STARTED, requires_user_input: true, gate: "scripts/test-aviona.ps1 -Live", notes: "locked live journey gate" }
+  V2-9: { status: NOT_STARTED, gate: "scripts/install-aviona.ps1 dry-run", notes: "windows install hardening carry-over" }
+  V2-10: { status: NOT_STARTED, gate: "docs updated; version 0.3.0", notes: "v2 migration close-out" }
 ```
 
 ---
@@ -398,6 +424,7 @@ issues:
   - "Phases 14–29 merged into ROADMAP.md 2026-05-20; Phase 13 done."
   - "2026-05-21: ROADMAP_PHASES_NEXT.md merged; phases 30–41 in ROADMAP.md; handoff at 88c1a50."
   - "scripts/run_phase12_staged.ps1 broken on Windows; use scripts/run_phase12_staged.py."
+  - "2026-05-21: Aviona v2 replan (ROADMAP_PRODUCTION_AVIONA_V2.md); live REPL fails despite 67 mocked tests; baseline tagged pre-v2 at 0.2.6."
 ```
 
 ---

@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import logging
+import sys
 from collections.abc import Callable, Iterator, Sequence
 
+from aviona.console import write_line
 from aviona.gitctx import format_git_summary
+from aviona.intent import conversational_reply, is_conversational
 from aviona.session import AvionaSession, TurnResult
 
 logger = logging.getLogger(__name__)
@@ -14,13 +17,13 @@ Reader = Callable[[str], str]
 Writer = Callable[[str], object]
 
 _HELP_TEXT = """Aviona commands:
-  /help          — show this help
-  /exit          — leave the REPL
-  /mode          — show current permission mode
-  /mode plan     — read-only (no writes / side-effect shell)
-  /mode default  — ask before side-effect shell
-  /mode auto     — allow cwd writes and allowlisted shell
-Type any other line to run one bounded agent turn."""
+  /help          - show this help
+  /exit          - leave the REPL
+  /mode          - show current permission mode
+  /mode plan     - read-only (no writes / side-effect shell)
+  /mode default  - ask before side-effect shell
+  /mode auto     - allow cwd writes and allowlisted shell
+Ask questions (explain the codebase), list/read files, or request edits."""
 
 
 class ScriptedReader:
@@ -39,6 +42,9 @@ class ScriptedReader:
 
 def default_reader(prompt: str) -> str:
     """Read one REPL line using ``prompt_toolkit`` when available, else ``input()``."""
+    if not sys.stdin.isatty():
+        return input(prompt)
+
     try:
         from prompt_toolkit import PromptSession
         from prompt_toolkit.history import InMemoryHistory
@@ -100,11 +106,11 @@ def run_repl(
         Process exit code (0 on normal exit).
     """
     read = reader or default_reader
-    write = writer or print
+    write = writer or write_line
     turn = run_turn or session.run_turn
     session.set_confirm_reader(read)
 
-    write(f"Aviona — workspace: {session.workspace}")
+    write(f"Aviona - workspace: {session.workspace}")
     write(f"mode: {session.permission_gate.mode}")
     git_line = format_git_summary(session.git_status)
     if git_line:
@@ -126,6 +132,10 @@ def run_repl(
                 return 0
             continue
 
+        if is_conversational(line):
+            write(conversational_reply(line))
+            continue
+
         try:
             result = turn(line)
         except KeyboardInterrupt:
@@ -137,4 +147,7 @@ def run_repl(
             continue
 
         write(result.status)
+        if result.detail:
+            for line in result.detail.splitlines():
+                write(f"  {line}")
     return 0

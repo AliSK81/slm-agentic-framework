@@ -146,6 +146,7 @@ def test_render_status_is_single_line_within_width() -> None:
     line = render_status(outcome, edited_path="solution.py")
     assert "\n" not in line
     assert len(line) <= STATUS_MAX_WIDTH
+    assert line.startswith("ok |")
 
 
 def test_aviona_daily_profile_has_lower_wm_ceiling(

@@ -26,11 +26,11 @@ def render_status(
         One-line status string for the REPL.
     """
     if outcome.test_passed or outcome.outcome == "solved":
-        mark = "✓"
+        mark = "ok"
     elif outcome.outcome == "escalate":
         mark = "!"
     else:
-        mark = "…"
+        mark = "..."
 
     parts: list[str] = [mark]
     if edited_path:
@@ -43,7 +43,7 @@ def render_status(
     if outcome.error:
         parts.append(outcome.error[:40])
 
-    line = " · ".join(parts)
+    line = " | ".join(parts)
     if len(line) > max_width:
-        return line[: max_width - 1] + "…"
+        return line[: max_width - 3] + "..."
     return line

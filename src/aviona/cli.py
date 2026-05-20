@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Sequence
 
 from aviona import __version__
+from aviona.console import configure_stdio, write_line
 from aviona.doctor import run_doctor
 from aviona.env import load_aviona_env
 from aviona.repl import run_repl
@@ -69,19 +70,19 @@ def _open_session(cwd: Path, args: argparse.Namespace) -> AvionaSession | None:
         if parent_id is None:
             latest = latest_session(cwd)
             if latest is None:
-                print("no prior session to fork")
+                write_line("no prior session to fork")
                 return None
             parent_id = latest.session_id
         try:
             return AvionaSession(cwd, fork_from=parent_id)
         except SessionNotFoundError as exc:
-            print(str(exc))
+            write_line(str(exc))
             return None
 
     if args.continue_session:
         latest = latest_session(cwd)
         if latest is None:
-            print("no prior session to continue")
+            write_line("no prior session to continue")
             return None
         return AvionaSession(cwd, session_id=latest.session_id)
 
@@ -89,7 +90,7 @@ def _open_session(cwd: Path, args: argparse.Namespace) -> AvionaSession | None:
         try:
             return AvionaSession(cwd, session_id=args.resume)
         except SessionNotFoundError as exc:
-            print(str(exc))
+            write_line(str(exc))
             return None
 
     return AvionaSession(cwd)
@@ -97,6 +98,7 @@ def _open_session(cwd: Path, args: argparse.Namespace) -> AvionaSession | None:
 
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the Aviona CLI."""
+    configure_stdio()
     cwd = Path.cwd()
     load_aviona_env(cwd)
     parser = build_parser()
@@ -112,9 +114,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         session = AvionaSession(cwd)
         restored = session.undo_last()
         if not restored:
-            print("nothing to undo")
+            write_line("nothing to undo")
             return 0
-        print("restored:", ", ".join(restored))
+        write_line("restored: " + ", ".join(restored))
         return 0
 
     validate_slm_api_key()

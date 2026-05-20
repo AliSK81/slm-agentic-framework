@@ -80,15 +80,15 @@ def git_status(cwd: Path) -> GitStatus:
 
 
 def format_git_summary(status: GitStatus) -> str | None:
-    """One-line REPL summary: ``git: main · 3 changed``."""
+    """One-line REPL summary: ``git: main | 3 changed files``."""
     if not status.branch and not status.changed_files:
         return None
     branch = status.branch or "(detached)"
     count = len(status.changed_files)
     if count:
         noun = "file" if count == 1 else "files"
-        return f"git: {branch} · {count} changed {noun}"
-    return f"git: {branch} · clean"
+        return f"git: {branch} | {count} changed {noun}"
+    return f"git: {branch} | clean"
 
 
 def git_anchor_segment(status: GitStatus) -> str | None:

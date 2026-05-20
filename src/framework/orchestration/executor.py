@@ -19,7 +19,8 @@ from framework.orchestration.messages import (
 )
 from framework.tools.code_sanitize import sanitize_python_source
 from framework.tools.compile_check import CompileResult, py_compile_check
-from framework.tools.file_tools import FileResult, edit_file, write_file
+from framework.tools.file_tools import FileResult, edit_file, read_file, write_file
+from framework.error_control.sandbox import safe_execute
 
 WriteFileFn = Callable[[str, str, Path], FileResult]
 EditFileFn = Callable[[str, str, str, Path], FileResult]
@@ -78,6 +79,7 @@ class ExecutorAgent:
         permission_check: Callable[[str, str], bool] | None = None,
         write_file_fn: WriteFileFn | None = None,
         edit_file_fn: EditFileFn | None = None,
+        effect_sink: list[str] | None = None,
     ) -> None:
         self._cycle = cycle
         self._memory = memory
@@ -89,6 +91,11 @@ class ExecutorAgent:
         self._permission_check = permission_check
         self._write_file = write_file_fn or write_file
         self._edit_file = edit_file_fn or edit_file
+        self._effect_sink = effect_sink
+
+    def _record_effect(self, text: str) -> None:
+        if self._effect_sink is not None and text.strip():
+            self._effect_sink.append(text.strip())
 
     def _require_permission(self, kind: str, detail: str) -> FileResult | None:
         """Return a denial ``FileResult`` when Aviona permission gate blocks the action."""
@@ -133,6 +140,7 @@ class ExecutorAgent:
 
         if not result.ok:
             return result
+        self._record_effect(f"changed {file_path}")
         if file_path.endswith(".py") or file_path.endswith(".pyw"):
             return _verify_python_file(file_path, self._workspace)
         return result
@@ -176,20 +184,86 @@ class ExecutorAgent:
                     if blocked is not None:
                         self.last_edit_result = blocked
                         return blocked
-                    content = sanitize_python_source(
-                        str(decision.payload.get("content", ""))
-                    )
+                    raw_content = str(decision.payload.get("content", ""))
+                    if file_path.endswith((".py", ".pyw")):
+                        raw_content = sanitize_python_source(raw_content)
                     self.last_edit_result = self._write_file(
-                        file_path, content, self._workspace
+                        file_path, raw_content, self._workspace
                     )
                     if self.last_edit_result.ok:
-                        self.last_edit_result = _verify_python_file(
-                            file_path, self._workspace
-                        )
+                        self._record_effect(f"created {file_path}")
+                        if file_path.endswith((".py", ".pyw")):
+                            self.last_edit_result = _verify_python_file(
+                                file_path, self._workspace
+                            )
                     return self.last_edit_result
+                if tool == "read_file":
+                    file_path = _resolve_file_path(decision.payload, default="")
+                    if not file_path:
+                        self.last_tool_result = FileResult(
+                            ok=False, message="read_file requires path"
+                        )
+                        return self.last_tool_result
+                    self.last_tool_result = read_file(file_path, self._workspace)
+                    if self.last_tool_result.ok and self.last_tool_result.content:
+                        self._record_effect(self.last_tool_result.content)
+                    return self.last_tool_result
+                if tool == "list_dir":
+                    rel = _resolve_file_path(decision.payload, default=".")
+                    target = (self._workspace / rel).resolve()
+                    try:
+                        target.relative_to(self._workspace)
+                    except ValueError:
+                        self.last_tool_result = FileResult(
+                            ok=False, message="path outside workspace"
+                        )
+                        return self.last_tool_result
+                    if not target.is_dir():
+                        self.last_tool_result = FileResult(
+                            ok=False, message=f"not a directory: {rel}"
+                        )
+                        return self.last_tool_result
+                    names = sorted(
+                        p.name + ("/" if p.is_dir() else "")
+                        for p in target.iterdir()
+                    )
+                    listing = "\n".join(names)
+                    self.last_tool_result = FileResult(
+                        ok=True, message="ok", content=listing
+                    )
+                    self._record_effect(listing)
+                    return self.last_tool_result
+                if tool in ("shell", "run_command"):
+                    command = str(decision.payload.get("command", "")).strip()
+                    if not command:
+                        self.last_tool_result = FileResult(
+                            ok=False, message="shell requires command"
+                        )
+                        return self.last_tool_result
+                    blocked = self._require_permission("shell", command)
+                    if blocked is not None:
+                        self.last_tool_result = blocked
+                        return blocked
+                    result = safe_execute(command, self._workspace, timeout_s=30)
+                    self.last_tool_result = result
+                    if result.stdout:
+                        self._record_effect(result.stdout)
+                    return result
             if decision.kind == "code_edit":
                 self.last_edit_result = self._apply_code_edit(decision)
                 return self.last_edit_result
+            if decision.kind == "terminate":
+                answer = str(
+                    (decision.payload or {}).get("answer") or decision.rationale or ""
+                ).strip()
+                self.last_tool_result = FileResult(
+                    ok=bool(answer),
+                    message="ok" if answer else "empty terminate answer",
+                    content=answer or None,
+                )
+                if answer:
+                    self._record_effect(answer)
+                return self.last_tool_result
             if decision.kind == "handoff":
                 handback = HandbackMessage(
                     session_id=session_id,
@@ -226,6 +300,8 @@ class ExecutorAgent:
             passed = False
         elif self.last_tool_result is not None and hasattr(self.last_tool_result, "passed"):
             passed = bool(self.last_tool_result.passed)
+        elif self.last_tool_result is not None and hasattr(self.last_tool_result, "ok"):
+            passed = bool(self.last_tool_result.ok)
         elif self.last_edit_result is not None:
             passed = bool(self.last_edit_result.ok)
 

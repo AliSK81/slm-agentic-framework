@@ -1,0 +1,208 @@
+You are planning an ARCHITECTURAL replan for Aviona — not another round of 0.2.x patches. Do NOT implement code. Output a structured replan document (phases, gates, diagrams, deletion list).
+
+================================================================================
+PROJECT
+================================================================================
+
+Name: Aviona — terminal REPL agent CLI
+Repo: D:/thesis/agentic-ai (Python, thesis SLM Agentic Framework)
+Package: aviona 0.2.6 (mostly UNCOMMITTED on top of last Aviona commit 4c638b3)
+Test workspace: D:/thesis/aviona-test (README.md, hello.txt, main.py, calculator.py, AVIONA.md)
+Install: pip install -e . ; scripts/install-aviona.ps1 on Windows (aviona.exe lock / corrupt ~* dist-info)
+
+Thesis track: PAUSED at phase 39. Aviona track marked DONE (AVIONA-1..12) in PROGRESS.md but live UX is broken.
+
+Product intent (ROADMAP_PRODUCTION_AVIONA.md):
+- Thin REPL over thesis engine — NOT reimplement planner/executor/cycle/tools
+- One user line → one bounded run_full_session(engine="graph") with persistent MemoryStores
+- v1 DoD was: create hello.txt with "hi" → file exists + session JSONL under ~/.aviona/projects/<hash>/
+- eval/ benchmark harness is FROZEN — Aviona must not depend on live eval runs
+
+================================================================================
+ATTACHED FILES — WHAT EACH ONE IS (read them)
+================================================================================
+
+1. AVIONA_CURRENT_STATE.md
+   Snapshot: version, module map, QA layers, what works vs live failures, 0.2.0–0.2.6 patch list, thesis rules.
+
+2. AVIONA_ARCHITECTURE_ISSUE.md
+   Root problem statement, symptom→mechanism table, 7 architectural mismatches, mermaid of current broken flow,
+   what user REJECTED (regex routers, README fallbacks as main fix), planning questions, required deliverables.
+
+3. ROADMAP_PRODUCTION_AVIONA.md (~420 lines)
+   Original v1 design: mermaid architecture, 8 non-negotiable framework rules, AVIONA-1..12 phase definitions,
+   explicit v1 DoD, commit messages. THIS is what was built — your plan extends/replaces product layer only.
+
+4. JOURNEYS.md
+   User journey matrix J1–J9 locked by mocked tests. Shows expected goal kinds (local chat, read, read_content,
+   explain, write, general) and what REPL must/must not show. Grew from live bug reports — symptom of regex NLU debt.
+
+5. session.py (~410 lines) — MAIN PAIN POINT
+   AvionaSession.run_turn(): the turn adapter.
+   - Calls run_full_session(goal, hard_constraints, verifier=TurnOutcomeVerifier, max_steps=15, effect_sink=...)
+   - Injects 6+ hard_constraint hint strings based on classify_goal(): EXECUTOR, READ, READ_CONTENT, EXPLAIN,
+     QA, REPLY, PROJECT QUESTION
+   - Anchor built from: workspace path, git status, AVIONA.md rules, runtime_anchor_segment() (provider/model)
+   - Rolling history → [SESSION CONTEXT] injected every turn (compaction.py)
+   - On failure: try_read_content_fallback, try_explain_fallback (project questions only), auto undo edits
+   - TurnResult: status line + optional detail (scraped post-hoc)
+   - Permission: plan/default/auto; read-only wrapper for explain/read_content/reply goals
+
+6. effects.py (~440 lines) — CLASSIFICATION + VERIFICATION SCRAPING
+   - classify_goal() → write | read | read_content | explain | general (ALL regex)
+   - analyze_turn_effects() decides satisfied + user_detail from decision log + file snapshots + tool_outputs
+   - _best_answer() scrapes terminate payload/rationale; rejects answers <20 chars unless requested_reply_text match
+   - _is_vacuous_answer() filters meta terminate text ("no further action needed")
+   - infer_target_file(), is_project_question(), is_open_question(), requested_reply_text()
+   - NO typed user_visible field — everything inferred after the session
+
+7. fallbacks.py (~120 lines)
+   - try_read_content_fallback: direct read_file when agent only listed dir
+   - try_explain_fallback: build_project_summary from README.md, AVIONA.md, main.py, calculator.py
+   - Masks agent failure; wrong for non-project questions (e.g. "what language model?" got README dump)
+
+8. PROGRESS.md
+   Full thesis phase log 0–38 DONE, Aviona phases 1–12 DONE with commit hashes and test gates.
+
+9. test-aviona.ps1
+   L2 gate: 67 mocked pytest tests, skip pip if version OK, optional -Live smoke (minimal, not journey-complete).
+
+10. PROMPT_AVIONA_REPLAN.md
+    Earlier brief version of this request.
+
+================================================================================
+THESIS ENGINE (not attached — context you need)
+================================================================================
+
+Stack per REPL line today:
+  repl.py → AvionaSession.run_turn → framework/orchestration/session.py run_full_session(engine="graph")
+  → LangGraph FSM (Python transitions only, SLM never picks next state)
+  → PlannerAgent + ExecutorAgent, each using DecisionCycle (READ→PROPOSE→SELF_CHECK→CORRECT→ACT→RECORD)
+  → Tools: list_dir, read_file, write_file, code_edit, pytest, shell (sandboxed), etc.
+  → MemoryStores SQLite at ~/.aviona/projects/<hash>/memory.db
+
+Framework SessionOutcome fields: session_id, outcome (solved/unresolvable/...), step_count, tokens_total,
+test_passed, error — NO user-facing message field.
+
+Aviona adds TurnOutcomeVerifier wrapping NoOpVerifier — second pass/fail layer.
+
+Model profile (configs/models.yaml, aviona-daily): deepseek-v4-flash, max_working_memory_tokens: 480,
+PLANNER_PROFILE/EXECUTOR_PROFILE env default to aviona-daily via profiles.py.
+
+================================================================================
+8 NON-NEGOTIABLE RULES (from roadmap)
+================================================================================
+
+1. Agents pass state only through memory stores
+2. Agents communicate only via typed Pydantic messages
+3. SLM never decides workflow transitions — Python/graph only
+4. Every LLM call goes through Decision Cycle
+5. Truncate every tool output before it enters a prompt
+6. Anchor (goal + constraints) is always first in every prompt
+7. Decision Log is append-only
+8. Write-guard enforced at tool level
+
+Your plan must respect these OR explicitly propose "product mode" exceptions with justification.
+
+================================================================================
+LIVE FAILURES (real terminal sessions — user tested in aviona-test)
+================================================================================
+
+These are NOT hypothetical. Mocked L2 tests pass; these fail within minutes of live use.
+
+| # | User typed | Actual REPL output | Tokens/steps | Problem |
+|---|------------|-------------------|--------------|---------|
+| 1 | what is this project | ok + "User asked... no further action needed" OR README dump | 2–6k | No real answer / wrong fallback |
+| 2 | what is content of hello file? | ! "Use read_file" OR ok after fallback "hi" | 5–7k | Agent calls list_dir not read_file |
+| 3 | ok (after hi) | ! edited notes.txt + "You didn't ask to change files" | ~5k | Non-write goal triggered file edit |
+| 4 | what is your model? | ok + "I am a planner agent..." | ~3k | Wrong answer, full graph for meta Q |
+| 5 | what language model? | ok + Project overview README/main.py dump; "Working memory 799 tokens exceeds ceiling 750" | ~9.7k | Misclassified explain + fallback + context bloat |
+| 6 | try to fastly reply with "salam" | ok \| 3 steps \| 3.6k tok — NO detail line under status | ~3.6k | Vacuous ok; answer <20 chars rejected by scraper |
+| 7 | hi | Local greeting, 0 tokens | 0 | WORKS (intent.py local only) |
+| 8 | list files in this dir | ok + listing | ~1.4k | Usually WORKS |
+
+User explicitly REJECTED fixing #4/#5 by routing model questions to canned local replies ("do not route it").
+User wants the AGENT/ARCHITECTURE fixed, not more regex bypasses.
+
+================================================================================
+WHY 0.2.x PATCHES FAIL (mechanism summary)
+================================================================================
+
+A. One orchestration for everything: salam and create foo.py both run planner+executor LangGraph up to 15 steps.
+
+B. Dual verification: framework SessionOutcome.solved vs analyze_turn_effects.satisfied — often disagree;
+   patches force unresolvable, fallbacks, or auto-undo after the fact.
+
+C. REPL "detail" is scraped from decision log (terminate rationale, effect_sink tool text) via _best_answer()
+   with heuristics — not a first-class contract. Empty detail + ok is possible.
+
+D. classify_goal() regex drives hints, read-only mode, step budget, verification, fallbacks — unbounded whack-a-mole.
+
+E. Deterministic fallbacks (read_file, README summary) hide SLM failures and produce wrong answers for wrong goal types.
+
+F. Test pyramid inverted: 67 mocked tests green; L3 live is optional minimal smoke; user IS the integration test.
+
+================================================================================
+CURRENT classify_goal() KINDS (effects.py — regex)
+================================================================================
+
+write        → create/edit/implement verbs
+read_content → "content of", read hello.txt, "hello file" + content hint
+read         → list files, ls, dir
+explain      → explain/describe OR "what is this project" OR _EXPLAIN_GOAL
+general      → everything else (model questions, reply with salam, etc.)
+
+Each kind adds different [AVIONA *] hints to hard_constraints and different analyze_turn_effects rules.
+
+================================================================================
+WHAT USER WILL NOT ACCEPT AS "THE FIX"
+================================================================================
+
+- More is_conversational / is_aviona_meta regex routers skipping the agent
+- Permanent README/read_file fallbacks as product behavior
+- More [AVIONA EXECUTOR] hint strings without orchestration change
+- Calling 0.2.6 production-ready without live L3 journey gate
+- Breaking eval/ harness or the 8 thesis rules without documenting it
+
+================================================================================
+YOUR DELIVERABLES (structured markdown output)
+================================================================================
+
+1. EXECUTIVE SUMMARY (2 paragraphs: root cause + recommended direction)
+
+2. TARGET ARCHITECTURE
+   - Mermaid diagram
+   - Turn taxonomy: which types exist, how each is detected (NOT per-phrase regex list), which orchestration path
+     (full graph / executor-only / single cycle / zero-LLM for hi/ok only)
+   - User-visible outcome contract: typed field, who sets it, how REPL displays it
+   - Single verification story aligned with what user sees (ok/!/detail)
+
+3. DELETION / SHRINK LIST
+   - What to remove from effects.py, fallbacks.py, session.py hint strings, TurnOutcomeVerifier scraping
+
+4. PHASED ROADMAP (new file: ROADMAP_PRODUCTION_AVIONA_V2.md outline)
+   - Phase goals, tasks, test gates (L2 mocked + L3 live prompts from table above), commit message style
+   - Mark [REQUIRES_USER_INPUT] for live API budget / product definition choices
+
+5. ACCEPTANCE MATRIX
+   - Minimum live prompts that block release (from live failures table + JOURNEYS.md)
+   - Token/step budgets per turn type (today: 3–10k for trivial lines is unacceptable)
+
+6. FRAMEWORK vs AVIONA CHANGES
+   - What requires changes to framework/orchestration/session.py vs aviona-only
+
+7. RISKS & OPEN QUESTIONS
+   - File agent (Claude Code) vs chat assistant that edits files — pick one product definition
+
+================================================================================
+SUCCESS CRITERIA FOR YOUR PLAN
+================================================================================
+
+A reader should know:
+- Why session.py + effects.py + fallbacks.py architecture cannot reach reliable live REPL
+- What replaces "one graph session per line"
+- How user ALWAYS gets detail text or honest ! with reason
+- How we test it (mock tier keeps CI fast; live tier blocks releases)
+- What gets deleted from the patch stack
+
+Plan only. No code.

@@ -213,6 +213,7 @@ def _build_agents(
     permission_check: Callable[[str, str], bool] | None = None,
     write_file_fn: WriteFileFn | None = None,
     edit_file_fn: EditFileFn | None = None,
+    effect_sink: list[str] | None = None,
 ) -> tuple[PlannerAgent, ExecutorAgent, SLMUsageAccumulator, str]:
     usage = SLMUsageAccumulator()
     planner_inner = client_for_role("planner")
@@ -250,6 +251,7 @@ def _build_agents(
         permission_check=permission_check,
         write_file_fn=write_file_fn,
         edit_file_fn=edit_file_fn,
+        effect_sink=effect_sink,
     )
     return planner, executor, usage, primary_model_id
 
@@ -383,6 +385,7 @@ def run_full_session(
     permission_check: Callable[[str, str], bool] | None = None,
     write_file_fn: WriteFileFn | None = None,
     edit_file_fn: EditFileFn | None = None,
+    effect_sink: list[str] | None = None,
 ) -> SessionOutcome:
     """Run PLAN → DISPATCH → EXECUTE until DONE, ESCALATE, or budget exhausted.
 
@@ -424,6 +427,7 @@ def run_full_session(
         permission_check=permission_check,
         write_file_fn=write_file_fn,
         edit_file_fn=edit_file_fn,
+        effect_sink=effect_sink,
     )
 
     memory.state.write(

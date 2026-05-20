@@ -135,11 +135,61 @@ def resolve_endpoint(profile_name: str) -> EndpointConfig:
     )
 
 
+def list_profile_names() -> list[str]:
+    """Profile keys defined in ``configs/models.yaml``."""
+    return list(_load_raw().get("profiles", {}).keys())
+
+
+def list_bundle_names() -> list[str]:
+    """Named bundle keys (e.g. ``slm_small``) from models.yaml."""
+    return list(_load_raw().get("bundles", {}).keys())
+
+
+def resolve_bundle(bundle_name: str) -> dict[str, str]:
+    """Resolve a named bundle to planner and executor profile keys.
+
+    Inputs:
+        bundle_name: Key under ``bundles`` in models.yaml.
+
+    Outputs:
+        Dict with ``planner`` and ``executor`` profile keys.
+
+    Side effects:
+        None. Raises ``ValueError`` when the bundle or a referenced profile is missing.
+    """
+    bundles: dict[str, Any] = _load_raw().get("bundles", {})
+    if bundle_name not in bundles:
+        known = ", ".join(sorted(bundles)) or "(none)"
+        raise ValueError(f"Unknown SLM bundle {bundle_name!r}. Known bundles: {known}")
+
+    block = bundles[bundle_name]
+    planner = str(block.get("planner", "")).strip()
+    executor = str(block.get("executor", "")).strip()
+    if not planner or not executor:
+        raise ValueError(
+            f"Bundle {bundle_name!r} must define non-empty planner and executor profiles"
+        )
+
+    profiles = _load_raw().get("profiles", {})
+    for role, profile_name in (("planner", planner), ("executor", executor)):
+        if profile_name not in profiles:
+            known_profiles = ", ".join(sorted(profiles)) or "(none)"
+            raise ValueError(
+                f"Bundle {bundle_name!r} references unknown profile {profile_name!r} "
+                f"for {role}. Known profiles: {known_profiles}"
+            )
+
+    return {"planner": planner, "executor": executor}
+
+
 def load_profile(profile_name: str) -> ModelProfile:
     """Load a profile from models.yaml."""
     profiles: dict[str, Any] = _load_raw().get("profiles", {})
     if profile_name not in profiles:
-        raise ValueError(f"Unknown model profile: {profile_name}")
+        known = ", ".join(sorted(profiles)) or "(none)"
+        raise ValueError(
+            f"Unknown model profile: {profile_name!r}. Known profiles: {known}"
+        )
     return ModelProfile.model_validate(profiles[profile_name])
 
 

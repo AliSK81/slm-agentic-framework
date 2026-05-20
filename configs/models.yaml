@@ -32,6 +32,13 @@ defaults:
   planner: deepseek-v4-flash
   executor: deepseek-v4-flash
 
+# Named bundles — set PLANNER_PROFILE=slm_small and EXECUTOR_PROFILE=slm_small (or use --bundle)
+bundles:
+  slm_small:
+    planner: qwen2.5-coder-7b-instruct
+    executor: devstral-small
+    provider: openrouter
+
 profiles:
   default:
     model_id: deepseek-v4-flash
@@ -95,7 +102,7 @@ profiles:
     tool_call_format: json
 
   qwen2.5-coder-7b-instruct:
-    model_id: qwen/qwen-2.5-coder-32b-instruct
+    model_id: qwen/qwen2.5-coder-7b-instruct
     provider: openrouter
     context_limit: 32768
     effective_context: 12000

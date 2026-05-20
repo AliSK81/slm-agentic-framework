@@ -8,7 +8,10 @@ from typing import Any, Literal
 from framework.slm.config import (
     ModelProfile,
     active_provider_name,
+    list_bundle_names,
+    list_profile_names,
     load_profile,
+    resolve_bundle,
     resolve_endpoint,
 )
 
@@ -24,14 +27,13 @@ def resolve_profile_name(role: AgentRole) -> str:
     for candidate in (env_profile, env_model):
         if not candidate:
             continue
-        matched = _match_profile_key(candidate)
-        if matched:
-            return matched
-        from framework.slm.config import list_profile_names
-
+        resolved = _resolve_env_candidate(role, candidate)
+        if resolved:
+            return resolved
         raise ValueError(
             f"No profile matches {role!r} override {candidate!r}. "
-            f"Known profiles: {', '.join(list_profile_names())}"
+            f"Known profiles: {', '.join(list_profile_names())}; "
+            f"known bundles: {', '.join(list_bundle_names())}"
         )
 
     defaults: dict[str, str] = _load_raw().get("defaults", {})
@@ -46,6 +48,17 @@ def resolve_profile_name(role: AgentRole) -> str:
     )
 
 
+def _resolve_env_candidate(role: AgentRole, candidate: str) -> str | None:
+    """Map env override to a profile key (bundle name or profile key/model_id)."""
+    from framework.slm.config import _load_raw
+
+    bundles: dict[str, Any] = _load_raw().get("bundles", {})
+    if candidate in bundles:
+        return resolve_bundle(candidate)[role]
+
+    return _match_profile_key(candidate)
+
+
 def _match_profile_key(value: str) -> str | None:
     """Resolve env value to a profile key (by key or by ``model_id``)."""
     from framework.slm.config import _load_raw
@@ -58,13 +71,6 @@ def _match_profile_key(value: str) -> str | None:
         if model_id == value:
             return name
     return None
-
-
-def list_profile_names() -> list[str]:
-    """Profile keys defined in models.yaml."""
-    from framework.slm.config import _load_raw
-
-    return list(_load_raw().get("profiles", {}).keys())
 
 
 def model_id_for_role(role: AgentRole) -> str:

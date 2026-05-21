@@ -40,7 +40,8 @@ def runtime_answer_constraint() -> str:
     """Hard constraint instructing meta answers from the anchor runtime line."""
     return (
         "[AVIONA] Self/meta questions (model, provider, version, cwd): answer only the "
-        "CURRENT user goal from the runtime: line in [CONSTRAINTS]. Ignore prior turns. "
+        "CURRENT user goal from the runtime: line in [CONSTRAINTS]. Ignore [CONTEXT] items "
+        "— they may be stale from prior sessions. "
         "Do not read repository files, handoff, or write tools. "
         "Use terminate{user_message, turn_type:answer} in one cycle."
     )

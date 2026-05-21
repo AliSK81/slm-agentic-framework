@@ -25,8 +25,7 @@ aviona_v3_status: PENDING
 pre_v2_tag: pre-v2
 pre_v2_baseline_version: "0.2.6"
 product_sign_off: "2026-05-21: Chat-first assistant that can edit files (ROADMAP_PRODUCTION_AVIONA_V2.md §2.0). Additive framework terminate.user_message + interactive turn mode approved for V2-1+."
-replan_note: "2026-05-21: Claude replan — ROADMAP_FRAMEWORK_INTERACTIVE.md (FI-1..FI-7) + ROADMAP_AVIONA_V3.md (AV3-1..AV3-5). Evidence pack: temp/roadmap-replan-handoff/. Thesis 39-41 frozen until thesis_resume_gate."
-handoff_pack: temp/roadmap-replan-handoff/
+replan_note: "2026-05-21: Claude replan — ROADMAP_FRAMEWORK_INTERACTIVE.md (FI-1..FI-7) + ROADMAP_AVIONA_V3.md (AV3-1..AV3-5). Thesis 39-41 frozen until thesis_resume_gate."
 ```
 
 ---
@@ -464,7 +463,7 @@ issues:
   - "2026-05-21: ROADMAP_PHASES_NEXT.md merged; phases 30–41 in ROADMAP.md; handoff at 88c1a50."
   - "scripts/run_phase12_staged.ps1 broken on Windows; use scripts/run_phase12_staged.py."
   - "2026-05-21: Aviona v2 replan (ROADMAP_PRODUCTION_AVIONA_V2.md); live REPL fails despite 67 mocked tests; baseline tagged pre-v2 at 0.2.6."
-  - "2026-05-21: Live REPL failures traced to framework ICP gap (temp/roadmap-replan-handoff/); hardcoded Aviona shortcuts removed at 10c80eb."
+  - "2026-05-21: Live REPL failures traced to framework ICP gap; hardcoded Aviona shortcuts removed at 10c80eb."
 ```
 
 ---

@@ -50,3 +50,6 @@ htmlcov/
 
 # Chroma / model caches
 .chroma/
+
+# Local scratch / handoff artifacts (not versioned)
+temp/

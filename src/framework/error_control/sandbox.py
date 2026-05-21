@@ -42,6 +42,30 @@ class SubprocessResult(BaseModel):
     message: str = ""
 
 
+def is_inspect_run_command(cmd: str) -> bool:
+    """True when a shell command is read-only run/verify safe for declared inspect turns."""
+    stripped = cmd.strip()
+    if not stripped:
+        return False
+    if stripped.lower().startswith("pytest"):
+        return True
+    parts = shlex.split(stripped, posix=False)
+    if not parts:
+        return False
+    raw = parts[0].replace('"', "").replace("'", "")
+    executable = Path(raw).name.lower()
+    if executable.endswith(".exe"):
+        executable = executable[:-4]
+    if executable == "pytest":
+        return True
+    if executable in ("python", "python3") and len(parts) >= 2:
+        if parts[1] == "-m" and len(parts) >= 3 and parts[2] == "pytest":
+            return True
+        if parts[1] == "-c":
+            return True
+    return False
+
+
 def _command_allowed(cmd: str) -> bool:
     parts = shlex.split(cmd, posix=False)
     if not parts:

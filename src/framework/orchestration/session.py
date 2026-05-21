@@ -673,7 +673,6 @@ _READ_TOOLS = frozenset(
     {
         "read_file",
         "list_dir",
-        "grep",
         "glob",
         "py_compile",
         "py_compile_check",

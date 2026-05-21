@@ -34,7 +34,8 @@ _EXECUTOR_PAYLOAD_HINT = (
     'For code_edit use file_path "solution.py" unless editing another file. '
     "For existing files, include old_string for partial edits, or send a full "
     'replacement function in content/code/new_string. '
-    "You HAVE tools: list_dir (path=.), read_file (file_path), code_edit, shell. "
+    "You HAVE tools: list_dir (path=.), read_file (file_path), glob (pattern), "
+    "code_edit, pytest (target), shell. "
     "Use them — never claim you lack filesystem access."
 )
 

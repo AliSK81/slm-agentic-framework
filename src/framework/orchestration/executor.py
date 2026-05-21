@@ -21,7 +21,7 @@ from framework.orchestration.messages import (
 from framework.tools.code_sanitize import sanitize_python_source
 from framework.tools.compile_check import CompileResult, py_compile_check
 from framework.tools.file_tools import FileResult, edit_file, read_file, write_file
-from framework.error_control.sandbox import safe_execute
+from framework.error_control.sandbox import is_inspect_run_command, safe_execute
 
 WriteFileFn = Callable[[str, str, Path], FileResult]
 EditFileFn = Callable[[str, str, str, Path], FileResult]
@@ -44,6 +44,22 @@ _TOOL_ALIASES: dict[str, str] = {
     "run_command": "shell",
     "run_terminal_cmd": "shell",
 }
+
+EXECUTOR_IMPLEMENTED_TOOLS: frozenset[str] = frozenset(
+    {
+        "list_dir",
+        "read_file",
+        "glob",
+        "code_edit",
+        "pytest",
+        "py_compile",
+        "py_compile_check",
+        "write_file",
+        "edit_file",
+        "shell",
+        "run_command",
+    }
+)
 
 
 def _resolve_tool_name(payload: dict) -> str:
@@ -130,6 +146,15 @@ class ExecutorAgent:
         turn_type = str((decision.payload or {}).get("turn_type", "")).lower()
         return turn_type in ("edit", "build")
 
+    def _inspect_run_auto_allowed(self, decision: DecisionEntry | None, detail: str) -> bool:
+        """Auto-allow run-safe commands when the agent declared turn_type inspect."""
+        if decision is None:
+            return False
+        turn_type = str((decision.payload or {}).get("turn_type", "")).lower()
+        if turn_type != "inspect":
+            return False
+        return is_inspect_run_command(detail)
+
     def _require_permission(
         self,
         kind: str,
@@ -141,6 +166,10 @@ class ExecutorAgent:
         if kind in ("write_file", "edit_file") and decision is not None:
             if self.interactive_read_only and not self._write_permitted(decision):
                 return FileResult(ok=False, message="permission denied: read-only turn")
+        if kind in ("shell", "run_tests") and self._inspect_run_auto_allowed(
+            decision, detail
+        ):
+            return None
         if self._permission_check is None:
             return None
         if self._permission_check(kind, detail):
@@ -212,7 +241,11 @@ class ExecutorAgent:
                 logger.debug("[EXECUTOR] tool_dispatch_start tool=%s", tool)
                 if tool == "pytest":
                     target = decision.payload.get("target", "tests/")
-                    blocked = self._require_permission("shell", f"pytest {target}")
+                    blocked = self._require_permission(
+                        "run_tests",
+                        f"pytest {target}",
+                        decision=decision,
+                    )
                     if blocked is not None:
                         self.last_tool_result = blocked
                         return blocked
@@ -283,6 +316,37 @@ class ExecutorAgent:
                     )
                     self._record_effect(listing)
                     return self.last_tool_result
+                if tool == "glob":
+                    rel_base = _resolve_file_path(decision.payload, default=".")
+                    pattern = str(
+                        decision.payload.get("pattern")
+                        or decision.payload.get("glob")
+                        or "*"
+                    )
+                    base = (self._workspace / rel_base).resolve()
+                    try:
+                        base.relative_to(self._workspace.resolve())
+                    except ValueError:
+                        self.last_tool_result = FileResult(
+                            ok=False, message="path outside workspace"
+                        )
+                        return self.last_tool_result
+                    if not base.is_dir():
+                        self.last_tool_result = FileResult(
+                            ok=False, message=f"not a directory: {rel_base}"
+                        )
+                        return self.last_tool_result
+                    matches = sorted(
+                        str(p.relative_to(self._workspace.resolve())).replace("\\", "/")
+                        for p in base.glob(pattern)
+                        if p.resolve().is_relative_to(self._workspace.resolve())
+                    )
+                    listing = "\n".join(matches) if matches else "(no matches)"
+                    self.last_tool_result = FileResult(
+                        ok=True, message="ok", content=listing
+                    )
+                    self._record_effect(listing)
+                    return self.last_tool_result
                 if tool in ("shell", "run_command"):
                     command = str(decision.payload.get("command", "")).strip()
                     if not command:
@@ -290,7 +354,9 @@ class ExecutorAgent:
                             ok=False, message="shell requires command"
                         )
                         return self.last_tool_result
-                    blocked = self._require_permission("shell", command)
+                    blocked = self._require_permission(
+                        "shell", command, decision=decision
+                    )
                     if blocked is not None:
                         self.last_tool_result = blocked
                         return blocked

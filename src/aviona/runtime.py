@@ -56,7 +56,7 @@ def interactive_turn_contract_hint() -> str:
         "Explore/search (e.g. md files) → glob or read_file on matches, not bare list_dir. "
         "Run/execute code or pytest → shell then terminate turn_type:inspect with stdout (≤6 cycles). "
         "Create/edit/write tests → code_edit turn_type:edit then terminate turn_type:edit (≤6 cycles). "
-        "Tools available: list_dir, read_file, code_edit, shell."
+        "Tools available: list_dir, read_file, glob, code_edit, pytest, shell."
     )
 
 

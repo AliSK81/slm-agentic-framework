@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from framework.control.budget import StepBudgetLimiter
+from framework.control.interactive import InteractiveCompletionState
 from framework.control.models import CycleResult, ErrorControlBundle, SLMProposal
 from framework.control.self_check import self_check
 from framework.error_control.parser import parse_decision
@@ -199,6 +200,7 @@ class DecisionCycle:
         decision_floor: int = 0,
         require_turn_type: bool = False,
         interactive_turn_floor: int | None = None,
+        icp: InteractiveCompletionState | None = None,
     ) -> CycleResult:
         """Execute the full decision cycle; never raises on SLM failure."""
         limiter = StepBudgetLimiter(
@@ -321,6 +323,7 @@ class DecisionCycle:
                     self._memory,
                     session_id,
                     require_turn_type=require_turn_type,
+                    icp=icp,
                 )
             else:
                 check = SelfCheckRecord(verdict="pass", issues=[])

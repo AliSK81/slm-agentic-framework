@@ -35,6 +35,13 @@ from framework.control.workflow import (
 from framework.memory.checkpoint import save_checkpoint
 from framework.memory.reflection import _reflection_config, write_reflection
 from framework.memory.stores import DecisionEntry, MemoryStores, StateEntry, SubTask
+from framework.control.interactive import (
+    InteractiveCompletionState,
+    icp_after_successful_edit,
+    icp_after_successful_tool,
+    icp_initial_state,
+    tool_path_key,
+)
 from framework.memory.tool_results import append_tool_result
 from framework.memory.working_memory import WorkingMemoryBuilder
 from framework.control.ablation import AblationSettings
@@ -584,6 +591,7 @@ def _interactive_initial_state(
         "interactive_mode": True,
         "interactive_turn_bound": False,
         "interactive_turn_state": turn_state.model_dump(),
+        "icp_state": icp_initial_state().model_dump(),
     }
 
 
@@ -697,7 +705,6 @@ def _run_interactive_executor_turn(
         max_retries=max_retries,
     )
     state["decision_floor"] = len(memory.decisions.list_for_session(session_id))
-    state["read_tools_used"] = []
     state["code_edits_done"] = []
     billable_cycles = 0
     attempts = 0
@@ -821,16 +828,8 @@ def _run_interactive_executor_turn(
         if decision.kind == "tool_call":
             payload = decision.payload or {}
             tool = _resolve_tool_name(payload)
-            read_tools_used: list[str] = state.setdefault("read_tools_used", [])
-            read_key = _read_tool_key(tool, payload)
+            read_key = tool_path_key(tool, payload)
             billable_cycles += 1
-            if read_key and read_key in read_tools_used:
-                state["retry_count"] = int(state.get("retry_count", 0)) + 1
-                state["cycle_last_error"] = (
-                    f"You already ran {read_key}. terminate{{user_message, turn_type:inspect}} "
-                    "now using the prior tool output in [TOOL RESULTS]."
-                )
-                continue
             tool_result = executor.last_tool_result
             turn_floor = int(state.get("decision_floor", 0))
             result_path = read_key or str(
@@ -852,8 +851,6 @@ def _run_interactive_executor_turn(
                 state["cycle_last_error"] = message
                 continue
             if tool_result is not None and getattr(tool_result, "ok", False):
-                if read_key:
-                    read_tools_used.append(read_key)
                 state["last_tool_snapshot"] = {
                     "tool": tool,
                     "payload": dict(payload),
@@ -869,6 +866,12 @@ def _run_interactive_executor_turn(
                     output=result_text,
                     ok=True,
                 )
+                icp = InteractiveCompletionState.model_validate(
+                    state.get("icp_state", {})
+                )
+                state["icp_state"] = icp_after_successful_tool(
+                    icp, read_key
+                ).model_dump()
                 state["cycle_last_error"] = None
             continue
 
@@ -898,6 +901,10 @@ def _run_interactive_executor_turn(
                     output=f"applied edit to {file_path or 'file'}",
                     ok=True,
                 )
+                icp = InteractiveCompletionState.model_validate(
+                    state.get("icp_state", {})
+                )
+                state["icp_state"] = icp_after_successful_edit(icp).model_dump()
                 state["cycle_last_error"] = None
             continue
 
@@ -913,25 +920,6 @@ def _run_interactive_executor_turn(
         session_id,
         decision_floor=floor,
     )
-    if not outcome.user_message.strip():
-        edits_done = list(state.get("code_edits_done") or [])
-        synthesized = _synthesize_interactive_user_message(
-            memory=memory,
-            session_id=session_id,
-            decision_floor=floor,
-            executor=executor,
-            workspace=workspace,
-            goal=goal,
-            code_edits_done=edits_done,
-            last_tool_snapshot=state.get("last_tool_snapshot"),
-        )
-        if synthesized.strip():
-            outcome.user_message = synthesized.strip()
-            outcome.outcome = "solved"
-            if edits_done:
-                outcome.test_passed = bool(evaluation.get("passed"))
-            else:
-                outcome.test_passed = True
     if outcome.user_message.strip() and outcome.test_passed:
         outcome.outcome = "solved"
         outcome.final_state = STATE_DONE

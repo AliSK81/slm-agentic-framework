@@ -7,7 +7,11 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from framework.control.interactive import turn_type_from_payload
+from framework.control.interactive import (
+    InteractiveCompletionState,
+    icp_issues,
+    turn_type_from_payload,
+)
 from framework.control.models import parse_terminate_payload
 from framework.memory.stores import DecisionEntry, Issue, MemoryStores, SelfCheckRecord
 
@@ -154,6 +158,7 @@ def self_check(
     session_id: str,
     *,
     require_turn_type: bool = False,
+    icp: InteractiveCompletionState | None = None,
 ) -> SelfCheckRecord:
     """Run schema, contradiction, scope, and rationale checks."""
     _ = session_id  # reserved for session-scoped rules in later phases
@@ -164,6 +169,7 @@ def self_check(
     issues.extend(_scope_issues(proposal))
     issues.extend(_rationale_issues(proposal))
     issues.extend(_turn_type_required_issues(proposal, require_turn_type=require_turn_type))
+    issues.extend(icp_issues(proposal, icp))
     issues.extend(_terminate_payload_issues(proposal))
 
     if issues:

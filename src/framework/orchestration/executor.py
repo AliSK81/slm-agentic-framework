@@ -354,8 +354,14 @@ class ExecutorAgent:
             state.get("interactive_mode") and not state.get("interactive_turn_bound")
         )
         turn_floor: int | None = None
+        icp = None
         if state.get("interactive_mode"):
             turn_floor = int(state.get("decision_floor", 0))
+            from framework.control.interactive import InteractiveCompletionState
+
+            raw_icp = state.get("icp_state")
+            if isinstance(raw_icp, dict):
+                icp = InteractiveCompletionState.model_validate(raw_icp)
         result = self._cycle.run(
             session_id,
             "executor",
@@ -367,6 +373,7 @@ class ExecutorAgent:
             decision_floor=int(state.get("decision_floor", 0)),
             require_turn_type=require_turn_type,
             interactive_turn_floor=turn_floor,
+            icp=icp,
         )
 
         passed = False

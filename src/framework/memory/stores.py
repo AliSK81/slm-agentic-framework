@@ -37,6 +37,9 @@ class Issue(BaseModel):
         "empty",
         "loop",
         "turn_type_required",
+        "must_terminate_after_tool",
+        "repeat_tool",
+        "must_terminate_after_edit",
     ]
     detail: str
 

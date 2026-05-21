@@ -1,5 +1,19 @@
 # Changelog — Aviona
 
+## 0.4.0 — v3 thin adapter (2026-05-21)
+
+### Added
+
+- **Framework ICP consumption** (AV3-1) — Aviona reads `turn_type` and budgets directly from framework `load_interactive_budgets()`; deleted local `infer_interactive_max_steps` heuristics.
+- **Permission UX** (AV3-2) — mode banner at session start; `default` mode prompts `[y/N]` for side-effecting shell; `auto` and inspect-run (`pytest --collect-only`) skip prompts; `--yes`/non-tty → auto.
+- **Expanded L3 live gate** (AV3-3) — `scripts/live_gate.py` grown from 9 to 17 cases covering the real session failure matrix (`inspect-main-file`, `inspect-explore-md`, `inspect-partial`, `inspect-empty`, `repeat-list`, `run-input`, `anaphora-read`, `edit-test-run`); `must_contain_any` field; retry-on-failure; structural test `test_live_gate_matrix.py`.
+- **E2E REPL matrix** (AV3-4) — `tests/e2e/test_aviona_repl_matrix.py`: 17 parametrized `@pytest.mark.e2e` tests driving `aviona` as a subprocess; `--debug` trace collected on failure; excluded from default CI via `-m "not e2e"`; invoked by `test-aviona.ps1 -Live`.
+
+### Changed
+
+- `scripts/test-aviona.ps1 -Live` — runs E2E REPL matrix after the live gate.
+- `tests/aviona/JOURNEYS.md` — L3 table updated with all 17 locked cases.
+
 ## 0.3.0 — v2 migration close-out (2026-05-21)
 
 ### Added

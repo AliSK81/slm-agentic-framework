@@ -1,17 +1,20 @@
-"""Per-turn-type cycle and token budgets (ROADMAP §5)."""
+"""Per-turn-type cycle caps aligned with framework interactive budgets (FI-1 / AV3-1)."""
 
 from __future__ import annotations
 
 from aviona.contract import TurnContractResult, TurnType
+from framework.control.interactive import load_interactive_budgets
 from framework.orchestration.session import SessionOutcome
 
-# LLM cycle caps per declared turn type.
+_FRAMEWORK_BUDGETS = load_interactive_budgets()
+
+# Display and contract verification caps — sourced from configs/models.yaml via framework.
 TURN_CYCLE_CAPS: dict[TurnType, int] = {
     "local": 0,
-    "answer": 1,
-    "inspect": 3,
-    "edit": 6,
-    "build": 15,
+    "answer": _FRAMEWORK_BUDGETS["answer"],
+    "inspect": _FRAMEWORK_BUDGETS["inspect"],
+    "edit": _FRAMEWORK_BUDGETS["edit"],
+    "build": _FRAMEWORK_BUDGETS["build"],
 }
 
 INTERACTIVE_CYCLE_CEILING = TURN_CYCLE_CAPS["edit"]

@@ -129,7 +129,7 @@ CONTRACT_MATRIX: tuple[ContractMatrixRow, ...] = (
         False,
         True,
         llm_calls=3,
-        budget_cap=3,
+        budget_cap=4,
     ),
     ContractMatrixRow(
         "inspect-no-write",
@@ -140,7 +140,7 @@ CONTRACT_MATRIX: tuple[ContractMatrixRow, ...] = (
         False,
         contract_failure_contains="must not write",
         llm_calls=2,
-        budget_cap=3,
+        budget_cap=4,
     ),
     ContractMatrixRow(
         "inspect-budget-exceeded",
@@ -149,8 +149,8 @@ CONTRACT_MATRIX: tuple[ContractMatrixRow, ...] = (
         [],
         False,
         True,
-        llm_calls=4,
-        budget_cap=3,
+        llm_calls=5,
+        budget_cap=4,
         expected_budget_pass=False,
     ),
     ContractMatrixRow(

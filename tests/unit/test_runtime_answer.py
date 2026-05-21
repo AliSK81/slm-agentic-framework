@@ -8,11 +8,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from aviona.runtime import (
-    infer_interactive_max_steps,
-    runtime_anchor_segment,
-    runtime_answer_constraint,
-)
+from aviona.runtime import runtime_anchor_segment, runtime_answer_constraint
 from aviona.session import AvionaSession
 from framework.control.ablation import AblationSettings
 from framework.memory.backend import SQLiteBackend
@@ -88,27 +84,6 @@ def workspace(tmp_path: Path) -> Path:
 @pytest.fixture
 def memory(tmp_path: Path) -> MemoryStores:
     return MemoryStores(SQLiteBackend(tmp_path / "runtime.db"))
-
-
-def test_infer_interactive_max_steps_by_goal_shape() -> None:
-    """Inspect-style goals get a tight cycle ceiling; edits get more room."""
-    assert infer_interactive_max_steps("hi") == 1
-    assert infer_interactive_max_steps("tell me what is your llm model?") == 1
-    assert infer_interactive_max_steps("list files in this dir") == 3
-    assert infer_interactive_max_steps('create bar.txt with "debug-smoke"') == 6
-    assert (
-        infer_interactive_max_steps(
-            'run this code with input "ali" and show me the result'
-        )
-        == 6
-    )
-    assert (
-        infer_interactive_max_steps(
-            "write a unit test for it, run it, and show me the output of test"
-        )
-        == 6
-    )
-    assert infer_interactive_max_steps("explore md files") == 3
 
 
 def test_runtime_anchor_segment_includes_model_version_and_cwd(

@@ -164,15 +164,16 @@ class AvionaSession:
         *,
         constraints: list[str] | None = None,
         verifier: Verifier | None = None,
-        max_steps: int = 15,
     ) -> TurnResult:
-        """Run one user line: anchor → interactive engine → TurnContract → render.
+        """Run one user line: anchor → framework interactive ICP → TurnContract → render.
+
+        Cycle budgets and ``turn_type`` binding are owned by the framework (FI-1);
+        Aviona does not pass ``max_steps`` or infer turn shape from goal text.
 
         Args:
             text: User goal for this turn.
             constraints: Optional hard constraints appended to the anchor.
             verifier: Override verification (default ``NoOpVerifier``).
-            max_steps: Step budget for the framework interactive turn.
 
         Returns:
             ``TurnResult`` with status line and typed ``user_message`` detail.

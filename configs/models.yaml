@@ -1,5 +1,5 @@
 # Active provider when SLM_PROVIDER is unset (must match a key under providers)
-active_provider: deepseek
+active_provider: ollama
 
 # Interactive REPL cycle budgets (FI-1 single source of truth)
 interactive:
@@ -39,8 +39,8 @@ providers:
 
 # Role → profile key (override with PLANNER_PROFILE / EXECUTOR_PROFILE in .env)
 defaults:
-  planner: deepseek-v4-flash
-  executor: deepseek-v4-flash
+  planner: ollama-gpt-oss-20b
+  executor: ollama-qwen3-4b-instruct
 
 # Named bundles — set PLANNER_PROFILE=slm_small and EXECUTOR_PROFILE=slm_small (or use --bundle)
 bundles:
@@ -198,5 +198,45 @@ profiles:
     timeout_by_role:
       planner: 120
       executor: 180
+      tool_call: 60
+    tool_call_format: json
+
+  ollama-gpt-oss-20b:
+    model_id: gpt-oss:20b
+    provider: ollama
+    context_limit: 32768
+    effective_context: 16000
+    thinking_budget: null
+    api_thinking: false
+    max_working_memory_tokens: 750
+    tool_output_caps:
+      pytest_run: 5000
+      py_compile: 2000
+      read_file: 12000
+      search_codebase: 2000
+    skill_budget_tokens: 150
+    timeout_by_role:
+      planner: 180
+      executor: 240
+      tool_call: 90
+    tool_call_format: json
+
+  ollama-qwen3-4b-instruct:
+    model_id: qwen3:4b-instruct
+    provider: ollama
+    context_limit: 32768
+    effective_context: 12000
+    thinking_budget: null
+    api_thinking: false
+    max_working_memory_tokens: 650
+    tool_output_caps:
+      pytest_run: 4000
+      py_compile: 1500
+      read_file: 8000
+      search_codebase: 1500
+    skill_budget_tokens: 120
+    timeout_by_role:
+      planner: 120
+      executor: 150
       tool_call: 60
     tool_call_format: json

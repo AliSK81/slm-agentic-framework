@@ -102,6 +102,13 @@ def test_infer_interactive_max_steps_by_goal_shape() -> None:
         )
         == 6
     )
+    assert (
+        infer_interactive_max_steps(
+            "write a unit test for it, run it, and show me the output of test"
+        )
+        == 6
+    )
+    assert infer_interactive_max_steps("explore md files") == 3
 
 
 def test_runtime_anchor_segment_includes_model_version_and_cwd(

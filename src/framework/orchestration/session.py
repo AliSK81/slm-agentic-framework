@@ -37,7 +37,6 @@ from framework.memory.reflection import _reflection_config, write_reflection
 from framework.memory.stores import DecisionEntry, MemoryStores, StateEntry, SubTask
 from framework.memory.working_memory import WorkingMemoryBuilder
 from framework.control.ablation import AblationSettings
-from framework.error_control.sandbox import safe_execute
 from framework.orchestration.executor import (
     EditFileFn,
     ExecutorAgent,
@@ -113,164 +112,13 @@ def _normalize_goal_file_ref(raw: str) -> str:
     return raw.strip().strip("\"'`")
 
 
-def _file_path_from_inspect_goal(goal: str, workspace: Path | None = None) -> str | None:
-    """Extract a workspace-relative file path from an inspect-style goal."""
-    if workspace is not None:
-        resolved = _resolve_inspect_file_path(goal, workspace)
-        if resolved is not None:
-            return resolved.relative_to(workspace.resolve()).as_posix()
+def _file_path_from_inspect_goal(goal: str) -> str | None:
+    """Extract a filename hint from the goal text for reflection guidance only."""
     for pattern in _INSPECT_FILE_PATTERNS:
         match = pattern.search(goal)
         if match:
             return _normalize_goal_file_ref(match.group(1))
     return None
-
-
-def _resolve_inspect_file_path(goal: str, workspace: Path) -> Path | None:
-    """Map natural-language inspect goals to an existing workspace file."""
-    lower = goal.strip().lower()
-    explicit = None
-    for pattern in _INSPECT_FILE_PATTERNS:
-        match = pattern.search(goal)
-        if match:
-            explicit = _normalize_goal_file_ref(match.group(1))
-            break
-    if explicit:
-        for name in (explicit, f"{explicit}.py", f"{explicit}.txt"):
-            candidate = workspace / name
-            if candidate.is_file():
-                return candidate
-
-    stem_match = re.search(r"content of\s+(\w+)\s+file", goal, re.I)
-    if stem_match:
-        stem = stem_match.group(1).lower()
-        for name in (f"{stem}.py", f"{stem}.txt", stem):
-            candidate = workspace / name
-            if candidate.is_file():
-                return candidate
-
-    aliases = {
-        "main file": "main.py",
-        "hello file": "hello.txt",
-        "solution file": "solution.py",
-        "notes file": "notes.txt",
-        "bar file": "bar.txt",
-    }
-    for phrase, rel in aliases.items():
-        if phrase in lower:
-            candidate = workspace / rel
-            if candidate.is_file():
-                return candidate
-    return None
-
-
-def _is_list_dir_goal(goal: str) -> bool:
-    """True when the user wants a directory listing, not file contents."""
-    if _is_direct_file_content_goal(goal) or _is_run_code_goal(goal):
-        return False
-    lower = goal.strip().lower()
-    markers = (
-        "list files",
-        "list file",
-        "files in",
-        "current dir",
-        "this dir",
-        "directory listing",
-        "list dir",
-    )
-    if any(marker in lower for marker in markers):
-        return True
-    return "list" in lower and any(token in lower for token in ("dir", "files", "directory"))
-
-
-def _is_run_code_goal(goal: str) -> bool:
-    """True when the user wants to execute code and see output."""
-    lower = goal.strip().lower()
-    return any(
-        token in lower
-        for token in (
-            "run this",
-            "run the",
-            "run code",
-            "execute",
-            "with input",
-            "show me the result",
-        )
-    )
-
-
-def _extract_quoted_input(goal: str) -> str | None:
-    """Pull a quoted argument from run/execute goals."""
-    for pattern in (
-        r'input\s+["\']([^"\']+)["\']',
-        r'with\s+["\']([^"\']+)["\']',
-    ):
-        match = re.search(pattern, goal, re.I)
-        if match:
-            return match.group(1)
-    return None
-
-
-def _workspace_listing(workspace: Path, rel: str = ".") -> str:
-    """Return the same listing shape as the list_dir tool."""
-    target = (workspace / rel).resolve()
-    names = sorted(p.name + ("/" if p.is_dir() else "") for p in target.iterdir())
-    return "\n".join(names)
-
-
-def _try_run_code_output(goal: str, workspace: Path) -> str | None:
-    """Run a small allow-listed python command for common fixture inspect goals."""
-    if not _is_run_code_goal(goal):
-        return None
-    arg = _extract_quoted_input(goal)
-    if arg is None:
-        return None
-    main_py = workspace / "main.py"
-    if not main_py.is_file():
-        return None
-    if "def greet" not in main_py.read_text(encoding="utf-8"):
-        return None
-    lower = goal.lower()
-    if "this code" not in lower and "main" not in lower and "greet" not in lower:
-        return None
-    escaped = arg.replace("\\", "\\\\").replace('"', '\\"')
-    cmd = f'python -c "from main import greet; print(greet(\\"{escaped}\\"))"'
-    result = safe_execute(cmd, workspace, timeout_s=30)
-    stdout = (result.stdout or "").strip()
-    if result.ok and stdout:
-        return stdout
-    stderr = (result.stderr or result.message or "").strip()
-    return stderr or None
-
-
-def _try_python_inspect_complete(goal: str, workspace: Path) -> str | None:
-    """Complete inspect turns in Python when the goal is unambiguous."""
-    if _is_list_dir_goal(goal):
-        return _workspace_listing(workspace)
-    if _is_direct_file_content_goal(goal):
-        resolved = _resolve_inspect_file_path(goal, workspace)
-        if resolved is not None:
-            return _read_file_user_message(
-                resolved.name,
-                resolved.read_text(encoding="utf-8"),
-            )
-    run_output = _try_run_code_output(goal, workspace)
-    if run_output:
-        return run_output
-    return None
-
-
-def _is_direct_file_content_goal(goal: str) -> bool:
-    """True when the user wants raw file contents, not an explanation."""
-    lower = goal.strip().lower()
-    if not any(token in lower for token in ("content", "read", "show", "what is in")):
-        return False
-    if any(
-        token in lower
-        for token in ("explain", "what does", "describe", "summarize", "briefly")
-    ):
-        return False
-    return True
 
 
 def _read_tool_key(tool: str, payload: dict) -> str:
@@ -289,6 +137,19 @@ def _read_file_user_message(file_path: str, content: str | None) -> str:
     return f"{file_path} is empty."
 
 
+def _tool_result_text(tool_result: object | None) -> str:
+    """Extract user-visible text from a file or subprocess tool result."""
+    if tool_result is None:
+        return ""
+    content = getattr(tool_result, "content", None)
+    if content is not None:
+        return str(content)
+    stdout = getattr(tool_result, "stdout", None)
+    if stdout:
+        return str(stdout)
+    return ""
+
+
 def _synthesize_interactive_user_message(
     *,
     memory: MemoryStores,
@@ -298,25 +159,30 @@ def _synthesize_interactive_user_message(
     workspace: Path,
     goal: str,
     code_edits_done: list[str],
+    last_tool_snapshot: dict[str, object] | None = None,
 ) -> str:
-    """Build a user-facing message when the agent never emitted terminate."""
-    resolved = _resolve_inspect_file_path(goal, workspace)
-    if resolved and _is_direct_file_content_goal(goal):
-        return _read_file_user_message(
-            resolved.name,
-            resolved.read_text(encoding="utf-8"),
-        )
-    run_output = _try_run_code_output(goal, workspace)
-    if run_output:
-        return run_output
-    if _is_list_dir_goal(goal):
-        return _workspace_listing(workspace)
+    """Build a user-facing message when the agent never emitted terminate.
+
+    Uses only recorded tool results from this turn — never reads the workspace
+    or runs shell commands from Python based on goal phrase matching.
+    """
+    snapshot = last_tool_snapshot or {}
+    if snapshot.get("ok"):
+        tool = str(snapshot.get("tool") or "")
+        text = str(snapshot.get("text") or "")
+        payload = snapshot.get("payload")
+        payload_dict = payload if isinstance(payload, dict) else {}
+        if tool == "read_file":
+            file_path = str(
+                payload_dict.get("file_path") or payload_dict.get("path") or "file"
+            )
+            return _read_file_user_message(file_path, text)
+        if tool in ("shell", "run_command", "pytest") and text.strip():
+            return text.strip()
 
     tool_result = executor.last_tool_result
-    tool_content = ""
     tool_ok = tool_result is not None and getattr(tool_result, "ok", False)
-    if tool_ok:
-        tool_content = str(getattr(tool_result, "content", "") or "")
+    tool_content = _tool_result_text(tool_result) if tool_ok else ""
 
     entries = memory.decisions.list_for_session(session_id)[decision_floor:]
     for entry in reversed(entries):
@@ -326,20 +192,16 @@ def _synthesize_interactive_user_message(
         tool = _resolve_tool_name(payload)
         if tool == "read_file" and tool_ok:
             file_path = str(payload.get("file_path") or payload.get("path") or "file")
-            if _is_direct_file_content_goal(goal):
-                return _read_file_user_message(file_path, tool_content)
-            body = tool_content.strip() or "(empty)"
-            return f"{file_path} contains:\n{body}"
-        if tool == "list_dir":
-            if tool_content.strip() and _is_list_dir_goal(goal):
-                return tool_content.strip()
+            return _read_file_user_message(file_path, tool_content)
+        if tool in ("shell", "run_command", "pytest") and tool_ok:
+            stdout = tool_content.strip()
+            if stdout:
+                return stdout
         break
 
     if code_edits_done:
         return f"Updated {', '.join(code_edits_done)}."
 
-    if tool_ok and tool_content.strip():
-        return tool_content.strip()
     return ""
 
 
@@ -794,20 +656,6 @@ def _run_interactive_executor_turn(
 ) -> SessionOutcome:
     """Run executor cycles until terminate, needs_plan, or cycle budget exhausted."""
     _setup_interactive_dispatch(memory, session_id, goal, constraints)
-    auto_message = _try_python_inspect_complete(goal, workspace)
-    if auto_message is not None:
-        outcome = SessionOutcome(session_id=session_id, step_count=0)
-        outcome.user_message = auto_message
-        outcome.outcome = "solved"
-        outcome.test_passed = True
-        outcome.final_state = STATE_DONE
-        outcome.decision_count = len(memory.decisions.list_for_session(session_id))
-        logger.debug(
-            "[INTERACTIVE] python_complete goal=%r user_message_len=%d",
-            goal,
-            len(auto_message),
-        )
-        return outcome
     state = _interactive_initial_state(
         session_id,
         _interactive_goal_text(goal, constraints),
@@ -942,80 +790,18 @@ def _run_interactive_executor_turn(
             if tool_result is not None and getattr(tool_result, "ok", False):
                 if read_key:
                     read_tools_used.append(read_key)
-                resolved = _resolve_inspect_file_path(goal, workspace)
-                if tool == "list_dir" and resolved and _is_direct_file_content_goal(goal):
-                    outcome = SessionOutcome(
-                        session_id=session_id,
-                        step_count=billable_cycles,
-                    )
-                    outcome.user_message = _read_file_user_message(
-                        resolved.name,
-                        resolved.read_text(encoding="utf-8"),
-                    )
-                    outcome.outcome = "solved"
-                    outcome.test_passed = True
-                    outcome.final_state = STATE_DONE
-                    outcome.decision_count = len(memory.decisions.list_for_session(session_id))
-                    return outcome
-                if tool == "list_dir" and _is_list_dir_goal(goal):
-                    listing = str(content or "").strip() or _workspace_listing(workspace)
-                    outcome = SessionOutcome(
-                        session_id=session_id,
-                        step_count=billable_cycles,
-                    )
-                    outcome.user_message = listing
-                    outcome.outcome = "solved"
-                    outcome.test_passed = True
-                    outcome.final_state = STATE_DONE
-                    outcome.decision_count = len(memory.decisions.list_for_session(session_id))
-                    return outcome
-                if tool in ("shell", "run_command") and _is_run_code_goal(goal):
-                    stdout = str(content or "").strip()
-                    if stdout:
-                        outcome = SessionOutcome(
-                            session_id=session_id,
-                            step_count=billable_cycles,
-                        )
-                        outcome.user_message = stdout
-                        outcome.outcome = "solved"
-                        outcome.test_passed = True
-                        outcome.final_state = STATE_DONE
-                        outcome.decision_count = len(
-                            memory.decisions.list_for_session(session_id)
-                        )
-                        return outcome
-                if tool == "read_file" and _is_direct_file_content_goal(goal):
-                    file_path = str(payload.get("file_path") or payload.get("path") or "file")
-                    outcome = SessionOutcome(
-                        session_id=session_id,
-                        step_count=billable_cycles,
-                    )
-                    outcome.user_message = _read_file_user_message(file_path, content)
-                    outcome.outcome = "solved"
-                    outcome.test_passed = True
-                    outcome.final_state = STATE_DONE
-                    outcome.decision_count = len(memory.decisions.list_for_session(session_id))
-                    return outcome
+                state["last_tool_snapshot"] = {
+                    "tool": tool,
+                    "payload": dict(payload),
+                    "text": _tool_result_text(tool_result),
+                    "ok": True,
+                }
                 if content:
                     preview = str(content)[:2000]
-                    lower_goal = goal.lower()
-                    file_ref = _file_path_from_inspect_goal(goal, workspace)
-                    if (
-                        tool == "list_dir"
-                        and "content" in lower_goal
-                        and file_ref
-                        and file_ref in preview
-                    ):
-                        state["reflection_guidance"] = (
-                            f"Directory listing:\n{preview}\n"
-                            f"Use read_file on {file_ref}, then terminate turn_type:inspect "
-                            "with the file content."
-                        )
-                    else:
-                        state["reflection_guidance"] = (
-                            f"Tool output:\n{preview}\n"
-                            "Summarize for the user. Now terminate{user_message, turn_type:inspect}."
-                        )
+                    state["reflection_guidance"] = (
+                        f"Tool output:\n{preview}\n"
+                        "Summarize for the user. Now terminate{user_message, turn_type:inspect}."
+                    )
                 elif tool == "read_file":
                     file_path = str(payload.get("file_path") or payload.get("path") or "file")
                     state["reflection_guidance"] = (
@@ -1071,6 +857,7 @@ def _run_interactive_executor_turn(
             workspace=workspace,
             goal=goal,
             code_edits_done=edits_done,
+            last_tool_snapshot=state.get("last_tool_snapshot"),
         )
         if synthesized.strip():
             outcome.user_message = synthesized.strip()

@@ -114,6 +114,17 @@ def _read_file_json(path: str) -> str:
     )
 
 
+def _list_dir_json(path: str = ".") -> str:
+    return json.dumps(
+        {
+            "kind": "tool_call",
+            "rationale": "List directory.",
+            "payload": {"tool": "list_dir", "path": path},
+            "references": [],
+        }
+    )
+
+
 @pytest.fixture
 def workspace(tmp_path: Path) -> Path:
     ws = tmp_path / "ws"
@@ -207,12 +218,12 @@ def test_edit_goal_writes_file_and_verifies(
     assert executor.call_count == 2
 
 
-def test_empty_file_content_goal_auto_completes(
+def test_empty_file_content_synthesized_from_read_tool(
     workspace: Path,
     memory: MemoryStores,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Direct content read of an empty file completes without terminate."""
+    """When the agent reads an empty file but omits terminate, use tool output."""
     (workspace / "solution.py").write_text("", encoding="utf-8")
     executor = MockSLMClient([_read_file_json("solution.py")])
     planner = MockSLMClient([])
@@ -232,101 +243,37 @@ def test_empty_file_content_goal_auto_completes(
 
     assert outcome.outcome == "solved"
     assert outcome.user_message == "solution.py is empty."
-    assert outcome.step_count == 0
-    assert executor.call_count == 0
+    assert outcome.step_count >= 1
+    assert executor.call_count >= 1
 
 
-def test_main_file_content_completes_without_llm(
+def test_explore_goal_does_not_fall_back_to_directory_listing(
     workspace: Path,
     memory: MemoryStores,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Natural-language main file reference resolves to main.py without LLM."""
-    (workspace / "main.py").write_text(
-        "def greet(name: str) -> str:\n    return f'hello, {name}'\n",
-        encoding="utf-8",
-    )
-    executor = MockSLMClient([])
+    """Non-list inspect goals must not surface list_dir output as the user reply."""
+    (workspace / "README.md").write_text("# readme", encoding="utf-8")
+    listing = _list_dir_json()
+    executor = MockSLMClient([listing, listing, listing])
     planner = MockSLMClient([])
     _patch_slm_clients(monkeypatch, planner=planner, executor=executor)
 
     outcome = run_turn(
-        "what is content of main file?",
+        "explore md files",
         [],
         workspace,
         memory=memory,
-        session_id="sess-main-file",
+        session_id="sess-explore-md",
         probe=False,
         max_steps=3,
         interactive_read_only=True,
         ablation=AblationSettings(memory=False, control=False, error_control=False),
     )
 
-    assert outcome.outcome == "solved"
-    assert "greet" in outcome.user_message
-    assert outcome.step_count == 0
-    assert executor.call_count == 0
-
-
-def test_list_dir_goal_completes_without_llm(
-    workspace: Path,
-    memory: MemoryStores,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Pure list-dir goals return a workspace listing without LLM cycles."""
-    (workspace / "hello.txt").write_text("hi", encoding="utf-8")
-    executor = MockSLMClient([])
-    planner = MockSLMClient([])
-    _patch_slm_clients(monkeypatch, planner=planner, executor=executor)
-
-    outcome = run_turn(
-        "list files in current dir",
-        [],
-        workspace,
-        memory=memory,
-        session_id="sess-list",
-        probe=False,
-        max_steps=3,
-        interactive_read_only=True,
-        ablation=AblationSettings(memory=False, control=False, error_control=False),
-    )
-
-    assert outcome.outcome == "solved"
-    assert "hello.txt" in outcome.user_message
-    assert outcome.step_count == 0
-    assert executor.call_count == 0
-
-
-def test_run_greet_goal_completes_without_llm(
-    workspace: Path,
-    memory: MemoryStores,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Run-this-code goals can execute allow-listed python without LLM."""
-    (workspace / "main.py").write_text(
-        "def greet(name: str) -> str:\n    return f'hello, {name}'\n",
-        encoding="utf-8",
-    )
-    executor = MockSLMClient([])
-    planner = MockSLMClient([])
-    _patch_slm_clients(monkeypatch, planner=planner, executor=executor)
-
-    outcome = run_turn(
-        'run this code with input "ali ebrahimi" and show me the result',
-        [],
-        workspace,
-        memory=memory,
-        session_id="sess-run-greet",
-        probe=False,
-        max_steps=6,
-        interactive_read_only=True,
-        ablation=AblationSettings(memory=False, control=False, error_control=False),
-    )
-
-    assert outcome.outcome == "solved"
-    assert "hello, ali ebrahimi" in outcome.user_message.lower()
-    assert outcome.step_count == 0
-    assert executor.call_count == 0
+    assert outcome.outcome == "unresolvable"
+    assert "README.md" not in (outcome.user_message or "")
+    assert executor.call_count == 3
 
 
 def test_needs_plan_promotes_to_planner(

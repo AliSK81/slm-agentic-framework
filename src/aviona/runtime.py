@@ -52,9 +52,10 @@ def interactive_turn_contract_hint() -> str:
         "[AVIONA] Turn types: short greetings (hi, hello, ok) → terminate turn_type:answer "
         "only — reply to the CURRENT goal, not prior turns; do not run project smoke examples. "
         "Identity/model questions → turn_type:answer from runtime: facts (1 cycle). "
-        "Read/list/explain → list_dir/read_file tools then terminate turn_type:inspect (≤3 cycles). "
-        "Run/execute code with input → shell (python) then terminate turn_type:inspect with stdout (≤6 cycles). "
-        "Create/edit → code_edit with turn_type:edit then terminate turn_type:edit (≤6 cycles). "
+        "Read/list/explain → read_file/list_dir/glob then terminate turn_type:inspect (≤3 cycles). "
+        "Explore/search (e.g. md files) → glob or read_file on matches, not bare list_dir. "
+        "Run/execute code or pytest → shell then terminate turn_type:inspect with stdout (≤6 cycles). "
+        "Create/edit/write tests → code_edit turn_type:edit then terminate turn_type:edit (≤6 cycles). "
         "Tools available: list_dir, read_file, code_edit, shell."
     )
 
@@ -100,30 +101,32 @@ def infer_interactive_max_steps(goal: str) -> int:
             "run this",
             "run the",
             "run code",
+            "run it",
             "execute",
             "with input",
-            "show me the result",
+            "pytest",
+            "unit test",
         )
+    ):
+        return 6
+    if any(
+        token in lower
+        for token in ("create", "edit", "write", "add ", "fix ", "update", "delete")
     ):
         return 6
     if any(
         token in lower
         for token in (
             "list",
-            "read",
             "content",
             "explain",
             "what is",
-            "show",
             "inspect",
             "directory",
             "files in",
+            "explore",
+            "read",
         )
     ):
         return 3
-    if any(
-        token in lower
-        for token in ("create", "edit", "write", "add ", "fix ", "update", "delete")
-    ):
-        return 6
     return 3

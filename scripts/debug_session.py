@@ -47,7 +47,7 @@ DEBUG_MATRIX: tuple[DebugCase, ...] = (
         "inspect-list",
         "list files in this dir",
         must_contain=("hello.txt", "main.py"),
-        max_steps=0,
+        max_steps=3,
     ),
     DebugCase(
         "inspect-explain",
@@ -59,19 +59,7 @@ DEBUG_MATRIX: tuple[DebugCase, ...] = (
         "inspect-empty",
         "what is the content of solution.py?",
         must_contain=("empty",),
-        max_steps=0,
-    ),
-    DebugCase(
-        "inspect-main",
-        "what is content of main file?",
-        must_contain=("greet",),
-        max_steps=0,
-    ),
-    DebugCase(
-        "run-greet",
-        'run this code with input "ali ebrahimi" and show me the result',
-        must_contain=("hello", "ali"),
-        max_steps=0,
+        max_steps=3,
     ),
     DebugCase(
         "edit-bar",

@@ -39,21 +39,30 @@ def _payload_text(payload: dict) -> str:
     return ""
 
 
+_TOOL_ALIASES: dict[str, str] = {
+    "exec": "shell",
+    "run_command": "shell",
+    "run_terminal_cmd": "shell",
+}
+
+
 def _resolve_tool_name(payload: dict) -> str:
     """Resolve tool name from alternate SLM payload keys."""
-    for key in ("tool", "name"):
+    for key in ("tool", "name", "function", "command"):
         value = payload.get(key)
         if isinstance(value, str) and value.strip():
-            return value.strip().lower()
+            raw = value.strip().lower()
+            return _TOOL_ALIASES.get(raw, raw)
     return ""
 
 
 def _resolve_file_path(payload: dict, default: str = "solution.py") -> str:
     """Resolve target path from alternate SLM payload keys."""
     sources: list[dict] = [payload]
-    nested = payload.get("arguments")
-    if isinstance(nested, dict):
-        sources.append(nested)
+    for nested_key in ("arguments", "args", "params"):
+        nested = payload.get(nested_key)
+        if isinstance(nested, dict):
+            sources.append(nested)
     for source in sources:
         for key in ("file_path", "filePath", "file", "path"):
             value = source.get(key)
@@ -193,8 +202,14 @@ class ExecutorAgent:
         self.last_edit_result = None
 
         def action_fn(decision: DecisionEntry) -> Any:
+            logger.debug(
+                "[EXECUTOR] dispatch kind=%s turn_type=%s",
+                decision.kind,
+                (decision.payload or {}).get("turn_type"),
+            )
             if decision.kind == "tool_call":
                 tool = _resolve_tool_name(decision.payload)
+                logger.debug("[EXECUTOR] tool_dispatch_start tool=%s", tool)
                 if tool == "pytest":
                     target = decision.payload.get("target", "tests/")
                     blocked = self._require_permission("shell", f"pytest {target}")
@@ -285,6 +300,8 @@ class ExecutorAgent:
                         self._record_effect(result.stdout)
                     return result
             if decision.kind == "code_edit":
+                file_path = _resolve_file_path(decision.payload)
+                logger.debug("[EXECUTOR] code_edit file_path=%s", file_path)
                 self.last_edit_result = self._apply_code_edit(decision)
                 return self.last_edit_result
             if decision.kind == "terminate":
@@ -292,6 +309,11 @@ class ExecutorAgent:
                     decision.payload,
                     fallback_rationale=decision.rationale,
                 ).strip()
+                logger.debug(
+                    "[EXECUTOR] terminate user_message_len=%d turn_type=%s",
+                    len(answer),
+                    (decision.payload or {}).get("turn_type"),
+                )
                 self.last_tool_result = FileResult(
                     ok=bool(answer),
                     message="ok" if answer else "empty terminate answer",
@@ -329,6 +351,7 @@ class ExecutorAgent:
             action_fn=action_fn,
             last_error=last_error,
             session_retry_count=int(state.get("retry_count", 0)),
+            decision_floor=int(state.get("decision_floor", 0)),
         )
 
         passed = False

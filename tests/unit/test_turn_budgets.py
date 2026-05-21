@@ -150,6 +150,35 @@ def test_answer_turn_makes_exactly_one_slm_call(
     assert outcome.user_message == "The answer is 4."
 
 
+def test_answer_turn_passes_self_check_with_control_enabled(
+    workspace: Path,
+    memory: MemoryStores,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Executor terminate must pass SELF_CHECK when control ablation is on."""
+    executor = MockSLMClient([_terminate("The answer is 4.", "answer")])
+    planner = MockSLMClient([])
+    _patch_clients(monkeypatch, planner=planner, executor=executor)
+
+    outcome = run_turn(
+        "What is 2+2?",
+        [],
+        workspace,
+        memory=memory,
+        session_id="sess-answer-control",
+        probe=False,
+        max_steps=1,
+        interactive_read_only=True,
+        ablation=AblationSettings(memory=False, control=True, error_control=False),
+    )
+
+    assert outcome.llm_calls == 1
+    assert outcome.user_message == "The answer is 4."
+    logged = memory.decisions.get_last_n("sess-answer-control", 1)[0]
+    assert logged.kind == "terminate"
+    assert logged.self_check.verdict == "pass"
+
+
 def test_inspect_turn_stays_within_three_cycles(
     workspace: Path,
     memory: MemoryStores,
@@ -206,8 +235,9 @@ def test_read_only_turn_blocks_write_without_edit_turn_type(
     )
 
     assert not (workspace / "notes.txt").exists()
-    assert outcome.step_count == 0
-    assert outcome.llm_calls <= 4
+    assert outcome.step_count == 1
+    assert outcome.llm_calls == 1
+    assert outcome.outcome == "unresolvable"
 
 
 def test_edit_turn_allows_write_with_turn_type_edit(

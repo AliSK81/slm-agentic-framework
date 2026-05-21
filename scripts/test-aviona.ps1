@@ -51,7 +51,7 @@ Write-Host "==> pytest Aviona unit + contract tests"
     tests/unit/test_aviona_console.py `
     tests/unit/test_aviona_contract.py `
     tests/unit/test_aviona_doctor.py `
-    tests/unit/test_aviona_intent.py `
+    tests/unit/test_aviona_debug.py `
     tests/unit/test_aviona_contract_matrix.py `
     tests/unit/test_runtime_answer.py `
     tests/unit/test_aviona_patch_grep.py `

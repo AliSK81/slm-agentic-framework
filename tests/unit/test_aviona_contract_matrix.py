@@ -297,4 +297,12 @@ def test_declared_turn_type_matrix(
 ) -> None:
     """Declared turn_type is read from typed terminate/handoff decisions."""
     _ = case_id
-    assert declared_turn_type(entries, file_changes=file_changes) == expected
+    build_promoted = case_id == "needs-plan-handoff"
+    assert (
+        declared_turn_type(
+            entries,
+            file_changes=file_changes,
+            build_promoted=build_promoted,
+        )
+        == expected
+    )

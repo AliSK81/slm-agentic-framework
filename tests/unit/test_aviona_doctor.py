@@ -93,5 +93,8 @@ def test_cli_doctor_subcommand_delegates(monkeypatch: pytest.MonkeyPatch) -> Non
     """``aviona doctor`` calls run_doctor without starting REPL."""
     monkeypatch.setattr("aviona.cli.load_aviona_env", lambda _cwd=None: None)
     monkeypatch.setattr("aviona.cli.run_doctor", lambda: 0)
-    monkeypatch.setattr("aviona.cli.run_repl", lambda _s: (_ for _ in ()).throw(AssertionError("no repl")))
+    monkeypatch.setattr(
+        "aviona.cli.run_repl",
+        lambda _s, debug=False: (_ for _ in ()).throw(AssertionError("no repl")),
+    )
     assert main(["doctor"]) == 0

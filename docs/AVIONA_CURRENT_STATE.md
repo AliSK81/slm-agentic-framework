@@ -35,11 +35,10 @@ v1 (AVIONA-1..12) frozen at `4c638b3`. v2 replaces the 0.2.x patch stack with tu
 
 | Module | Purpose |
 |--------|---------|
-| `cli.py` / `repl.py` | Entry point; local handlers + one-turn REPL loop |
+| `cli.py` / `repl.py` | Entry point; every user line → one `run_turn` (no phrase routing) |
 | `session.py` | Turn adapter — framework `run_turn`, anchor, compaction |
 | `contract.py` / `turn_io.py` | `verify_turn` / `TurnContract`; decision log I/O |
 | `budgets.py` | Per-turn-type cycle caps |
-| `intent.py` | Local-only: greetings, runtime meta, locked L3 prompts |
 | `runtime.py` | Structured `runtime:` anchor segment + answer constraint |
 | `compaction.py` | Anchor + history compaction for prompts |
 | `permissions.py` | plan / default / auto modes |
@@ -71,31 +70,18 @@ Install repair (Windows): `scripts/install-aviona.ps1` (corrupt `~*` dist-info, 
 
 | Type | LLM cycles | Read-only | Outcome |
 |------|------------|-----------|---------|
-| `local` | 0 | yes | REPL-local reply; no agent |
 | `answer` | ≤1 | yes | `terminate.user_message`; no writes |
 | `inspect` | ≤3 | yes | read tools only; no writes |
 | `edit` | ≤6 | no | write + verify + message |
 | `build` | ≤15 | no | after `needs_plan`; full graph |
 
+All REPL lines (including `hi` / `ok`) go through the agent; turn type is declared by the agent in `terminate`.
+
 ---
 
 ## L3 live matrix (release-blocking)
 
-Locked prompts run at **0 agent steps** via local handlers where noted; see `scripts/live_gate.py`.
-
-| ID | Prompt | Handler |
-|----|--------|---------|
-| local-hi | `hi` | conversational |
-| local-ok | `ok` | conversational |
-| answer-model | `what is your model?` | runtime meta |
-| answer-language-model | `what language model?` | runtime meta |
-| answer-salam | `try to fastly reply with "salam"` | quoted echo |
-| inspect-hello-content | `what is content of hello file?` | locked L3 |
-| inspect-project | `what is this project` | locked L3 |
-| inspect-list-files | `list files in this dir` | locked L3 |
-| edit-create-foo | `create foo.txt with "x"` | locked L3 |
-
-General NLU routing remains agent-driven; locked handlers cover release smoke only.
+Agent turns only — see `scripts/live_gate.py` and `tests/aviona/JOURNEYS.md`.
 
 ---
 

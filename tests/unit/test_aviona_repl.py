@@ -125,10 +125,19 @@ def test_repl_mode_command_changes_session_mode(project_dir: Path) -> None:
     assert any("mode: auto" in line for line in output)
 
 
-def test_repl_conversational_line_skips_agent_turn(project_dir: Path) -> None:
-    """Greetings get a local reply and never call run_turn."""
+def test_repl_user_line_always_runs_agent_turn(project_dir: Path) -> None:
+    """Every non-command line invokes run_turn (no phrase routing)."""
     session = AvionaSession(project_dir)
-    run_turn = MagicMock()
+    run_turn = MagicMock(
+        return_value=TurnResult(
+            status="ok | 1 steps",
+            outcome="solved",
+            test_passed=True,
+            step_count=1,
+            detail="Hi.",
+            session_id=session._session_id,
+        )
+    )
     output: list[str] = []
     run_repl(
         session,
@@ -136,5 +145,5 @@ def test_repl_conversational_line_skips_agent_turn(project_dir: Path) -> None:
         writer=output.append,
         run_turn=run_turn,
     )
-    run_turn.assert_not_called()
-    assert any("explain" in line.lower() for line in output)
+    run_turn.assert_called_once_with("hi")
+    assert any("steps" in line for line in output)

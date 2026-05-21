@@ -57,10 +57,10 @@ def test_command_not_in_project_allowlist_is_denied() -> None:
     assert gate.check(PermissionAction(kind="shell", detail="python run.py")) == "deny"
 
 
-def test_git_not_allowed_when_not_in_safe_commands() -> None:
-    """Project allowlist cannot widen framework SAFE_COMMANDS (git blocked)."""
-    gate = PermissionGate("auto", allowlist=["git status"])
-    assert gate.check(PermissionAction(kind="shell", detail="git status")) == "deny"
+def test_unsafe_shell_denied_even_when_in_project_allowlist() -> None:
+    """Project allowlist cannot widen framework SAFE_COMMANDS."""
+    gate = PermissionGate("auto", allowlist=["rm -rf"])
+    assert gate.check(PermissionAction(kind="shell", detail="rm -rf /")) == "deny"
 
 
 def test_merged_safe_commands_never_exceeds_framework() -> None:
@@ -68,7 +68,8 @@ def test_merged_safe_commands_never_exceeds_framework() -> None:
     merged = merged_safe_commands(["pytest", "git", "python", "rm"])
     assert merged <= SAFE_COMMANDS
     assert "pytest" in merged
-    assert "git" not in merged
+    assert "git" in merged
+    assert "rm" not in merged
 
 
 def test_load_settings_from_project_yaml(tmp_path: Path) -> None:

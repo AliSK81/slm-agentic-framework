@@ -6,6 +6,7 @@ import sys
 
 _ASCII_REPLACEMENTS: tuple[tuple[str, str], ...] = (
     ("\u2713", "ok"),  # checkmark
+    ("\u273b", "*"),  # heavy asterisk (Claude-style timing marker)
     ("\u2026", "..."),  # ellipsis
     ("\u00b7", "|"),  # middle dot
     ("\u2014", "-"),  # em dash

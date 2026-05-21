@@ -38,11 +38,26 @@ def changed_files(before: dict[str, float], after: dict[str, float]) -> list[str
 
 def path_from_payload(payload: dict) -> str | None:
     """Resolve a file path key from a decision payload."""
-    for key in ("file_path", "filePath", "file", "path"):
+    sources = [payload]
+    for nested_key in ("arguments", "args", "params"):
+        nested = payload.get(nested_key)
+        if isinstance(nested, dict):
+            sources.append(nested)
+    for source in sources:
+        for key in ("file_path", "filePath", "file", "path"):
+            value = source.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+    return None
+
+
+def _tool_name(payload: dict) -> str:
+    """Resolve tool name from alternate SLM payload keys."""
+    for key in ("tool", "name", "function", "command"):
         value = payload.get(key)
         if isinstance(value, str) and value.strip():
-            return value.strip()
-    return None
+            return value.strip().lower()
+    return ""
 
 
 def collect_tool_paths(
@@ -59,7 +74,7 @@ def collect_tool_paths(
             if path:
                 edited.append(path)
         elif entry.kind == "tool_call":
-            tool = str(payload.get("tool", "")).lower()
+            tool = _tool_name(payload)
             path = path_from_payload(payload) or "."
             if tool in ("write_file", "edit_file"):
                 if path:
@@ -85,18 +100,29 @@ def declared_turn_type(
     new_entries: list[DecisionEntry],
     *,
     file_changes: list[str],
+    build_promoted: bool = False,
 ) -> TurnType:
-    """Read agent-declared turn_type from new decisions; minimal inference fallback."""
+    """Read agent-declared turn_type; infer inspect/edit when terminate omits it."""
+    terminate_type: TurnType | None = None
     for entry in reversed(new_entries):
-        if is_needs_plan_handoff(entry):
-            return "build"
         if entry.kind == "terminate":
             parsed = parse_terminate_payload(entry.payload)
-            if parsed.turn_type is not None:
-                return parsed.turn_type
-            if file_changes:
-                return "edit"
-            return "answer"
-    if file_changes:
+            terminate_type = parsed.turn_type
+            break
+
+    if terminate_type == "answer":
+        return "answer"
+    if terminate_type in ("inspect", "edit", "build"):
+        return terminate_type
+
+    edited, listed, read_paths = collect_tool_paths(new_entries)
+    has_code_edit = any(entry.kind == "code_edit" for entry in new_entries)
+
+    if file_changes or has_code_edit or edited:
         return "edit"
+    if listed or read_paths:
+        return "inspect"
+    for entry in reversed(new_entries):
+        if build_promoted and is_needs_plan_handoff(entry):
+            return "build"
     return "answer"

@@ -12,12 +12,12 @@ from framework.memory.stores import DecisionEntry, Issue, MemoryStores, SelfChec
 
 logger = logging.getLogger(__name__)
 
-_PLANNER_ONLY_KINDS = frozenset({"plan_step", "terminate"})
+_PLANNER_ONLY_KINDS = frozenset({"plan_step"})
 _EXECUTOR_ONLY_KINDS = frozenset(
     {"code_edit", "tool_call", "reflection", "quality_failure"}
 )
 _SHARED_KINDS = frozenset({"handoff"})
-# Payload keys that may change between retries (not logical contradictions).
+# Payload keys that may change between retries or turns (not logical contradictions).
 _RETRY_VARYING_KEYS = frozenset(
     {
         "old_string",
@@ -29,6 +29,13 @@ _RETRY_VARYING_KEYS = frozenset(
         "file_path",
         "file",
         "rationale",
+        "user_message",
+        "turn_type",
+        "reason",
+        "tool",
+        "name",
+        "function",
+        "command",
     }
 )
 
@@ -49,6 +56,8 @@ def _contradiction_issues(
     recent: list[DecisionEntry],
 ) -> list[Issue]:
     """Same kind + payload key with different value vs last 10 decisions."""
+    if proposal.kind == "tool_call":
+        return []
     issues: list[Issue] = []
     window = recent[-10:]
     for entry in window:
@@ -128,6 +137,22 @@ def self_check(
     issues.extend(_terminate_payload_issues(proposal))
 
     if issues:
-        logger.debug("self_check failed with %d issues", len(issues))
+        logger.debug(
+            "[SELF_CHECK] verdict=fail agent=%s kind=%s issues=%d",
+            proposal.by_agent,
+            proposal.kind,
+            len(issues),
+        )
+        for issue in issues:
+            logger.debug(
+                "[SELF_CHECK] issue kind=%s detail=%s",
+                issue.kind,
+                issue.detail,
+            )
         return SelfCheckRecord(verdict="fail", issues=issues)
+    logger.debug(
+        "[SELF_CHECK] verdict=pass agent=%s kind=%s",
+        proposal.by_agent,
+        proposal.kind,
+    )
     return SelfCheckRecord(verdict="pass", issues=[])

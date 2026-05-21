@@ -103,6 +103,17 @@ def _write_file_json(path: str, content: str) -> str:
     )
 
 
+def _read_file_json(path: str) -> str:
+    return json.dumps(
+        {
+            "kind": "tool_call",
+            "rationale": "Read requested file.",
+            "payload": {"tool": "read_file", "file_path": path},
+            "references": [],
+        }
+    )
+
+
 @pytest.fixture
 def workspace(tmp_path: Path) -> Path:
     ws = tmp_path / "ws"
@@ -194,6 +205,128 @@ def test_edit_goal_writes_file_and_verifies(
     assert outcome.test_passed
     assert outcome.step_count == 2
     assert executor.call_count == 2
+
+
+def test_empty_file_content_goal_auto_completes(
+    workspace: Path,
+    memory: MemoryStores,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Direct content read of an empty file completes without terminate."""
+    (workspace / "solution.py").write_text("", encoding="utf-8")
+    executor = MockSLMClient([_read_file_json("solution.py")])
+    planner = MockSLMClient([])
+    _patch_slm_clients(monkeypatch, planner=planner, executor=executor)
+
+    outcome = run_turn(
+        "what is the content of solution.py?",
+        [],
+        workspace,
+        memory=memory,
+        session_id="sess-empty-read",
+        probe=False,
+        max_steps=3,
+        interactive_read_only=True,
+        ablation=AblationSettings(memory=False, control=False, error_control=False),
+    )
+
+    assert outcome.outcome == "solved"
+    assert outcome.user_message == "solution.py is empty."
+    assert outcome.step_count == 0
+    assert executor.call_count == 0
+
+
+def test_main_file_content_completes_without_llm(
+    workspace: Path,
+    memory: MemoryStores,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Natural-language main file reference resolves to main.py without LLM."""
+    (workspace / "main.py").write_text(
+        "def greet(name: str) -> str:\n    return f'hello, {name}'\n",
+        encoding="utf-8",
+    )
+    executor = MockSLMClient([])
+    planner = MockSLMClient([])
+    _patch_slm_clients(monkeypatch, planner=planner, executor=executor)
+
+    outcome = run_turn(
+        "what is content of main file?",
+        [],
+        workspace,
+        memory=memory,
+        session_id="sess-main-file",
+        probe=False,
+        max_steps=3,
+        interactive_read_only=True,
+        ablation=AblationSettings(memory=False, control=False, error_control=False),
+    )
+
+    assert outcome.outcome == "solved"
+    assert "greet" in outcome.user_message
+    assert outcome.step_count == 0
+    assert executor.call_count == 0
+
+
+def test_list_dir_goal_completes_without_llm(
+    workspace: Path,
+    memory: MemoryStores,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Pure list-dir goals return a workspace listing without LLM cycles."""
+    (workspace / "hello.txt").write_text("hi", encoding="utf-8")
+    executor = MockSLMClient([])
+    planner = MockSLMClient([])
+    _patch_slm_clients(monkeypatch, planner=planner, executor=executor)
+
+    outcome = run_turn(
+        "list files in current dir",
+        [],
+        workspace,
+        memory=memory,
+        session_id="sess-list",
+        probe=False,
+        max_steps=3,
+        interactive_read_only=True,
+        ablation=AblationSettings(memory=False, control=False, error_control=False),
+    )
+
+    assert outcome.outcome == "solved"
+    assert "hello.txt" in outcome.user_message
+    assert outcome.step_count == 0
+    assert executor.call_count == 0
+
+
+def test_run_greet_goal_completes_without_llm(
+    workspace: Path,
+    memory: MemoryStores,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Run-this-code goals can execute allow-listed python without LLM."""
+    (workspace / "main.py").write_text(
+        "def greet(name: str) -> str:\n    return f'hello, {name}'\n",
+        encoding="utf-8",
+    )
+    executor = MockSLMClient([])
+    planner = MockSLMClient([])
+    _patch_slm_clients(monkeypatch, planner=planner, executor=executor)
+
+    outcome = run_turn(
+        'run this code with input "ali ebrahimi" and show me the result',
+        [],
+        workspace,
+        memory=memory,
+        session_id="sess-run-greet",
+        probe=False,
+        max_steps=6,
+        interactive_read_only=True,
+        ablation=AblationSettings(memory=False, control=False, error_control=False),
+    )
+
+    assert outcome.outcome == "solved"
+    assert "hello, ali ebrahimi" in outcome.user_message.lower()
+    assert outcome.step_count == 0
+    assert executor.call_count == 0
 
 
 def test_needs_plan_promotes_to_planner(

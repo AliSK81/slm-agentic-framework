@@ -45,13 +45,16 @@ def test_main_doctor_delegates_to_run_doctor(monkeypatch: pytest.MonkeyPatch) ->
 def test_main_bare_invocation_starts_repl(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Bare aviona probes once and enters the REPL."""
+    """Bare aviona checks key locally (no probe) and enters the REPL."""
     monkeypatch.setattr(
-        "aviona.cli.validate_slm_api_key",
-        lambda *args, **kwargs: None,
+        "aviona.cli.ensure_slm_api_key_configured",
+        lambda: None,
     )
     monkeypatch.setattr("aviona.cli.load_aviona_env", lambda _cwd=None: None)
-    monkeypatch.setattr("aviona.cli.run_repl", lambda _session: 0)
+    monkeypatch.setattr(
+        "aviona.cli.run_repl",
+        lambda _session, debug=False: 0,
+    )
     monkeypatch.setattr("aviona.cli.AvionaSession", lambda _cwd: object())
     code = main([])
     assert code == 0

@@ -10,7 +10,6 @@ from pydantic import BaseModel
 
 from aviona.budgets import (
     BUILD_CYCLE_CEILING,
-    INTERACTIVE_CYCLE_CEILING,
     verify_turn_budget,
 )
 from aviona.compaction import HistoryBlock, anchor_to_constraint, compact, history_to_constraint
@@ -20,7 +19,14 @@ from aviona.permissions import Mode, PermissionAction, PermissionGate
 from aviona.profiles import apply_daily_driver_profiles
 from aviona.project import load_project_rules
 from aviona.render import render_status, render_turn_detail
-from aviona.runtime import runtime_anchor_segment, runtime_answer_constraint
+from aviona.runtime import (
+    interactive_turn_contract_hint,
+    infer_interactive_max_steps,
+    is_answer_only_goal,
+    is_meta_question,
+    runtime_anchor_segment,
+    runtime_answer_constraint,
+)
 from aviona.settings import load_settings
 from aviona.snapshots import SnapshotStore
 from aviona.store import (
@@ -135,6 +141,7 @@ class AvionaSession:
     def _build_turn_constraints(
         self,
         *,
+        goal: str,
         extra: list[str] | None = None,
     ) -> list[str]:
         """Assemble anchor-first hard constraints for one interactive turn."""
@@ -142,7 +149,9 @@ class AvionaSession:
         anchor = anchor_to_constraint(self._history)
         if anchor:
             hard_constraints.append(anchor)
-        hard_constraints.append(runtime_answer_constraint())
+        hard_constraints.append(interactive_turn_contract_hint())
+        if is_answer_only_goal(goal):
+            hard_constraints.append(runtime_answer_constraint())
         context_segment = history_to_constraint(self._history)
         if context_segment:
             hard_constraints.append(context_segment)
@@ -176,8 +185,9 @@ class AvionaSession:
             for entry in self.memory.decisions.list_for_session(self._session_id)
         }
         before_files = snapshot_files(self.workspace)
-        hard_constraints = self._build_turn_constraints(extra=constraints)
+        hard_constraints = self._build_turn_constraints(goal=goal, extra=constraints)
         effective = verifier or self._verifier
+        step_ceiling = infer_interactive_max_steps(goal)
 
         self.snapshots.begin_turn()
         try:
@@ -191,7 +201,7 @@ class AvionaSession:
                 ablation=AblationSettings(memory=True, control=True, error_control=True),
                 probe=False,
                 verifier=effective,
-                max_steps=INTERACTIVE_CYCLE_CEILING,
+                max_steps=step_ceiling,
                 permission_check=self._permission_check,
                 write_file_fn=self._write_file_fn,
                 edit_file_fn=self._edit_file_fn,
@@ -212,7 +222,11 @@ class AvionaSession:
             snapshot_files(self.workspace),
             after_entries,
         )
-        turn_type = declared_turn_type(after_entries, file_changes=file_changes)
+        turn_type = declared_turn_type(
+            after_entries,
+            file_changes=file_changes,
+            build_promoted=session_outcome.build_promoted,
+        )
         contract = verify_turn(
             turn_type,
             session_outcome,
@@ -235,6 +249,24 @@ class AvionaSession:
 
         status = render_status(session_outcome, contract_passed=contract.passed)
         detail = render_turn_detail(session_outcome, contract)
+        from aviona.debug_log import is_debug_enabled, log_turn_summary
+
+        if is_debug_enabled():
+            log_turn_summary(
+                goal=goal,
+                status=status,
+                detail=detail,
+                step_count=session_outcome.step_count,
+                tokens_total=session_outcome.tokens_total,
+                outcome=session_outcome.outcome,
+                elapsed_ms=session_outcome.latency_ms_total,
+                turn_type=turn_type,
+                contract_passed=contract.passed,
+                failure_reason=contract.failure_reason if not contract.passed else None,
+                decision_rows=[
+                    (entry.kind, dict(entry.payload or {})) for entry in after_entries
+                ],
+            )
         new_refs = [entry.decision_id for entry in after_entries]
         self._store.append_turn(
             user_text=goal,

@@ -175,6 +175,37 @@ def test_cycle_records_decision_in_log(
     assert after - before == 1
 
 
+def _valid_executor_terminate_json() -> str:
+    return json.dumps(
+        {
+            "kind": "terminate",
+            "payload": {"user_message": "Done.", "turn_type": "answer"},
+            "rationale": "Answer from runtime facts.",
+            "references": [],
+        }
+    )
+
+
+def test_cycle_executor_terminate_passes_self_check(
+    memory: MemoryStores,
+    session_setup: str,
+) -> None:
+    """Executor terminate is allowed under SELF_CHECK (interactive REPL path)."""
+    slm = MockSLMClient([_valid_executor_terminate_json()])
+    cycle = _cycle(slm, memory)
+    result = cycle.run(
+        session_setup,
+        "executor",
+        "what model are you?",
+        f"root:{session_setup}",
+        action_fn=lambda d: None,
+    )
+    assert not result.exhausted
+    assert result.decision is not None
+    assert result.decision.kind == "terminate"
+    assert result.decision.self_check.verdict == "pass"
+
+
 def test_cycle_records_self_check_result(
     memory: MemoryStores,
     session_setup: str,

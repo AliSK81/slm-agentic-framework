@@ -32,7 +32,9 @@ _FORMAT_BY_ROLE: dict[str, str] = {
 _EXECUTOR_PAYLOAD_HINT = (
     'For code_edit use file_path "solution.py" unless editing another file. '
     "For existing files, include old_string for partial edits, or send a full "
-    'replacement function in content/code/new_string.'
+    'replacement function in content/code/new_string. '
+    "You HAVE tools: list_dir (path=.), read_file (file_path), code_edit, shell. "
+    "Use them — never claim you lack filesystem access."
 )
 
 _TERMINATE_PAYLOAD_HINT = (
@@ -76,6 +78,11 @@ def _json_format_block(agent_role: str, *, include_example: bool = True) -> str:
         example = (
             'Example: {"kind":"terminate","rationale":"because ...",'
             '"payload":{"user_message":"Here is the answer.","turn_type":"answer"},'
+            '"references":[]}\n'
+            'Example inspect: {"kind":"tool_call","rationale":"because ...",'
+            '"payload":{"tool":"list_dir","path":"."},"references":[]}\n'
+            'Example edit: {"kind":"code_edit","rationale":"because ...",'
+            '"payload":{"file_path":"foo.txt","new_string":"hi","turn_type":"edit"},'
             '"references":[]}'
         )
     elif agent_role == "planner":
@@ -176,6 +183,7 @@ class DecisionCycle:
         max_steps: int | None = None,
         last_error: str | None = None,
         session_retry_count: int = 0,
+        decision_floor: int = 0,
     ) -> CycleResult:
         """Execute the full decision cycle; never raises on SLM failure."""
         limiter = StepBudgetLimiter(
@@ -211,14 +219,29 @@ class DecisionCycle:
             if retry_count > 0 and not limiter.check_retries(retry_count):
                 break
 
+            logger.debug(
+                "[CYCLE] start agent=%s subtask=%r retry=%d session=%s",
+                agent_role,
+                current_subtask,
+                retry_count,
+                session_id,
+            )
             response = self._slm.call(messages, role=agent_role, json_mode=True)
             if response.error:
                 logger.warning("SLM error in cycle: %s", response.error)
+                logger.debug(
+                    "[CYCLE] exhausted agent=%s error=%s retry=%d",
+                    agent_role,
+                    response.error,
+                    retry_count,
+                )
                 return CycleResult(exhausted=True, retry_count=retry_count)
 
             raw = response.content
             parsed = parse_decision(raw, SLMProposal)
-            recent = self._memory.decisions.get_last_n(session_id, 10)
+            all_recent = self._memory.decisions.list_for_session(session_id)
+            recent = all_recent[decision_floor:] if decision_floor else all_recent
+            recent = recent[-10:]
             if self._ablation.error_control:
                 quality = self._error_control.quality_gate.check(raw, parsed, recent)
             else:
@@ -228,6 +251,13 @@ class DecisionCycle:
                 )
 
             if not quality.passed or parsed is None:
+                logger.debug(
+                    "[QUALITY] fail agent=%s mode=%s parsed=%s retry=%d",
+                    agent_role,
+                    quality.failure_mode or "unparseable",
+                    parsed.kind if parsed is not None else None,
+                    retry_count + 1,
+                )
                 retry_count += 1
                 if retry_count > max_retries:
                     break
@@ -258,6 +288,12 @@ class DecisionCycle:
                 step_index=step_index,
                 check=SelfCheckRecord(verdict="fail", issues=[]),
             )
+            logger.debug(
+                "[CYCLE] proposal agent=%s kind=%s turn_type=%s",
+                agent_role,
+                parsed.kind,
+                (parsed.payload or {}).get("turn_type"),
+            )
             if self._ablation.control:
                 check = self_check(draft, self._memory, session_id)
             else:
@@ -265,6 +301,13 @@ class DecisionCycle:
             draft = draft.model_copy(update={"self_check": check})
 
             if check.verdict != "pass":
+                logger.debug(
+                    "[CYCLE] self_check_retry agent=%s kind=%s retry=%d issues=%d",
+                    agent_role,
+                    parsed.kind,
+                    retry_count + 1,
+                    len(check.issues),
+                )
                 retry_count += 1
                 if retry_count > max_retries:
                     draft = draft.model_copy(
@@ -299,10 +342,23 @@ class DecisionCycle:
 
             outcome = action_fn(draft)
             self._memory.decisions.append(draft)
+            logger.debug(
+                "[CYCLE] complete agent=%s kind=%s decision_id=%s retries=%d",
+                agent_role,
+                draft.kind,
+                draft.decision_id,
+                retry_count,
+            )
             return CycleResult(
                 decision=draft,
                 outcome=outcome,
                 retry_count=retry_count,
             )
 
+        logger.debug(
+            "[CYCLE] exhausted agent=%s retries=%d session=%s",
+            agent_role,
+            retry_count,
+            session_id,
+        )
         return CycleResult(exhausted=True, retry_count=retry_count)

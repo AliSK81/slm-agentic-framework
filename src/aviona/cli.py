@@ -14,7 +14,7 @@ from aviona.env import load_aviona_env
 from aviona.repl import run_repl
 from aviona.session import AvionaSession
 from aviona.store import SessionNotFoundError, latest_session
-from framework.orchestration.session import validate_slm_api_key
+from framework.orchestration.session import ensure_slm_api_key_configured
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -27,6 +27,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--version",
         action="version",
         version=f"%(prog)s {__version__}",
+    )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Write verbose debug log to ~/.aviona/debug/<run-id>.txt",
     )
     parser.add_argument(
         "--mode",
@@ -119,13 +124,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         write_line("restored: " + ", ".join(restored))
         return 0
 
-    validate_slm_api_key()
+    ensure_slm_api_key_configured()
     session = _open_session(cwd, args)
     if session is None:
         return 1
     if getattr(args, "mode", None):
         session.set_mode(args.mode)  # type: ignore[arg-type]
-    return run_repl(session)
+    return run_repl(session, debug=bool(getattr(args, "debug", False)))
 
 
 if __name__ == "__main__":

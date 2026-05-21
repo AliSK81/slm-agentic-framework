@@ -137,11 +137,26 @@ class SLMClient:
             if self._profile.reasoning_effort:
                 payload["reasoning_effort"] = self._profile.reasoning_effort
 
+        logger.debug(
+            "[API REQUEST] role=%s model=%s messages=%d json_mode=%s prompt_chars=%d",
+            role,
+            self._profile.model_id,
+            len(outbound_messages),
+            json_mode,
+            sum(len(m.get("content", "")) for m in outbound_messages),
+        )
+
         started = time.perf_counter()
         try:
             data, status = self._call_with_retry(payload, timeout_s)
         except httpx.TimeoutException:
             elapsed_ms = int((time.perf_counter() - started) * 1000)
+            logger.debug(
+                "[API RESPONSE] role=%s model=%s error=timeout elapsed_ms=%d",
+                role,
+                self._profile.model_id,
+                elapsed_ms,
+            )
             return SLMResponse(
                 error="timeout",
                 model=self._profile.model_id,
@@ -194,6 +209,17 @@ class SLMClient:
         usage = data.get("usage") or {}
         tokens = int(usage.get("total_tokens") or 0)
         model_used = str(data.get("model") or self._profile.model_id)
+
+        preview = content.replace("\r", "").replace("\n", "\\n")[:400]
+        logger.debug(
+            "[API RESPONSE] role=%s model=%s tokens=%d elapsed_ms=%d content_len=%d preview=%s",
+            role,
+            model_used,
+            tokens,
+            elapsed_ms,
+            len(content),
+            preview,
+        )
 
         return SLMResponse(
             content=content,

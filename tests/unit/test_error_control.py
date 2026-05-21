@@ -144,6 +144,9 @@ def test_quality_gate_passes_clean_input() -> None:
 
 def test_truncation_asymmetric_formula() -> None:
     """text of 10000 chars, cap 4000 → head=3000, tail=1000."""
+    from framework.error_control.truncation import set_caps_profile
+
+    set_caps_profile("default")
     text = "a" * 10000
     out = truncate(text, "pytest_run")
     assert len(out) == 4000

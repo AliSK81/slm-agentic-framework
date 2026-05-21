@@ -9,6 +9,7 @@ import pytest
 from framework.orchestration.session import (
     ProbeFailedError,
     ProbeResult,
+    ensure_slm_api_key_configured,
     validate_slm_api_key,
 )
 from framework.slm.client import SLMResponse
@@ -84,3 +85,27 @@ def test_probe_does_not_retry_on_missing_api_key(
 
     assert exc_info.value.result.attempts == 1
     assert mock_client.call.call_count == 1
+
+
+def test_ensure_slm_api_key_configured_skips_network_probe(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """REPL startup uses local key check only — no probe_client call."""
+    monkeypatch.setattr(
+        "framework.orchestration.session.api_key_required_for_active_provider",
+        lambda: True,
+    )
+    monkeypatch.setattr(
+        "framework.orchestration.session.api_key_env_var_for_active_provider",
+        lambda: "DEEPSEEK_API_KEY",
+    )
+    monkeypatch.setattr(
+        "framework.orchestration.session.require_slm_api_key",
+        lambda: "x" * 32,
+    )
+    probe = MagicMock()
+    monkeypatch.setattr("framework.orchestration.session.probe_client", probe)
+
+    ensure_slm_api_key_configured()
+
+    probe.assert_not_called()

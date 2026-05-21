@@ -60,6 +60,42 @@ def test_self_check_fails_scope_violation_executor_plan(memory: MemoryStores) ->
     assert any(i.kind == "scope_violation" for i in result.issues)
 
 
+def test_self_check_allows_executor_terminate(memory: MemoryStores) -> None:
+    """Interactive REPL executor must pass terminate through SELF_CHECK."""
+    proposal = _entry(
+        by_agent="executor",
+        kind="terminate",
+        payload={"user_message": "Hello.", "turn_type": "answer"},
+        rationale="Answer the greeting.",
+    )
+    result = self_check(proposal, memory, "sess-sc")
+    assert result.verdict == "pass"
+
+
+def test_self_check_allows_different_terminate_user_message_per_turn(
+    memory: MemoryStores,
+) -> None:
+    """Each REPL turn may terminate with a different user_message."""
+    prior = _entry(
+        decision_id="d-old",
+        kind="terminate",
+        payload={"user_message": "ali ali", "turn_type": "answer"},
+        rationale="greeting",
+    )
+    memory.decisions.append(prior)
+    proposal = _entry(
+        decision_id="d-new",
+        kind="terminate",
+        payload={
+            "user_message": "My LLM model is deepseek-v4-flash.",
+            "turn_type": "answer",
+        },
+        rationale="runtime facts",
+    )
+    result = self_check(proposal, memory, "sess-sc")
+    assert result.verdict == "pass"
+
+
 def test_self_check_fails_scope_violation_planner_tool(memory: MemoryStores) -> None:
     proposal = _entry(by_agent="planner", kind="tool_call")
     result = self_check(proposal, memory, "sess-sc")
@@ -70,9 +106,21 @@ def test_self_check_fails_scope_violation_planner_tool(memory: MemoryStores) -> 
 def test_self_check_detects_contradiction_same_key_different_value(
     memory: MemoryStores,
 ) -> None:
-    prior = _entry(decision_id="d-old", payload={"tool": "pytest"})
+    prior = _entry(
+        decision_id="d-old",
+        by_agent="planner",
+        kind="plan_step",
+        payload={"phase": "design"},
+        rationale="plan a",
+    )
     memory.decisions.append(prior)
-    proposal = _entry(decision_id="d-new", payload={"tool": "compile"})
+    proposal = _entry(
+        decision_id="d-new",
+        by_agent="planner",
+        kind="plan_step",
+        payload={"phase": "implement"},
+        rationale="plan b",
+    )
     result = self_check(proposal, memory, "sess-sc")
     assert result.verdict == "fail"
     assert any(i.kind == "contradiction" for i in result.issues)
@@ -88,6 +136,25 @@ def test_self_check_no_contradiction_same_key_same_value(memory: MemoryStores) -
     prior = _entry(decision_id="d-old", payload={"tool": "pytest"})
     memory.decisions.append(prior)
     proposal = _entry(decision_id="d-new", payload={"tool": "pytest"})
+    result = self_check(proposal, memory, "sess-sc")
+    assert result.verdict == "pass"
+
+
+def test_self_check_allows_varying_tool_on_tool_call_retry(
+    memory: MemoryStores,
+) -> None:
+    """Tool retries may switch tools without contradiction."""
+    prior = _entry(
+        decision_id="d-old",
+        kind="tool_call",
+        payload={"tool": "exec", "args": {"command": "type hello.txt"}},
+    )
+    memory.decisions.append(prior)
+    proposal = _entry(
+        decision_id="d-new",
+        kind="tool_call",
+        payload={"tool": "list_dir", "args": {"path": "."}},
+    )
     result = self_check(proposal, memory, "sess-sc")
     assert result.verdict == "pass"
 

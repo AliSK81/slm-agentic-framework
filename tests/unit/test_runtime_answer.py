@@ -8,7 +8,11 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from aviona.runtime import runtime_anchor_segment, runtime_answer_constraint
+from aviona.runtime import (
+    infer_interactive_max_steps,
+    runtime_anchor_segment,
+    runtime_answer_constraint,
+)
 from aviona.session import AvionaSession
 from framework.control.ablation import AblationSettings
 from framework.memory.backend import SQLiteBackend
@@ -86,6 +90,20 @@ def memory(tmp_path: Path) -> MemoryStores:
     return MemoryStores(SQLiteBackend(tmp_path / "runtime.db"))
 
 
+def test_infer_interactive_max_steps_by_goal_shape() -> None:
+    """Inspect-style goals get a tight cycle ceiling; edits get more room."""
+    assert infer_interactive_max_steps("hi") == 1
+    assert infer_interactive_max_steps("tell me what is your llm model?") == 1
+    assert infer_interactive_max_steps("list files in this dir") == 3
+    assert infer_interactive_max_steps('create bar.txt with "debug-smoke"') == 6
+    assert (
+        infer_interactive_max_steps(
+            'run this code with input "ali" and show me the result'
+        )
+        == 6
+    )
+
+
 def test_runtime_anchor_segment_includes_model_version_and_cwd(
     workspace: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -121,11 +139,12 @@ def test_aviona_session_anchor_includes_runtime_facts(
     _mock_profiles(monkeypatch, model_id)
 
     session = AvionaSession(workspace)
-    constraints = session._build_turn_constraints()
+    constraints = session._build_turn_constraints(goal="what is your model?")
 
     anchor = session._history[0].text
     assert f"model={model_id}" in anchor
     assert runtime_answer_constraint() in constraints
+    assert any("Turn types:" in c for c in constraints)
 
 
 def test_what_model_turn_one_cycle_read_only(
@@ -163,10 +182,69 @@ def test_what_model_turn_one_cycle_read_only(
         probe=False,
         max_steps=1,
         interactive_read_only=True,
-        ablation=AblationSettings(memory=False, control=False, error_control=False),
+        ablation=AblationSettings(memory=False, control=True, error_control=False),
     )
 
     assert outcome.llm_calls == 1
     assert executor.call_count == 1
     assert model_id in outcome.user_message
     assert not list(workspace.rglob("*"))
+
+
+def test_model_question_after_prior_turn_succeeds(
+    workspace: Path,
+    memory: MemoryStores,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Second turn must not fail SELF_CHECK contradiction vs prior user_message."""
+    model_id = "deepseek/deepseek-v4-flash"
+    _mock_profiles(monkeypatch, model_id)
+    executor = MockSLMClient(
+        [
+            _terminate("ali ali", "answer"),
+            _terminate(f"My LLM model is {model_id}.", "answer"),
+        ]
+    )
+    planner = MockSLMClient([])
+
+    monkeypatch.setattr(
+        "framework.orchestration.session.client_for_role",
+        lambda role: planner if role == "planner" else executor,
+    )
+    monkeypatch.setattr(
+        "framework.orchestration.session.validate_slm_api_key",
+        lambda *args, **kwargs: ProbeResult(ok=True, attempts=1),
+    )
+
+    constraints = [
+        runtime_anchor_segment(cwd=workspace),
+        runtime_answer_constraint(),
+    ]
+    session_id = "sess-two-turn"
+    first = run_turn(
+        'just say "ali ali"',
+        constraints,
+        workspace,
+        memory=memory,
+        session_id=session_id,
+        probe=False,
+        max_steps=1,
+        interactive_read_only=True,
+        ablation=AblationSettings(memory=False, control=True, error_control=False),
+    )
+    second = run_turn(
+        "tell me what is your llm model?",
+        constraints,
+        workspace,
+        memory=memory,
+        session_id=session_id,
+        probe=False,
+        max_steps=1,
+        interactive_read_only=True,
+        ablation=AblationSettings(memory=False, control=True, error_control=False),
+    )
+
+    assert first.user_message == "ali ali"
+    assert model_id in second.user_message
+    assert second.llm_calls == 1
+    assert executor.call_count == 2

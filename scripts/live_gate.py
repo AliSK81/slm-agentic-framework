@@ -30,66 +30,65 @@ class LiveCase:
 
 LIVE_MATRIX: tuple[LiveCase, ...] = (
     LiveCase(
-        "local-hi",
+        "answer-hi",
         "hi",
-        "local",
-        must_contain=("Hi",),
-        max_steps=0,
+        "answer",
+        must_contain=("hi",),
+        max_steps=1,
     ),
     LiveCase(
-        "local-ok",
+        "answer-ok",
         "ok",
-        "local",
-        must_contain=("Got it",),
-        max_steps=0,
+        "answer",
+        max_steps=1,
         unchanged_files=("notes.txt",),
     ),
     LiveCase(
         "answer-model",
         "what is your model?",
-        "local",
-        max_steps=0,
+        "answer",
+        max_steps=1,
     ),
     LiveCase(
         "answer-language-model",
         "what language model?",
-        "local",
-        max_steps=0,
+        "answer",
+        max_steps=1,
     ),
     LiveCase(
         "answer-salam",
         'try to fastly reply with "salam"',
-        "local",
+        "answer",
         must_contain=("salam",),
-        max_steps=0,
+        max_steps=1,
     ),
     LiveCase(
         "inspect-hello-content",
         "what is content of hello file?",
-        "local",
+        "inspect",
         must_contain=("hi",),
-        max_steps=0,
+        max_steps=3,
     ),
     LiveCase(
         "inspect-project",
         "what is this project",
-        "local",
+        "inspect",
         must_contain=("Aviona test workspace",),
-        max_steps=0,
+        max_steps=3,
     ),
     LiveCase(
         "inspect-list-files",
         "list files in this dir",
-        "local",
+        "inspect",
         must_contain=("hello.txt", "main.py"),
-        max_steps=0,
+        max_steps=3,
     ),
     LiveCase(
         "edit-create-foo",
         'create foo.txt with "x"',
-        "local",
+        "edit",
         must_contain=("foo.txt",),
-        max_steps=0,
+        max_steps=6,
         expected_files={"foo.txt": "x"},
         cleanup_files=("foo.txt",),
     ),
@@ -190,12 +189,7 @@ def _check_case(
             )
 
     steps = _parse_step_count(output)
-    if case.max_steps == 0:
-        if steps is not None:
-            raise AssertionError(
-                f"{case.case_id}: local turn must not invoke agent steps (saw {steps})\n{output}"
-            )
-    elif case.max_steps is not None:
+    if case.max_steps is not None:
         if steps is None:
             raise AssertionError(
                 f"{case.case_id}: expected agent status with step count\n{output}"

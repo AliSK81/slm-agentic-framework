@@ -23,7 +23,11 @@ class FileResult(BaseModel):
 
 def _resolve_path(file_path: str, workspace: Path) -> Path | None:
     workspace = workspace.resolve()
-    target = (workspace / file_path).resolve()
+    candidate = Path(file_path)
+    if candidate.is_absolute():
+        target = candidate.resolve()
+    else:
+        target = (workspace / file_path).resolve()
     try:
         target.relative_to(workspace)
     except ValueError:

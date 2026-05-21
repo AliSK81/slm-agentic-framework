@@ -12,7 +12,7 @@
 current_phase: thesis-39
 phase_status: PAUSED
 last_updated: "2026-05-21T12:00Z"
-last_commit: "bf9eadc"
+last_commit: "5125ff5"
 blocker: null
 active_roadmap: ROADMAP_PRODUCTION_AVIONA_V2.md
 thesis_track: paused_at_phase_39
@@ -375,7 +375,7 @@ aviona_v2_phases:
   V2-7: { status: DONE, commit: "76ea3a2", gate: "pytest tests/unit/test_runtime_answer.py", notes: "Structured runtime anchor + runtime_answer_constraint; 88/88 aviona gate." }
   V2-8: { status: DONE, commit: "838f43a", gate: "scripts/test-aviona.ps1 -Live", notes: "live_gate.py 9-row locked matrix; local handlers for meta/salam/L3 inspect+edit; interactive read-only guard; 91/91 L2 + 9/9 L3 pass." }
   V2-9: { status: DONE, commit: "6b6ea2c", gate: "scripts/install-aviona.ps1 -DryRun + pytest tests/unit/test_aviona_install.py", notes: "Hardened install-aviona.ps1: repo-relative, -DryRun gate, ~* cleanup, aviona lock retry, version parity; 4/4 install tests." }
-  V2-10: { status: DONE, commit: "PENDING", gate: "docs updated; aviona --version == 0.3.0 && scripts/test-aviona.ps1", notes: "CHANGELOG.md; AVIONA_CURRENT_STATE + ARCHITECTURE v2 outcome; JOURNEYS L3 table; version 0.3.0." }
+  V2-10: { status: DONE, commit: "bf9eadc", gate: "docs updated; aviona --version == 0.3.0 && scripts/test-aviona.ps1", notes: "CHANGELOG.md; AVIONA_CURRENT_STATE + ARCHITECTURE v2 outcome; JOURNEYS L3 table; version 0.3.0; 91/91 L2 gate." }
 ```
 
 ---

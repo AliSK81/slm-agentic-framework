@@ -125,7 +125,7 @@ def test_cli_continue_unknown_exits_nonzero(
     """CLI --continue with no sessions exits 1."""
     monkeypatch.chdir(workspace)
     monkeypatch.setattr("aviona.cli.load_aviona_env", lambda _cwd=None: None)
-    monkeypatch.setattr("aviona.cli.validate_slm_api_key", lambda *a, **k: None)
+    monkeypatch.setattr("aviona.cli.ensure_slm_api_key_configured", lambda: None)
     monkeypatch.setattr(
         "aviona.cli.latest_session",
         lambda _cwd: None,
@@ -140,7 +140,7 @@ def test_cli_resume_unknown_exits_nonzero(
     """CLI --resume unknown id prints error and exits 1."""
     monkeypatch.chdir(workspace)
     monkeypatch.setattr("aviona.cli.load_aviona_env", lambda _cwd=None: None)
-    monkeypatch.setattr("aviona.cli.validate_slm_api_key", lambda *a, **k: None)
+    monkeypatch.setattr("aviona.cli.ensure_slm_api_key_configured", lambda: None)
     monkeypatch.setattr(
         "aviona.cli.AvionaSession",
         lambda *_a, **_k: (_ for _ in ()).throw(SessionNotFoundError("unknown session: bad")),
@@ -155,7 +155,7 @@ def test_cli_fork_session_uses_latest(
     """--fork-session without --resume forks from the latest session."""
     monkeypatch.chdir(workspace)
     monkeypatch.setattr("aviona.cli.load_aviona_env", lambda _cwd=None: None)
-    monkeypatch.setattr("aviona.cli.validate_slm_api_key", lambda *a, **k: None)
+    monkeypatch.setattr("aviona.cli.ensure_slm_api_key_configured", lambda: None)
     monkeypatch.setattr(
         "aviona.cli.latest_session",
         lambda _cwd: MagicMock(session_id="aviona-parent1"),
@@ -170,6 +170,6 @@ def test_cli_fork_session_uses_latest(
         return session
 
     monkeypatch.setattr("aviona.cli.AvionaSession", _fork_session)
-    monkeypatch.setattr("aviona.cli.run_repl", lambda _s: 0)
+    monkeypatch.setattr("aviona.cli.run_repl", lambda _s, debug=False: 0)
     assert main(["--fork-session"]) == 0
     assert created == ["aviona-parent1"]

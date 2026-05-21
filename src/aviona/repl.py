@@ -4,18 +4,17 @@ from __future__ import annotations
 
 import logging
 import sys
+import time
 from collections.abc import Callable, Iterator, Sequence
 
+from aviona.debug_log import (
+    close_debug_log,
+    enable_debug_log,
+    is_debug_enabled,
+    log_repl_user,
+)
 from aviona.console import write_line
 from aviona.gitctx import format_git_summary
-from aviona.intent import (
-    conversational_reply,
-    is_conversational,
-    is_runtime_meta_question,
-    runtime_meta_reply,
-    try_locked_l3_reply,
-    try_quoted_local_reply,
-)
 from aviona.session import AvionaSession, TurnResult
 
 logger = logging.getLogger(__name__)
@@ -99,26 +98,32 @@ def run_repl(
     writer: Writer | None = None,
     prompt: str = "aviona> ",
     run_turn: Callable[[str], TurnResult] | None = None,
+    debug: bool = False,
 ) -> int:
     """Run the interactive REPL until ``/exit`` or EOF.
 
-    Args:
-        session: Shared ``AvionaSession`` for all turns.
-        reader: Line reader (inject ``ScriptedReader`` in tests).
-        writer: Status/output sink (defaults to ``print``).
-        prompt: Input prompt string.
-        run_turn: Optional override for ``session.run_turn`` (testing).
-
-    Returns:
-        Process exit code (0 on normal exit).
+    Every non-command user line runs exactly one ``run_turn`` (no phrase routing).
     """
     read = reader or default_reader
     write = writer or write_line
     turn = run_turn or session.run_turn
     session.set_confirm_reader(read)
 
+    debug_path = None
+    if debug:
+        debug_path = enable_debug_log(
+            workspace=session.workspace,
+            session_id=session._session_id,
+        )
+        write("")
+        write("Debug mode enabled")
+        write(f"Logging to: {debug_path}")
+        write("")
+
     write(f"Aviona - workspace: {session.workspace}")
     write(f"mode: {session.permission_gate.mode}")
+    if debug:
+        write("Debug mode")
     git_line = format_git_summary(session.git_status)
     if git_line:
         write(git_line)
@@ -129,6 +134,8 @@ def run_repl(
             line = read(prompt).strip()
         except (EOFError, KeyboardInterrupt):
             write("")
+            if debug:
+                close_debug_log()
             return 0
 
         if not line:
@@ -136,27 +143,20 @@ def run_repl(
 
         if line.startswith("/"):
             if _handle_meta(line, writer=write, session=session):
+                if debug:
+                    close_debug_log()
                 return 0
             continue
 
-        quoted = try_quoted_local_reply(line)
-        if quoted is not None:
-            write(quoted)
-            continue
+        if is_debug_enabled():
+            log_repl_user(line)
 
-        locked = try_locked_l3_reply(line, session.workspace)
-        if locked is not None:
-            write(locked)
-            continue
+        write("...")
+        started = time.perf_counter()
+        if is_debug_enabled():
+            from aviona.debug_log import log_turn_start
 
-        if is_runtime_meta_question(line):
-            write(runtime_meta_reply(session.workspace))
-            continue
-
-        if is_conversational(line):
-            write(conversational_reply(line))
-            continue
-
+            log_turn_start(goal=line, session_id=session._session_id)
         try:
             result = turn(line)
         except KeyboardInterrupt:
@@ -167,8 +167,16 @@ def run_repl(
             write(f"error: {exc}")
             continue
 
+        elapsed_ms = int((time.perf_counter() - started) * 1000)
+
         write(result.status)
         if result.detail:
-            for line in result.detail.splitlines():
-                write(f"  {line}")
+            for detail_line in result.detail.splitlines():
+                write(f"  {detail_line}")
+        if debug:
+            seconds = elapsed_ms / 1000.0
+            if seconds >= 10:
+                write(f"* Worked for {seconds:.0f}s")
+            else:
+                write(f"* Worked for {seconds:.1f}s")
     return 0

@@ -68,6 +68,23 @@ def test_declared_turn_type_reads_agent_payload() -> None:
     assert declared_turn_type(entries, file_changes=[]) == "inspect"
 
 
+def test_declared_turn_type_infers_inspect_on_read_tools() -> None:
+    """read_file with missing terminate turn_type infers inspect."""
+    entries = [
+        _entry("tool_call", {"tool": "read_file", "file_path": "main.py"}),
+    ]
+    assert declared_turn_type(entries, file_changes=[]) == "inspect"
+
+
+def test_declared_turn_type_honors_terminate_answer_over_tools() -> None:
+    """Explicit terminate turn_type:answer wins for budget even after read tools."""
+    entries = [
+        _entry("tool_call", {"tool": "read_file", "file_path": "main.py"}),
+        _entry("terminate", {"user_message": "main runs app", "turn_type": "answer"}),
+    ]
+    assert declared_turn_type(entries, file_changes=[]) == "answer"
+
+
 def test_declared_turn_type_infers_edit_on_writes() -> None:
     """Missing turn_type with file changes defaults to edit."""
     entries = [_entry("tool_call", {"tool": "write_file", "file_path": "x.txt"})]

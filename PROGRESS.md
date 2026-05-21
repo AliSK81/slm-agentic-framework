@@ -9,20 +9,24 @@
 ## CURRENT STATE
 
 ```yaml
-current_phase: thesis-39
-phase_status: PAUSED
-last_updated: "2026-05-21T12:00Z"
-last_commit: "10c80eb"
+current_phase: framework-interactive-1
+phase_status: NOT_STARTED
+last_updated: "2026-05-21T18:00Z"
+last_commit: "4f3bc76"
 blocker: null
-active_roadmap: ROADMAP_PRODUCTION_AVIONA_V2.md
+active_roadmap: ROADMAP_FRAMEWORK_INTERACTIVE.md
 thesis_track: paused_at_phase_39
-aviona_track: v2
+thesis_resume_gate: "FI-7 DONE + AV3-3 live gate green (see ROADMAP_AVIONA_V3.md AV3-3)"
+aviona_track: v3_pending
 aviona_v2_phase: V2-10
 aviona_v2_status: DONE
+aviona_v3_phase: null
+aviona_v3_status: PENDING
 pre_v2_tag: pre-v2
 pre_v2_baseline_version: "0.2.6"
 product_sign_off: "2026-05-21: Chat-first assistant that can edit files (ROADMAP_PRODUCTION_AVIONA_V2.md §2.0). Additive framework terminate.user_message + interactive turn mode approved for V2-1+."
-replan_note: "V2-0 baselines 0.2.x patch stack at tag pre-v2. v1 (AVIONA-1..12) frozen at 4c638b3. Thesis 39-41 frozen until THESIS-RESUME."
+replan_note: "2026-05-21: Claude replan — ROADMAP_FRAMEWORK_INTERACTIVE.md (FI-1..FI-7) + ROADMAP_AVIONA_V3.md (AV3-1..AV3-5). Evidence pack: temp/roadmap-replan-handoff/. Thesis 39-41 frozen until thesis_resume_gate."
+handoff_pack: temp/roadmap-replan-handoff/
 ```
 
 ---
@@ -319,7 +323,7 @@ phases:
     status: PAUSED
     test_gate: "pytest tests/unit/test_report_latex.py tests/unit/test_figures.py"
     commit: null
-    notes: "Curated-only export."
+    notes: "Curated-only export. Resume after thesis_resume_gate (FI-7 + AV3-3 live gate green)."
 
   40:
     name: "Docs + zipped repro bundle"
@@ -380,6 +384,39 @@ aviona_v2_phases:
 
 ---
 
+## FRAMEWORK INTERACTIVE TRACK (`ROADMAP_FRAMEWORK_INTERACTIVE.md`)
+
+> **Active track.** Implements Interactive Completion Protocol (ICP) in framework control layer.
+> Thesis phase 39 resumes only after `thesis_resume_gate` in CURRENT STATE.
+
+```yaml
+framework_interactive_phases:
+  FI-1: { status: NOT_STARTED, gate: "pytest tests/unit/test_interactive_turn_type_binding.py", notes: "Agent declares turn_type on cycle 1; Python binds budget/permissions; delete Aviona infer_interactive_max_steps." }
+  FI-2: { status: NOT_STARTED, gate: "pytest tests/unit/test_tool_result_channel.py", notes: "Typed ToolResultEntry in working memory; remove reflection_guidance string injection." }
+  FI-3: { status: NOT_STARTED, gate: "pytest tests/unit/test_interactive_completion_protocol.py", notes: "ICP sub-state-machine; mandatory terminate after tools; repeat-tool dedup; delete default synthesis." }
+  FI-4: { status: NOT_STARTED, gate: "pytest tests/unit/test_interactive_finalizer.py", notes: "Finalizer Decision Cycle (terminate only) or honest unresolvable; fix outcome contract." }
+  FI-5: { status: NOT_STARTED, gate: "pytest tests/unit/test_interactive_handoff.py", notes: "Compound turns via typed handoff (needs_edit, needs_run, needs_plan)." }
+  FI-6: { status: NOT_STARTED, gate: "pytest tests/unit/test_inspect_run_policy.py tests/unit/test_executor_tool_parity.py", notes: "Inspect-run permission policy; glob/search tool parity." }
+  FI-7: { status: NOT_STARTED, gate: "pytest tests/unit/test_interactive_failure_modes.py", notes: "Mock SLM failure-mode suite mapping PROBLEM_INVENTORY rows; no live API." }
+```
+
+---
+
+## AVIONA V3 TRACK (`ROADMAP_AVIONA_V3.md`)
+
+> **Starts after FI-7.** Thin product layer consuming framework ICP.
+
+```yaml
+aviona_v3_phases:
+  AV3-1: { status: PENDING, gate: "pytest tests/unit/test_aviona_thin_runtime.py", notes: "Delete infer_interactive_max_steps + synthesis fallbacks; consume framework turn_type/budget." }
+  AV3-2: { status: PENDING, gate: "pytest tests/unit/test_aviona_permissions_ux.py", notes: "Permission UX for inspect-run; no framework logic in Aviona." }
+  AV3-3: { status: PENDING, gate: "scripts/test-aviona.ps1 -Live", notes: "Expand live_gate.py matrix; thesis_resume_gate requires this green." }
+  AV3-4: { status: PENDING, gate: "pytest tests/e2e/test_aviona_repl_matrix.py -m e2e", notes: "E2E REPL matrix from PROBLEM_INVENTORY." }
+  AV3-5: { status: PENDING, gate: "aviona --version == 0.4.0 && scripts/test-aviona.ps1", notes: "Docs + CHANGELOG 0.4.0; JOURNEYS L3 table update." }
+```
+
+---
+
 ## HOW TO UPDATE THIS FILE
 
 When a phase completes, update the YAML above:
@@ -420,11 +457,14 @@ decisions:
   - "2026-05-20: Thesis HumanEval D SR uses 082826Z or corrected 090933Z; discard 085222Z (network)."
   - "2026-05-20: Planner coerces SLM numeric task_id/depends_on to str (tests/unit/test_planner.py)."
   - "2026-05-20: Phase 12 e2e runs A+D only (not B/C); full ablation is Phase 11 eval/scenarios/ablation.py."
+  - "2026-05-21: Framework-first replan — FI track before Aviona v3 patches; no phrase routing or synthesis fallbacks."
+  - "2026-05-21: Thesis 39 paused until FI-7 + AV3-3 live gate green (Option B insertion from ROADMAP_CONTEXT.md)."
 issues:
   - "Phases 14–29 merged into ROADMAP.md 2026-05-20; Phase 13 done."
   - "2026-05-21: ROADMAP_PHASES_NEXT.md merged; phases 30–41 in ROADMAP.md; handoff at 88c1a50."
   - "scripts/run_phase12_staged.ps1 broken on Windows; use scripts/run_phase12_staged.py."
   - "2026-05-21: Aviona v2 replan (ROADMAP_PRODUCTION_AVIONA_V2.md); live REPL fails despite 67 mocked tests; baseline tagged pre-v2 at 0.2.6."
+  - "2026-05-21: Live REPL failures traced to framework ICP gap (temp/roadmap-replan-handoff/); hardcoded Aviona shortcuts removed at 10c80eb."
 ```
 
 ---

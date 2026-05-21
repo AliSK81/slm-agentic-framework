@@ -7,8 +7,8 @@ alwaysApply: true
 
 ## Orientation (every session, first)
 
-1. Read `PROGRESS.md` — `current_phase`, `phase_status`, `blocker`
-2. Read `ROADMAP.md` — section for the current phase only
+1. Read `PROGRESS.md` — `current_phase`, `phase_status`, `blocker`, `active_roadmap`
+2. Read the **active roadmap** from `active_roadmap` (e.g. `ROADMAP_FRAMEWORK_INTERACTIVE.md` for `framework-interactive-N`, `ROADMAP.md` for `thesis-N`, `ROADMAP_AVIONA_V3.md` for `AV3-N`) — current phase section only
 3. Apply the **thesis-iterate** skill (`.cursor/skills/thesis-iterate/`) for the full session protocol
 
 If `phase_status: BLOCKED` — resolve or document in `PROGRESS.md` before coding.
@@ -57,4 +57,4 @@ If `phase_status: BLOCKED` — resolve or document in `PROGRESS.md` before codin
 
 ## Commits (phase workflow)
 
-Use the exact commit message from `ROADMAP.md` for phase work. Update `PROGRESS.md` YAML after each phase gate passes.
+Use the exact commit message from the **active roadmap** (`active_roadmap` in `PROGRESS.md`) for phase work. Update `PROGRESS.md` YAML after each phase gate passes.

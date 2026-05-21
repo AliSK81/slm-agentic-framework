@@ -10,9 +10,14 @@ description: >-
 
 Autonomous, phase-by-phase implementation of the SLM Agentic Framework thesis.
 
-**State files:** `PROGRESS.md` (current phase), `ROADMAP.md` (specs and test gates).
+**State files:** `PROGRESS.md` (current phase + `active_roadmap`), active roadmap file (see below), `ROADMAP.md` (thesis phases 0–41).
 
 Project standards (code quality, testing, architecture) live in `.cursor/rules/thesis-roadmap.mdc`.
+
+**Active roadmap resolution:** Read `active_roadmap` from `PROGRESS.md` CURRENT STATE. Examples:
+- `framework-interactive-1` → `ROADMAP_FRAMEWORK_INTERACTIVE.md` § FI-1
+- `thesis-39` → `ROADMAP.md` § Phase 39
+- `AV3-1` → `ROADMAP_AVIONA_V3.md` § AV3-1
 
 ---
 
@@ -20,9 +25,9 @@ Project standards (code quality, testing, architecture) live in `.cursor/rules/t
 
 ### Step 1 — Orient
 
-Read `PROGRESS.md` and `ROADMAP.md` (current phase section).
+Read `PROGRESS.md` and the **active roadmap** (from `active_roadmap` field) for the current phase section.
 
-Determine: phase number, status (`NOT_STARTED` / `IN_PROGRESS` / `BLOCKED` / `DONE`), test gate, blockers.
+Determine: phase id, status (`NOT_STARTED` / `IN_PROGRESS` / `BLOCKED` / `DONE`), test gate, blockers.
 
 If `BLOCKED` → resolve, document in `PROGRESS.md`, continue.
 
@@ -44,18 +49,18 @@ pip install -r requirements.txt
 
 ### Step 3 — Implement current phase
 
-Follow `ROADMAP.md` for the current phase only. Do not skip tasks or implement future phases.
+Follow the active roadmap for the current phase only. Do not skip tasks or implement future phases.
 
 Per file:
 
-1. Read spec from `ROADMAP.md`
+1. Read spec from the active roadmap
 2. Read `thesis_solution_path_v4.md` in project root if present
 3. Implement completely
 4. Run unit tests for that file immediately
 
 ### Step 4 — Phase test gate
 
-Run the gate from `PROGRESS.md` / `ROADMAP.md` exactly, e.g.:
+Run the gate from `PROGRESS.md` / active roadmap exactly, e.g.:
 
 ```bash
 pytest tests/unit/test_X.py -v
@@ -68,10 +73,10 @@ On failure: fix implementation, re-run. Only change tests with justification in 
 ```bash
 git add -A
 git status
-git commit -m "phase-N: <message from ROADMAP.md>"
+git commit -m "FI-N: <message from ROADMAP_FRAMEWORK_INTERACTIVE.md>"
 ```
 
-Use the ROADMAP commit message verbatim.
+Use the active roadmap commit message verbatim (e.g. `FI-1: ...`, `phase-N: ...`, `AV3-1: ...`).
 
 ### Step 6 — Update PROGRESS.md
 
@@ -90,7 +95,7 @@ Proceed to the next phase without stopping.
 **Stop only when:**
 
 - Phase has `[REQUIRES_USER_INPUT]` and prerequisite is unmet
-- All phases in `ROADMAP.md` Phase Overview are `DONE` → then run **`thesis-handoff-report`** skill for Claude/next-phase planning
+- All phases in the active roadmap Phase Overview are `DONE` → resume next track per `PROGRESS.md` (e.g. FI-7 → AV3-1; AV3-3 green → thesis-39)
 - Blocker unresolved after 3 attempts
 
 ---
@@ -99,8 +104,10 @@ Proceed to the next phase without stopping.
 
 | Path | Role |
 |------|------|
-| `ROADMAP.md` | Phase specs and test gates |
-| `PROGRESS.md` | Current state (agent updates) |
+| `PROGRESS.md` | Current state + `active_roadmap` (agent updates) |
+| `ROADMAP.md` | Thesis phase specs (0–41) |
+| `ROADMAP_FRAMEWORK_INTERACTIVE.md` | FI-1..FI-7 ICP track (active) |
+| `ROADMAP_AVIONA_V3.md` | AV3-1..AV3-5 product track (after FI-7) |
 | `configs/models.yaml` | Model profiles |
 | `configs/memory.yaml` | Memory / retrieval weights |
 | `configs/eval.yaml` | Benchmark / ablation config |

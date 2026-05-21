@@ -9,19 +9,19 @@
 ## CURRENT STATE
 
 ```yaml
-current_phase: AV3-1
+current_phase: AV3-2
 phase_status: NOT_STARTED
 last_updated: "2026-05-21T26:00Z"
 last_commit: "d1bcb27"
 blocker: null
-active_roadmap: ROADMAP_FRAMEWORK_INTERACTIVE.md
+active_roadmap: ROADMAP_AVIONA_V3.md
 thesis_track: paused_at_phase_39
 thesis_resume_gate: "FI-7 DONE + AV3-3 live gate green (see ROADMAP_AVIONA_V3.md AV3-3)"
 aviona_track: v3_pending
 aviona_v2_phase: V2-10
 aviona_v2_status: DONE
-aviona_v3_phase: null
-aviona_v3_status: PENDING
+aviona_v3_phase: AV3-2
+aviona_v3_status: NOT_STARTED
 pre_v2_tag: pre-v2
 pre_v2_baseline_version: "0.2.6"
 product_sign_off: "2026-05-21: Chat-first assistant that can edit files (ROADMAP_PRODUCTION_AVIONA_V2.md §2.0). Additive framework terminate.user_message + interactive turn mode approved for V2-1+."
@@ -396,7 +396,7 @@ framework_interactive_phases:
   FI-4: { status: DONE, commit: "491d60c", gate: "pytest tests/unit/test_finalizer_forces_terminate.py", notes: "4/4 unit pass. finalizer:on terminate-only cycle from [TOOL RESULTS]; finalizer:off honest unresolvable; user_message only from terminate; deleted synthesis." }
   FI-5: { status: DONE, commit: "b9ff3c6", gate: "pytest tests/integration/test_compound_edit_run.py", notes: "3/3 integration pass. Typed handoff phase machine (inspect/edit/run); per-phase budgets; ICP allows needs_edit/needs_run handoffs; needs_run after code_edit for verify." }
   FI-6: { status: DONE, commit: "6453ca6", gate: "pytest tests/unit/test_shell_inspect_permission_policy.py tests/unit/test_executor_tool_parity.py", notes: "8/8 unit pass. is_inspect_run_command + executor auto-allow on turn_type inspect; glob tool; hint parity; search_codebase not advertised." }
-  FI-7: { status: DONE, commit: "PENDING", gate: "pytest tests/unit/test_interactive_turn_type_binding.py tests/unit/test_interactive_failure_modes.py tests/integration/test_interactive_turn.py", notes: "7/7 failure-mode unit + 15/15 interactive gate pass. _mock_slm_queue.py; R06-R15 loop patterns; wired into scripts/test-aviona.ps1 L2." }
+  FI-7: { status: DONE, commit: "d1bcb27", gate: "pytest tests/unit/test_interactive_turn_type_binding.py tests/unit/test_interactive_failure_modes.py tests/integration/test_interactive_turn.py", notes: "7/7 failure-mode unit + 15/15 interactive gate pass. _mock_slm_queue.py; R06-R15 loop patterns; wired into scripts/test-aviona.ps1 L2." }
 ```
 
 ---
@@ -407,7 +407,7 @@ framework_interactive_phases:
 
 ```yaml
 aviona_v3_phases:
-  AV3-1: { status: PENDING, gate: "pytest tests/unit/test_aviona_thin_runtime.py", notes: "Delete infer_interactive_max_steps + synthesis fallbacks; consume framework turn_type/budget." }
+  AV3-1: { status: DONE, commit: "PENDING", gate: "pytest tests/unit/test_aviona_consumes_framework_turn_type.py tests/unit/test_aviona_contract_matrix.py", notes: "5/5 + 20/20 matrix pass. Deleted infer_interactive_max_steps; budgets from load_interactive_budgets; run_turn drops max_steps kwarg." }
   AV3-2: { status: PENDING, gate: "pytest tests/unit/test_aviona_permissions_ux.py", notes: "Permission UX for inspect-run; no framework logic in Aviona." }
   AV3-3: { status: PENDING, gate: "scripts/test-aviona.ps1 -Live", notes: "Expand live_gate.py matrix; thesis_resume_gate requires this green." }
   AV3-4: { status: PENDING, gate: "pytest tests/e2e/test_aviona_repl_matrix.py -m e2e", notes: "E2E REPL matrix from PROBLEM_INVENTORY." }

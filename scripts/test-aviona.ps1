@@ -62,7 +62,8 @@ Write-Host "==> pytest Aviona unit + contract tests"
     tests/unit/test_aviona_store.py `
     tests/unit/test_turn_io.py `
     tests/unit/test_turn_budgets.py `
-    tests/unit/test_interactive_*.py `
+    tests/unit/test_interactive_failure_modes.py `
+    tests/unit/test_interactive_turn_type_binding.py `
     tests/unit/test_live_gate_matrix.py `
     tests/integration/test_interactive_turn.py `
     -v --tb=short

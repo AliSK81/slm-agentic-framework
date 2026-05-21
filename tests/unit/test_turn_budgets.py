@@ -184,10 +184,11 @@ def test_inspect_turn_stays_within_three_cycles(
     memory: MemoryStores,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Inspect turn allows up to three executor cycles before terminate."""
+    """Inspect turn completes in three cycles (declare + tool + terminate)."""
+    # Cycle 1 must declare turn_type so binding fires; subsequent cycles use inspect budget.
     executor = MockSLMClient(
         [
-            _tool_call("list_dir", path="."),
+            _tool_call("list_dir", path=".", turn_type="inspect"),
             _tool_call("read_file", file_path="README.md"),
             _terminate("Project overview from README.", "inspect"),
         ]
@@ -202,7 +203,6 @@ def test_inspect_turn_stays_within_three_cycles(
         memory=memory,
         session_id="sess-inspect-budget",
         probe=False,
-        max_steps=3,
         interactive_read_only=True,
         ablation=AblationSettings(memory=False, control=False, error_control=False),
     )

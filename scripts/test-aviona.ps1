@@ -63,6 +63,7 @@ Write-Host "==> pytest Aviona unit + contract tests"
     tests/unit/test_turn_io.py `
     tests/unit/test_turn_budgets.py `
     tests/unit/test_interactive_*.py `
+    tests/unit/test_live_gate_matrix.py `
     tests/integration/test_interactive_turn.py `
     -v --tb=short
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

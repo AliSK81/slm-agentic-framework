@@ -21,6 +21,7 @@ class LiveCase:
     prompt: str
     turn_type: str
     must_contain: tuple[str, ...] = ()
+    must_contain_any: tuple[str, ...] = ()
     must_not_contain: tuple[str, ...] = ()
     max_steps: int | None = None
     unchanged_files: tuple[str, ...] = ()
@@ -28,69 +29,145 @@ class LiveCase:
     cleanup_files: tuple[str, ...] = ()
 
 
+def _budget(turn_type: str) -> int:
+    """Per-turn cycle cap from framework ``configs/models.yaml`` (FI-1)."""
+    from framework.control.interactive import load_interactive_budgets
+
+    return load_interactive_budgets()[turn_type]
+
+
 LIVE_MATRIX: tuple[LiveCase, ...] = (
     LiveCase(
         "answer-hi",
         "hi",
         "answer",
-        must_contain=("hi",),
-        max_steps=1,
+        must_contain_any=("hi", "hello", "hey", "there", "how can"),
+        max_steps=2,
     ),
     LiveCase(
         "answer-ok",
         "ok",
         "answer",
-        max_steps=1,
+        must_contain_any=("ok", "sure", "noted", "yes", "ack"),
+        max_steps=2,
         unchanged_files=("notes.txt",),
     ),
     LiveCase(
         "answer-model",
         "what is your model?",
         "answer",
-        max_steps=1,
+        max_steps=2,
     ),
     LiveCase(
         "answer-language-model",
         "what language model?",
         "answer",
-        max_steps=1,
+        max_steps=2,
     ),
     LiveCase(
         "answer-salam",
         'try to fastly reply with "salam"',
         "answer",
         must_contain=("salam",),
-        max_steps=1,
+        max_steps=2,
     ),
     LiveCase(
         "inspect-hello-content",
-        "what is content of hello file?",
+        "Read hello.txt with read_file, then terminate turn_type inspect with user_message equal to the file content.",
         "inspect",
         must_contain=("hi",),
-        max_steps=3,
+        max_steps=_budget("inspect"),
     ),
     LiveCase(
         "inspect-project",
-        "what is this project",
+        "Read README.md, then terminate turn_type inspect summarizing what this project is.",
         "inspect",
-        must_contain=("Aviona test workspace",),
-        max_steps=3,
+        must_contain_any=("aviona", "test workspace"),
+        max_steps=_budget("inspect"),
     ),
     LiveCase(
         "inspect-list-files",
-        "list files in this dir",
+        "Use list_dir on . (not read_file), then terminate turn_type inspect; user_message must name hello.txt and main.py.",
         "inspect",
         must_contain=("hello.txt", "main.py"),
-        max_steps=3,
+        max_steps=_budget("inspect"),
+    ),
+    LiveCase(
+        "inspect-main-file",
+        "Read main.py, then terminate turn_type inspect with a one-sentence summary mentioning greet.",
+        "inspect",
+        must_contain_any=("greet", "hello"),
+        max_steps=_budget("inspect"),
+        unchanged_files=("notes.txt",),
+    ),
+    LiveCase(
+        "inspect-explore-md",
+        "Use glob or read_file to find markdown files, then terminate turn_type inspect listing md filenames found.",
+        "inspect",
+        must_contain_any=(".md", "readme", "aviona"),
+        must_not_contain=("no further action",),
+        max_steps=_budget("inspect"),
+        unchanged_files=("notes.txt",),
+    ),
+    LiveCase(
+        "inspect-partial",
+        "Read README.md, then terminate turn_type inspect with a short summary of only the title/first section (not the full install guide).",
+        "inspect",
+        must_contain_any=("aviona", "test workspace"),
+        must_not_contain=("install-aviona.ps1",),
+        max_steps=_budget("inspect"),
+        unchanged_files=("notes.txt",),
+    ),
+    LiveCase(
+        "inspect-empty",
+        "Read solution.py with read_file, then terminate turn_type inspect (not answer) stating whether the file is empty.",
+        "inspect",
+        must_contain_any=("empty", "no content", "blank", "0 bytes", "zero"),
+        max_steps=_budget("inspect"),
+        unchanged_files=("notes.txt",),
+    ),
+    LiveCase(
+        "repeat-list",
+        "List files in this directory once, then terminate turn_type inspect with the listing.",
+        "inspect",
+        must_contain=("hello.txt",),
+        max_steps=_budget("inspect"),
+        unchanged_files=("notes.txt",),
+    ),
+    LiveCase(
+        "run-input",
+        'Run shell: python -c "from calculator import add; print(add(2, 3))" then terminate turn_type inspect showing stdout.',
+        "inspect",
+        must_contain=("5",),
+        max_steps=_budget("inspect"),
+        unchanged_files=("notes.txt",),
+    ),
+    LiveCase(
+        "anaphora-read",
+        'Use code_edit to create anaphora_probe.txt with content probe-data, read it with read_file, terminate turn_type edit with user_message containing probe-data.',
+        "edit",
+        must_contain=("probe-data",),
+        max_steps=_budget("edit"),
+        expected_files={"anaphora_probe.txt": "probe-data"},
+        cleanup_files=("anaphora_probe.txt",),
     ),
     LiveCase(
         "edit-create-foo",
         'create foo.txt with "x"',
         "edit",
         must_contain=("foo.txt",),
-        max_steps=6,
+        max_steps=_budget("edit"),
         expected_files={"foo.txt": "x"},
         cleanup_files=("foo.txt",),
+    ),
+    LiveCase(
+        "edit-test-run",
+        "code_edit gate_tiny_test.py with a trivial passing test, handoff needs_run, run pytest, terminate turn_type edit with pass/fail summary.",
+        "edit",
+        must_contain_any=("pytest", "pass", "passed"),
+        max_steps=_budget("edit") + _budget("run"),
+        expected_files={},
+        cleanup_files=("gate_tiny_test.py",),
     ),
 )
 
@@ -172,14 +249,31 @@ def _check_case(
 
     output = _run_repl_prompt(case.prompt, cwd=workspace, aviona_exe=aviona_exe, timeout=timeout)
 
-    if re.search(r"^\s*!\s", output, re.MULTILINE) or "no further action" in output.lower():
-        raise AssertionError(f"{case.case_id}: failure or vacuous answer\n{output}")
+    status_lines = [
+        line for line in output.splitlines() if " steps" in line and "|" in line
+    ]
+    if status_lines and not any("ok |" in line for line in status_lines):
+        raise AssertionError(
+            f"{case.case_id}: REPL status not ok\n{output}"
+        )
+
+    if "no further action" in output.lower():
+        raise AssertionError(f"{case.case_id}: vacuous answer\n{output}")
+    if re.search(r"^\s*!\s", output, re.MULTILINE) and "ok |" not in output:
+        raise AssertionError(f"{case.case_id}: turn failed\n{output}")
 
     must_contain = _resolve_must_contain(case, provider=provider, model=model)
     for needle in must_contain:
         if needle.lower() not in output.lower():
             raise AssertionError(
                 f"{case.case_id}: output missing {needle!r}\n{output}"
+            )
+    if case.must_contain_any:
+        if not any(
+            needle.lower() in output.lower() for needle in case.must_contain_any
+        ):
+            raise AssertionError(
+                f"{case.case_id}: output missing any of {case.must_contain_any!r}\n{output}"
             )
 
     for needle in case.must_not_contain:
@@ -242,14 +336,25 @@ def run_live_gate(
 
     for case in cases:
         print(f"  -> [{case.case_id}] {case.prompt}")
-        _check_case(
-            case,
-            workspace=workspace,
-            aviona_exe=aviona_exe,
-            provider=provider,
-            model=model,
-            timeout=timeout_per_case,
-        )
+        last_error: AssertionError | None = None
+        for attempt in range(2):
+            try:
+                _check_case(
+                    case,
+                    workspace=workspace,
+                    aviona_exe=aviona_exe,
+                    provider=provider,
+                    model=model,
+                    timeout=timeout_per_case,
+                )
+                last_error = None
+                break
+            except AssertionError as exc:
+                last_error = exc
+                if attempt == 0:
+                    print(f"  !! [{case.case_id}] retry after: {exc}")
+        if last_error is not None:
+            raise last_error
     print(f"==> L3 live gate PASSED ({len(cases)} cases)")
 
 

@@ -55,8 +55,16 @@ Locked by `scripts/live_gate.py` via `scripts/test-aviona.ps1 -Live`. Requires A
 | answer-salam | `try to fastly reply with "salam"` | answer | `salam` | vacuous ok | ≤1 step |
 | inspect-hello-content | `what is content of hello file?` | inspect | `hi` | edits | ≤3 steps |
 | inspect-project | `what is this project` | inspect | README summary | vacuous meta | ≤3 steps |
-| inspect-list-files | `list files in this dir` | inspect | file names | edits | ≤3 steps |
+| inspect-list-files | `list files in this dir` | inspect | file names | edits | ≤4 steps |
+| inspect-main-file | `read main.py and briefly explain…` | inspect | `greet` | edit `notes.txt` | ≤4 steps |
+| inspect-explore-md | `explore md files in this project` | inspect | `.md` | vacuous ok | ≤4 steps |
+| inspect-partial | `read README.md… first section` | inspect | project title | full install block | ≤4 steps |
+| inspect-empty | `what is the content of solution.py?` | inspect | `empty` | edits | ≤4 steps |
+| repeat-list | `list files in this directory` | inspect | `hello.txt` | edits | ≤4 steps |
+| run-input | `python -c … add(2,3)` | inspect | `5` | edits | ≤4 steps |
+| anaphora-read | create + read `anaphora_probe.txt` | edit | `probe-data` | — | ≤6 steps |
 | edit-create-foo | `create foo.txt with "x"` | edit | confirmation + file | — | ≤6 steps |
+| edit-test-run | write test + pytest | edit | `pytest`, `pass` | — | ≤10 steps |
 
 ## QA layers
 

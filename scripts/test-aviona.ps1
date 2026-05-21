@@ -72,6 +72,10 @@ if ($Live) {
     Write-Host "==> L3 live gate (requires API key)"
     & $Python (Join-Path $Repo "scripts\live_gate.py") --aviona $Aviona
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+    Write-Host "==> E2E REPL matrix (AV3-4)"
+    & $Python -m pytest tests/e2e/test_aviona_repl_matrix.py -m e2e -v --tb=short
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
 
 Write-Host "==> Aviona gate PASSED ($ExpectedVersion)"

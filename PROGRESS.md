@@ -9,10 +9,10 @@
 ## CURRENT STATE
 
 ```yaml
-current_phase: AV3-4
+current_phase: AV3-5
 phase_status: NOT_STARTED
 last_updated: "2026-05-21T00:00Z"
-last_commit: "34895e4"
+last_commit: "pending"
 blocker: null
 active_roadmap: ROADMAP_AVIONA_V3.md
 thesis_track: paused_at_phase_39
@@ -20,7 +20,7 @@ thesis_resume_gate: "FI-7 DONE + AV3-3 live gate green (see ROADMAP_AVIONA_V3.md
 aviona_track: v3_pending
 aviona_v2_phase: V2-10
 aviona_v2_status: DONE
-aviona_v3_phase: AV3-4
+aviona_v3_phase: AV3-5
 aviona_v3_status: NOT_STARTED
 pre_v2_tag: pre-v2
 pre_v2_baseline_version: "0.2.6"
@@ -410,7 +410,7 @@ aviona_v3_phases:
   AV3-1: { status: DONE, commit: "e0b196a", gate: "pytest tests/unit/test_aviona_consumes_framework_turn_type.py tests/unit/test_aviona_contract_matrix.py", notes: "5/5 + 20/20 matrix pass. Deleted infer_interactive_max_steps; budgets from load_interactive_budgets; run_turn drops max_steps kwarg." }
   AV3-2: { status: DONE, commit: "b954b85", gate: "pytest tests/unit/test_aviona_permission_ux.py", notes: "6/6 UX + permissions/cli pass. Mode banner; default [y/N] for side-effect shell; inspect-run no prompt; --yes/non-tty → auto." }
   AV3-3: { status: DONE, commit: "34895e4", gate: "scripts/test-aviona.ps1 -Live", notes: "Expanded live_gate.py to 17 cases; must_contain_any + _budget() + retry; test_live_gate_matrix.py 3/3 pass." }
-  AV3-4: { status: PENDING, gate: "pytest tests/e2e/test_aviona_repl_matrix.py -m e2e", notes: "E2E REPL matrix from PROBLEM_INVENTORY." }
+  AV3-4: { status: DONE, commit: "pending", gate: "pytest tests/e2e/test_aviona_repl_matrix.py --collect-only", notes: "17 parametrized e2e tests; --debug trace on failure; test-aviona.ps1 -Live invokes -m e2e run." }
   AV3-5: { status: PENDING, gate: "aviona --version == 0.4.0 && scripts/test-aviona.ps1", notes: "Docs + CHANGELOG 0.4.0; JOURNEYS L3 table update." }
 ```
 

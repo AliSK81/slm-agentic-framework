@@ -9,10 +9,10 @@
 ## CURRENT STATE
 
 ```yaml
-current_phase: framework-interactive-4
-phase_status: IN_PROGRESS
-last_updated: "2026-05-21T22:00Z"
-last_commit: "7245765"
+current_phase: framework-interactive-5
+phase_status: NOT_STARTED
+last_updated: "2026-05-21T23:00Z"
+last_commit: "FI4_PLACEHOLDER"
 blocker: null
 active_roadmap: ROADMAP_FRAMEWORK_INTERACTIVE.md
 thesis_track: paused_at_phase_39
@@ -393,7 +393,7 @@ framework_interactive_phases:
   FI-1: { status: DONE, commit: "a63cdcd", gate: "pytest tests/unit/test_interactive_turn_type_binding.py", notes: "8/8 unit pass. InteractiveTurnState + models.yaml budgets; cycle-1 turn_type_required self_check; session binds budget/read_only; Aviona no longer passes infer_interactive_max_steps." }
   FI-2: { status: DONE, commit: "5feca84", gate: "pytest tests/unit/test_working_memory_contains_tool_output.py", notes: "3/3 unit pass. ToolResultEntry + [TOOL RESULTS]/[RECENT TURNS] in WM; interactive path uses cycle_last_error not reflection_guidance." }
   FI-3: { status: DONE, commit: "7245765", gate: "pytest tests/unit/test_icp_terminate_after_tool.py tests/unit/test_list_dir_repeat_blocked_then_terminate.py", notes: "3/3 ICP unit + 7/7 integration pass. ICP state in interactive.py; repeat_tool/must_terminate self_check; synthesis removed from interactive completion path." }
-  FI-4: { status: NOT_STARTED, gate: "pytest tests/unit/test_interactive_finalizer.py", notes: "Finalizer Decision Cycle (terminate only) or honest unresolvable; fix outcome contract." }
+  FI-4: { status: DONE, commit: "FI4_PLACEHOLDER", gate: "pytest tests/unit/test_finalizer_forces_terminate.py", notes: "4/4 unit pass. finalizer:on terminate-only cycle from [TOOL RESULTS]; finalizer:off honest unresolvable; user_message only from terminate; deleted synthesis." }
   FI-5: { status: NOT_STARTED, gate: "pytest tests/unit/test_interactive_handoff.py", notes: "Compound turns via typed handoff (needs_edit, needs_run, needs_plan)." }
   FI-6: { status: NOT_STARTED, gate: "pytest tests/unit/test_inspect_run_policy.py tests/unit/test_executor_tool_parity.py", notes: "Inspect-run permission policy; glob/search tool parity." }
   FI-7: { status: NOT_STARTED, gate: "pytest tests/unit/test_interactive_failure_modes.py", notes: "Mock SLM failure-mode suite mapping PROBLEM_INVENTORY rows; no live API." }

@@ -17,8 +17,8 @@ def test_resolve_profile_name_uses_yaml_defaults(monkeypatch: pytest.MonkeyPatch
     monkeypatch.delenv("PLANNER_MODEL", raising=False)
     monkeypatch.delenv("EXECUTOR_PROFILE", raising=False)
     monkeypatch.delenv("EXECUTOR_MODEL", raising=False)
-    assert resolve_profile_name("planner") == "ollama-gpt-oss-20b"
-    assert resolve_profile_name("executor") == "ollama-qwen3-4b-instruct"
+    assert resolve_profile_name("planner") == "ollama-qwen3-4b-instruct"
+    assert resolve_profile_name("executor") == "ollama-gpt-oss-20b"
 
 
 def test_resolve_profile_name_from_env_profile(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -36,7 +36,7 @@ def test_client_for_role_returns_client_with_matching_profile(
     monkeypatch.delenv("EXECUTOR_PROFILE", raising=False)
     monkeypatch.delenv("EXECUTOR_MODEL", raising=False)
     client = client_for_role("executor")
-    assert client.profile.model_id == "qwen3:4b-instruct"
+    assert client.profile.model_id == "gpt-oss:20b"
     client.close()
 
 

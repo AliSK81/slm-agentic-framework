@@ -39,8 +39,8 @@ providers:
 
 # Role → profile key (override with PLANNER_PROFILE / EXECUTOR_PROFILE in .env)
 defaults:
-  planner: ollama-gpt-oss-20b
-  executor: ollama-qwen3-4b-instruct
+  planner: ollama-qwen3-4b-instruct
+  executor: ollama-gpt-oss-20b
 
 # Named bundles — set PLANNER_PROFILE=slm_small and EXECUTOR_PROFILE=slm_small (or use --bundle)
 bundles:
@@ -239,4 +239,24 @@ profiles:
       planner: 120
       executor: 150
       tool_call: 60
+    tool_call_format: json
+
+  ollama-qwen2.5-coder-3b:
+    model_id: qwen2.5-coder:3b
+    provider: ollama
+    context_limit: 32768
+    effective_context: 8000
+    thinking_budget: null
+    api_thinking: false
+    max_working_memory_tokens: 400
+    tool_output_caps:
+      pytest_run: 3000
+      py_compile: 1200
+      read_file: 6000
+      search_codebase: 1200
+    skill_budget_tokens: 100
+    timeout_by_role:
+      planner: 90
+      executor: 120
+      tool_call: 45
     tool_call_format: json

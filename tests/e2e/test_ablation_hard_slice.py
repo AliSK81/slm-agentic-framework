@@ -20,7 +20,6 @@ def test_ablation_d_geq_a_on_hard_slice(require_api_key: str) -> None:
         n=HARD_SLICE_N,
         seeds=[HARD_SLICE_SEED],
         dry_run=False,
-        profile_bundle="deepseek",
     )
     row_a = result.configs.get("A")
     row_d = result.configs.get("D")

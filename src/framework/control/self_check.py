@@ -12,7 +12,11 @@ from framework.control.interactive import (
     icp_issues,
     turn_type_from_payload,
 )
-from framework.control.models import parse_terminate_payload
+from framework.control.models import (
+    handoff_reason,
+    parse_handoff_payload,
+    parse_terminate_payload,
+)
 from framework.memory.stores import DecisionEntry, Issue, MemoryStores, SelfCheckRecord
 
 logger = logging.getLogger(__name__)
@@ -157,6 +161,20 @@ def _finalizer_only_issues(
     ]
 
 
+def _handoff_payload_issues(proposal: DecisionEntry) -> list[Issue]:
+    """Require typed handoff reason (needs_edit | needs_run | needs_plan)."""
+    if proposal.kind != "handoff":
+        return []
+    if handoff_reason(proposal) is not None:
+        return []
+    return [
+        Issue(
+            kind="schema_violation",
+            detail="handoff payload.reason must be needs_edit, needs_run, or needs_plan",
+        )
+    ]
+
+
 def _terminate_payload_issues(proposal: DecisionEntry) -> list[Issue]:
     """Validate typed terminate payload when kind is terminate."""
     if proposal.kind != "terminate":
@@ -190,6 +208,7 @@ def self_check(
     issues.extend(_turn_type_required_issues(proposal, require_turn_type=require_turn_type))
     issues.extend(icp_issues(proposal, icp))
     issues.extend(_finalizer_only_issues(proposal, finalizer_only=finalizer_only))
+    issues.extend(_handoff_payload_issues(proposal))
     issues.extend(_terminate_payload_issues(proposal))
 
     if issues:

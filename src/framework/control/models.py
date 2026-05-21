@@ -59,17 +59,55 @@ def user_message_from_payload(
     return fallback_rationale.strip()
 
 
-NEEDS_PLAN_REASON = "needs_plan"
+HandoffReason = Literal["needs_edit", "needs_run", "needs_plan"]
+NEEDS_PLAN_REASON: HandoffReason = "needs_plan"
+NEEDS_EDIT_REASON: HandoffReason = "needs_edit"
+NEEDS_RUN_REASON: HandoffReason = "needs_run"
+_VALID_HANDOFF_REASONS = frozenset({"needs_edit", "needs_run", "needs_plan"})
+
+
+class HandoffPayload(BaseModel):
+    """Typed payload for ``kind=handoff`` (compound-turn phase promotion)."""
+
+    reason: HandoffReason
+
+
+def parse_handoff_payload(payload: dict[str, Any] | None) -> HandoffPayload | None:
+    """Validate handoff payload; return None when reason is missing or invalid."""
+    if not payload:
+        return None
+    raw = str(payload.get("reason", "")).strip().lower()
+    if raw not in _VALID_HANDOFF_REASONS:
+        return None
+    try:
+        return HandoffPayload(reason=raw)  # type: ignore[arg-type]
+    except ValidationError:
+        return None
+
+
+def handoff_reason(decision: DecisionEntry | None) -> HandoffReason | None:
+    """Return typed handoff reason from a decision, if present."""
+    if decision is None or decision.kind != "handoff":
+        return None
+    parsed = parse_handoff_payload(decision.payload)
+    if parsed is not None:
+        return parsed.reason
+    return None
 
 
 def is_needs_plan_handoff(decision: DecisionEntry | None) -> bool:
     """Return True when an executor handoff requests full planner promotion."""
-    if decision is None or decision.kind != "handoff":
-        return False
-    reason = str(decision.payload.get("reason", "")).strip().lower()
-    if reason == NEEDS_PLAN_REASON:
-        return True
-    return decision.rationale.strip().lower() == NEEDS_PLAN_REASON
+    return handoff_reason(decision) == NEEDS_PLAN_REASON
+
+
+def is_needs_edit_handoff(decision: DecisionEntry | None) -> bool:
+    """Return True when handoff requests promotion to the edit phase."""
+    return handoff_reason(decision) == NEEDS_EDIT_REASON
+
+
+def is_needs_run_handoff(decision: DecisionEntry | None) -> bool:
+    """Return True when handoff requests promotion to the run/verify phase."""
+    return handoff_reason(decision) == NEEDS_RUN_REASON
 
 
 class SLMProposal(BaseModel):

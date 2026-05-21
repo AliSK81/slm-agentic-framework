@@ -18,7 +18,13 @@ from pydantic import BaseModel
 from framework.env import load_project_env
 
 from framework.control.cycle import DecisionCycle
-from framework.control.models import ErrorControlBundle, is_needs_plan_handoff, parse_terminate_payload
+from framework.control.models import (
+    ErrorControlBundle,
+    is_needs_edit_handoff,
+    is_needs_plan_handoff,
+    is_needs_run_handoff,
+    parse_terminate_payload,
+)
 from framework.orchestration.messages import DispatchMessage, save_dispatch
 from framework.control.ledger import build_progress_ledger
 from framework.control.workflow import (
@@ -36,11 +42,15 @@ from framework.memory.reflection import _reflection_config, write_reflection
 from framework.memory.stores import DecisionEntry, MemoryStores, StateEntry, SubTask
 from framework.control.interactive import (
     InteractiveCompletionState,
+    apply_compound_phase_promotion,
+    bind_interactive_turn,
+    compound_phase_for_turn_type,
     icp_after_successful_edit,
     icp_after_successful_tool,
     icp_initial_state,
     load_interactive_finalizer_enabled,
     tool_path_key,
+    turn_type_from_payload,
 )
 from framework.memory.tool_results import append_tool_result
 from framework.memory.working_memory import WorkingMemoryBuilder
@@ -570,6 +580,10 @@ def _interactive_initial_state(
         "interactive_turn_bound": False,
         "interactive_turn_state": turn_state.model_dump(),
         "icp_state": icp_initial_state().model_dump(),
+        "compound_phase": "inspect",
+        "phase_billable": 0,
+        "phase_cycles": {},
+        "verify_ran": False,
     }
 
 
@@ -583,23 +597,46 @@ def _apply_interactive_turn_binding(
         return True
     if decision is None:
         return False
-    from framework.control.interactive import bind_interactive_turn, turn_type_from_payload
-
     turn_type = turn_type_from_payload(decision.payload)
     if turn_type is None:
         return False
     bound = bind_interactive_turn(turn_type)
     state["interactive_turn_bound"] = True
     state["interactive_turn_state"] = bound.model_dump()
+    state["compound_phase"] = compound_phase_for_turn_type(turn_type)
+    state["phase_billable"] = 0
+    state["phase_cycles"] = {}
     state["max_steps"] = bound.max_steps
     executor.interactive_read_only = bound.read_only
     logger.debug(
-        "[INTERACTIVE] bound turn_type=%s max_steps=%d read_only=%s",
+        "[INTERACTIVE] bound turn_type=%s phase=%s max_steps=%d read_only=%s",
         turn_type,
+        state["compound_phase"],
         bound.max_steps,
         bound.read_only,
     )
     return True
+
+
+def _total_interactive_steps(state: WorkflowState) -> int:
+    """Sum of billable cycles across all compound phases in this turn."""
+    cycles = state.get("phase_cycles") or {}
+    total = sum(int(v) for v in cycles.values())
+    return total + int(state.get("phase_billable", 0))
+
+
+def _promote_handoff_phase(
+    state: WorkflowState,
+    executor: ExecutorAgent,
+    *,
+    target: str,
+    read_only: bool,
+) -> None:
+    """Apply typed handoff promotion with a fresh per-phase budget."""
+    apply_compound_phase_promotion(state, target=target)  # type: ignore[arg-type]
+    executor.interactive_read_only = read_only
+    if target == "edit":
+        state["interactive_turn_state"] = bind_interactive_turn("edit").model_dump()
 
 
 def _abandon_open_executor_subtasks(memory: MemoryStores, session_id: str) -> None:
@@ -659,7 +696,11 @@ def _read_only_invalid_decision(decision: DecisionEntry) -> bool:
             return turn_type not in ("edit", "build")
         return tool not in _READ_TOOLS
     if decision.kind == "handoff":
-        return True
+        return not (
+            is_needs_edit_handoff(decision)
+            or is_needs_run_handoff(decision)
+            or is_needs_plan_handoff(decision)
+        )
     return False
 
 
@@ -684,19 +725,20 @@ def _run_interactive_executor_turn(
     )
     state["decision_floor"] = len(memory.decisions.list_for_session(session_id))
     state["code_edits_done"] = []
-    billable_cycles = 0
     attempts = 0
     interactive_read_only = bool(executor.interactive_read_only)
     max_steps = int(state["max_steps"])
     max_attempts = max_steps + max_retries + 2
     decision: DecisionEntry | None = None
-    while billable_cycles < max_steps and attempts < max_attempts:
+    while int(state.get("phase_billable", 0)) < max_steps and attempts < max_attempts:
         attempts += 1
+        phase_billable = int(state.get("phase_billable", 0))
         before_count = len(memory.decisions.list_for_session(session_id))
         logger.debug(
-            "[INTERACTIVE] attempt=%d billable=%d max_steps=%d goal=%r",
+            "[INTERACTIVE] attempt=%d phase=%s phase_billable=%d max_steps=%d goal=%r",
             attempts,
-            billable_cycles,
+            state.get("compound_phase"),
+            phase_billable,
             max_steps,
             goal,
         )
@@ -729,13 +771,16 @@ def _run_interactive_executor_turn(
         if decision is not None and decision.kind == "terminate":
             parsed = parse_terminate_payload(decision.payload)
             user_msg = parsed.user_message
+            state["phase_billable"] = phase_billable + 1
             logger.debug(
-                "[INTERACTIVE] terminate turn_type=%s user_message_len=%d billable=%d",
+                "[INTERACTIVE] terminate turn_type=%s user_message_len=%d steps=%d",
                 parsed.turn_type,
                 len(user_msg),
-                billable_cycles + 1,
+                _total_interactive_steps(state),
             )
-            outcome = SessionOutcome(session_id=session_id, step_count=billable_cycles + 1)
+            outcome = SessionOutcome(
+                session_id=session_id, step_count=_total_interactive_steps(state)
+            )
             outcome.user_message = user_msg
             if parsed.turn_type in ("edit", "build"):
                 evaluation = verifier.evaluate(workspace).as_dict()
@@ -746,22 +791,29 @@ def _run_interactive_executor_turn(
             return outcome
 
         if decision is not None and is_needs_plan_handoff(decision):
-            if not _goal_invites_build_promotion(goal):
-                logger.debug(
-                    "[INTERACTIVE] reject_handoff attempt=%d reason=needs_plan_not_build",
-                    attempts,
-                )
-                state["retry_count"] = int(state.get("retry_count", 0)) + 1
-                state["cycle_last_error"] = (
-                    "handoff needs_plan is only for multi-file build tasks. "
-                    "Use terminate{user_message, turn_type:answer|inspect|edit} "
-                    "for this goal."
-                )
-                continue
-            outcome = SessionOutcome(session_id=session_id, step_count=billable_cycles + 1)
+            state["phase_billable"] = phase_billable + 1
+            outcome = SessionOutcome(
+                session_id=session_id, step_count=_total_interactive_steps(state)
+            )
             outcome.final_state = _INTERACTIVE_NEEDS_PLAN
             outcome.decision_count = len(memory.decisions.list_for_session(session_id))
             return outcome
+
+        if decision is not None and is_needs_edit_handoff(decision):
+            logger.debug("[INTERACTIVE] handoff_promote needs_edit attempt=%d", attempts)
+            _promote_handoff_phase(state, executor, target="edit", read_only=False)
+            interactive_read_only = False
+            max_steps = int(state["max_steps"])
+            max_attempts = max(max_steps + max_retries + 2, attempts + 1)
+            continue
+
+        if decision is not None and is_needs_run_handoff(decision):
+            logger.debug("[INTERACTIVE] handoff_promote needs_run attempt=%d", attempts)
+            _promote_handoff_phase(state, executor, target="run", read_only=True)
+            interactive_read_only = True
+            max_steps = int(state["max_steps"])
+            max_attempts = max(max_steps + max_retries + 2, attempts + 1)
+            continue
 
         if (
             interactive_read_only
@@ -772,9 +824,9 @@ def _run_interactive_executor_turn(
                 "[INTERACTIVE] read_only_reject kind=%s turn_type=%s billable=%d",
                 decision.kind,
                 (decision.payload or {}).get("turn_type"),
-                billable_cycles + 1,
+                phase_billable + 1,
             )
-            billable_cycles += 1
+            state["phase_billable"] = phase_billable + 1
             state["retry_count"] = int(state.get("retry_count", 0)) + 1
             if decision.kind == "code_edit":
                 state["cycle_last_error"] = (
@@ -783,8 +835,7 @@ def _run_interactive_executor_turn(
                 )
             elif decision.kind == "handoff":
                 state["cycle_last_error"] = (
-                    "handoff needs_plan is only for multi-file build tasks. "
-                    "Use code_edit with turn_type:edit for file creation."
+                    "handoff reason must be needs_edit, needs_run, or needs_plan."
                 )
             else:
                 state["cycle_last_error"] = (
@@ -794,7 +845,7 @@ def _run_interactive_executor_turn(
             continue
 
         if decision is None:
-            if billable_cycles < max_steps:
+            if phase_billable < max_steps:
                 state["retry_count"] = int(state.get("retry_count", 0)) + 1
                 state["cycle_last_error"] = (
                     "respond with a valid JSON terminate decision including "
@@ -807,7 +858,9 @@ def _run_interactive_executor_turn(
             payload = decision.payload or {}
             tool = _resolve_tool_name(payload)
             read_key = tool_path_key(tool, payload)
-            billable_cycles += 1
+            state["phase_billable"] = phase_billable + 1
+            if tool in ("pytest", "py_compile", "py_compile_check"):
+                state["verify_ran"] = True
             tool_result = executor.last_tool_result
             turn_floor = int(state.get("decision_floor", 0))
             result_path = read_key or str(
@@ -854,7 +907,7 @@ def _run_interactive_executor_turn(
             continue
 
         if decision.kind == "code_edit":
-            billable_cycles += 1
+            state["phase_billable"] = phase_billable + 1
             payload = decision.payload or {}
             turn_type = str(payload.get("turn_type", "")).lower()
             file_path = str(payload.get("file_path") or "")
@@ -886,10 +939,12 @@ def _run_interactive_executor_turn(
                 state["cycle_last_error"] = None
             continue
 
-        billable_cycles += 1
+        state["phase_billable"] = phase_billable + 1
         break
 
-    outcome = SessionOutcome(session_id=session_id, step_count=billable_cycles)
+    outcome = SessionOutcome(
+        session_id=session_id, step_count=_total_interactive_steps(state)
+    )
     evaluation = verifier.evaluate(workspace).as_dict()
     outcome.test_passed = bool(evaluation.get("passed"))
     floor = int(state.get("decision_floor", 0))

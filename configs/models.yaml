@@ -8,6 +8,7 @@ interactive:
     answer: 1
     inspect: 4
     edit: 6
+    run: 4
     build: 15
 
 # OpenAI-compatible endpoints — add any provider here; no code changes required

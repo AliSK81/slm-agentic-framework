@@ -45,9 +45,10 @@ _TERMINATE_PAYLOAD_HINT = (
 )
 
 _HANDOFF_PAYLOAD_HINT = (
-    'For handoff requesting full planning use payload {"reason":"needs_plan"} '
-    "only for multi-file build tasks — never for greetings, meta/self questions, "
-    "read-only inspect, or single-file edits. Use terminate instead."
+    'For handoff use payload {"reason":"needs_edit"|"needs_run"|"needs_plan"} only. '
+    "needs_edit: promote to write phase after inspect reads. "
+    "needs_run: promote to run/verify phase (pytest) after edits. "
+    "needs_plan: multi-file build → full planner. Otherwise use terminate."
 )
 
 _TURN_TYPE_DECLARE_HINT = (

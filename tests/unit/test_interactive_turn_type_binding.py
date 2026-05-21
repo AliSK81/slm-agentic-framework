@@ -87,7 +87,7 @@ def test_load_interactive_budgets_from_models_yaml() -> None:
     """Framework budget map matches ROADMAP FI-1 defaults."""
     clear_interactive_config_cache()
     budgets = load_interactive_budgets()
-    assert budgets == {"answer": 1, "inspect": 4, "edit": 6, "build": 15}
+    assert budgets == {"answer": 1, "inspect": 4, "edit": 6, "run": 4, "build": 15}
 
 
 def test_bind_inspect_sets_budget_four_and_read_only() -> None:

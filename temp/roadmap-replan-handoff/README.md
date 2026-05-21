@@ -1,6 +1,9 @@
 # Roadmap Replan Handoff Pack
 
-**Purpose:** Give Claude (or another planner) enough evidence to **replan the thesis framework roadmap** and a **minimal Aviona follow-on track** — without repeating hardcoded/boilerplate fixes.
+**Status:** Replan **complete** (2026-05-21). Outputs merged to repo root:
+`ROADMAP_FRAMEWORK_INTERACTIVE.md`, `ROADMAP_AVIONA_V3.md`, and `PROGRESS.md` (FI track active).
+
+**Purpose:** Archive of evidence used to replan the thesis framework roadmap and Aviona v3 follow-on track.
 
 **Generated:** 2026-05-21  
 **Repo:** `D:/thesis/agentic-ai`  

@@ -50,13 +50,13 @@ Locked by `scripts/live_gate.py` via `scripts/test-aviona.ps1 -Live`. Requires A
 |----|--------|-----------|--------------|----------|--------|
 | local-hi | `hi` | local | greeting | agent steps | 0 |
 | local-ok | `ok` | local | acknowledgment | edit `notes.txt` | 0 |
-| answer-model | `what is your model?` | answer | provider + model from anchor | edits | ≤1 step |
-| answer-language-model | `what language model?` | answer | model id | project overview | ≤1 step |
-| answer-salam | `try to fastly reply with "salam"` | answer | `salam` | vacuous ok | ≤1 step |
-| inspect-hello-content | `what is content of hello file?` | inspect | `hi` | edits | ≤3 steps |
-| inspect-project | `what is this project` | inspect | README summary | vacuous meta | ≤3 steps |
-| inspect-list-files | `list files in this dir` | inspect | file names | edits | ≤3 steps |
-| edit-create-foo | `create foo.txt with "x"` | edit | confirmation + file | — | ≤6 steps |
+| answer-model | `what is your model?` | local | provider + model from anchor | edits | 0 |
+| answer-language-model | `what language model?` | local | model id | project overview | 0 |
+| answer-salam | `try to fastly reply with "salam"` | local | `salam` | vacuous ok | 0 |
+| inspect-hello-content | `what is content of hello file?` | local | `hi` | edits | 0 |
+| inspect-project | `what is this project` | local | README summary | vacuous meta | 0 |
+| inspect-list-files | `list files in this dir` | local | file names | edits | 0 |
+| edit-create-foo | `create foo.txt with "x"` | local | confirmation + file | — | 0 |
 
 ## QA layers
 

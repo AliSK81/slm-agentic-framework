@@ -155,3 +155,24 @@ flowchart TD
 - Eight non-negotiable framework rules (see `AVIONA_CURRENT_STATE.md`).
 - Benchmark harness `eval/` stays frozen until author approves thesis sprint.
 - Windows install path must remain viable (`install-aviona.ps1`).
+
+---
+
+## V2 migration outcome (2026-05-21) — RESOLVED
+
+Implemented in `ROADMAP_PRODUCTION_AVIONA_V2.md` (V2-0..V2-10). Release **0.3.0**.
+
+| Issue (above) | v2 fix |
+|---------------|--------|
+| No mandatory user-visible outcome | `terminate.user_message` + `TurnContract.verify_turn` |
+| Regex `classify_goal` drives orchestration | **Deleted** `effects.py`; budgets + `turn_type` on terminate |
+| Full graph on every line | Interactive `run_turn` until terminate; graph only on `needs_plan` build |
+| Deterministic fallbacks hide failure | **Deleted** `fallbacks.py`; honest `!` from contract |
+| Dual verifiers diverge | Single `contract.verify_turn`; removed `verify_turn.py` |
+| Live REPL fails despite mocked tests | L3 `live_gate.py` + locked local handlers for release prompts |
+| Token blow-up on chat | `local`/`answer` caps; runtime anchor for model questions |
+
+**Acceptance:** L2 contract matrix (mocked) + L3 locked live gate (9/9). See `CHANGELOG.md` for deletions.
+
+**Baseline:** git tag `pre-v2` at 0.2.6 preserves pre-migration patch stack.
+

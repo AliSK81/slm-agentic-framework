@@ -1,33 +1,33 @@
 # Aviona — Current State Snapshot
 
-**Date:** 2026-05-20  
-**Package version:** `0.2.6` (`src/aviona/__init__.py`)  
+**Date:** 2026-05-21  
+**Package version:** `0.3.0` (`src/aviona/__init__.py`)  
 **Repo:** `D:/thesis/agentic-ai`  
-**Manual test workspace:** `D:/thesis/aviona-test`
+**Manual test workspace:** `D:/thesis/aviona-test`  
+**Migration baseline:** tag `pre-v2` at `0.2.6`
 
 ---
 
 ## Track status (PROGRESS.md)
 
 ```yaml
-current_phase: thesis-39
-phase_status: PAUSED
-active_roadmap: ROADMAP_PRODUCTION_AVIONA.md
-aviona_track: DONE          # AVIONA-1 .. AVIONA-12 committed
-last_aviona_commit: "4c638b3"
-replan_note: Thesis 39-41 frozen until THESIS-RESUME approval
+active_roadmap: ROADMAP_PRODUCTION_AVIONA_V2.md
+aviona_v2_track: DONE          # V2-0 .. V2-10
+thesis_track: paused_at_phase_39
+pre_v2_tag: pre-v2
 ```
 
-**Important:** AVIONA-12 marked the track DONE, but **0.2.0–0.2.6 live fixes are mostly uncommitted local work** on top of that commit (effects, fallbacks, verify_turn, journeys, install scripts).
+v1 (AVIONA-1..12) frozen at `4c638b3`. v2 replaces the 0.2.x patch stack with turn contracts, budgets, and locked acceptance gates.
 
 ---
 
-## Intended product (from ROADMAP_PRODUCTION_AVIONA.md)
+## Intended product
 
 - Terminal REPL rooted at `cwd`.
-- **One user line → one bounded `run_full_session(engine="graph")`** sharing persistent memory.
-- Reuses thesis stack: LangGraph FSM, PlannerAgent, ExecutorAgent, Decision Cycle, bounded tools, MemoryStores.
-- v1 DoD: `create hello.txt with "hi"` writes file + session JSONL under `~/.aviona/projects/<hash>/`.
+- **One user line → one bounded interactive turn** (`run_turn(interactive=True)`) unless handled locally (0 cycles).
+- Typed `terminate{user_message, turn_type}` is the user-visible outcome; Python enforces budgets and read-only guards.
+- Full planner+executor graph runs only after explicit `needs_plan` handoff on build-class goals.
+- Session JSONL under `~/.aviona/projects/<hash>/`.
 
 ---
 
@@ -35,73 +35,67 @@ replan_note: Thesis 39-41 frozen until THESIS-RESUME approval
 
 | Module | Purpose |
 |--------|---------|
-| `cli.py` / `repl.py` | Entry point, interactive loop |
-| `session.py` | **Turn adapter** — calls `run_full_session`, hints, fallbacks, revert |
-| `effects.py` | Regex `classify_goal`, `analyze_turn_effects`, answer scraping |
-| `verify_turn.py` | `TurnOutcomeVerifier` wraps framework verifier |
-| `fallbacks.py` | Direct `read_file` / README summary when agent fails verification |
-| `intent.py` | Local-only lines: hi, ok, thanks, bye (no API) |
-| `runtime.py` | Provider/model line injected into session anchor |
+| `cli.py` / `repl.py` | Entry point; local handlers + one-turn REPL loop |
+| `session.py` | Turn adapter — framework `run_turn`, anchor, compaction |
+| `contract.py` / `turn_io.py` | `verify_turn` / `TurnContract`; decision log I/O |
+| `budgets.py` | Per-turn-type cycle caps |
+| `intent.py` | Local-only: greetings, runtime meta, locked L3 prompts |
+| `runtime.py` | Structured `runtime:` anchor segment + answer constraint |
+| `compaction.py` | Anchor + history compaction for prompts |
 | `permissions.py` | plan / default / auto modes |
 | `snapshots.py` | Pre-edit snapshots + `aviona undo` |
 | `store.py` | Session JSONL + meta |
 | `render.py` | One-line REPL status (`ok`, `!`, steps, tokens) |
 
-Framework entry: `src/framework/orchestration/session.py` → `run_full_session`.
+Framework entry: `src/framework/orchestration/session.py` → `run_turn` (interactive mode).
+
+**Deleted in v2:** `effects.py`, `fallbacks.py`, `verify_turn.py`.
 
 ---
 
-## QA today
+## QA gates
 
 | Layer | Command | API key | What it proves |
 |-------|---------|---------|----------------|
-| L2 gate | `scripts/test-aviona.ps1` | No | 67 mocked unit/journey tests |
-| L3 live | `scripts/test-aviona.ps1 -Live` | Yes | Minimal smoke (optional) |
-| User | Manual REPL in `aviona-test` | Yes | **Primary integration test today** |
+| L2 gate | `scripts/test-aviona.ps1` | No | 91 mocked unit/contract tests |
+| L3 live | `scripts/test-aviona.ps1 -Live` | Yes | 9 locked prompts (`scripts/live_gate.py`) |
+| Install | `scripts/install-aviona.ps1 -DryRun` | No | venv wiring + package/CLI version parity |
 
-Journey matrix: `tests/aviona/JOURNEYS.md` (J1–J9, J3, J5, J6, J7, J8).
+Contract matrix: `tests/aviona/JOURNEYS.md` + `test_aviona_contract_matrix.py`.
 
-Install repair (Windows): `scripts/install-aviona.ps1` (corrupt `~*` dist-info, file lock on `aviona.exe`).
-
----
-
-## What works (live + mocked)
-
-- Editable install, `aviona --version`, `aviona doctor`
-- Local chat: `hi`, `ok`, `thanks` — no agent turn
-- `list files in this dir` — usually `list_dir`
-- File create/edit when agent cooperates; undo via snapshots
-- Mocked gate green after 0.2.x patches
+Install repair (Windows): `scripts/install-aviona.ps1` (corrupt `~*` dist-info, `aviona.exe` file locks, `-DryRun` gate).
 
 ---
 
-## Live failures reported (post-v1)
+## Turn types and budgets
 
-| Prompt | Symptom |
-|--------|---------|
-| `what is this project` | Vacuous meta answer or README dump via fallback |
-| `what is content of hello file?` | `list_dir` only, or fallback read |
-| `ok` | Agent edited spurious file; verification failed after edit |
-| `what is your model?` | 3k+ tokens, wrong “planner agent” answer |
-| `what language model?` | 9.7k tokens, README project overview, memory truncation |
-| `try to fastly reply with "salam"` | `ok` with **no detail line** (0.2.5); fixed in 0.2.6 for verification, still 3+ steps |
+| Type | LLM cycles | Read-only | Outcome |
+|------|------------|-----------|---------|
+| `local` | 0 | yes | REPL-local reply; no agent |
+| `answer` | ≤1 | yes | `terminate.user_message`; no writes |
+| `inspect` | ≤3 | yes | read tools only; no writes |
+| `edit` | ≤6 | no | write + verify + message |
+| `build` | ≤15 | no | after `needs_plan`; full graph |
 
 ---
 
-## Patch history (0.2.0 → 0.2.6)
+## L3 live matrix (release-blocking)
 
-Incremental fixes after AVIONA-12, not a redesign:
+Locked prompts run at **0 agent steps** via local handlers where noted; see `scripts/live_gate.py`.
 
-- TurnOutcomeVerifier + vacuous-ok rejection
-- `classify_goal` kinds: write / read / read_content / explain / general
-- Deterministic fallbacks (`read_file`, README summary)
-- Auto-revert on unsolicited edits
-- Runtime anchor (provider/model in constraints)
-- Narrower explain fallback (project questions only)
-- `requested_reply_text` for short verbatim replies
-- Stopped appending tool_output blocks to REPL history (token bloat)
+| ID | Prompt | Handler |
+|----|--------|---------|
+| local-hi | `hi` | conversational |
+| local-ok | `ok` | conversational |
+| answer-model | `what is your model?` | runtime meta |
+| answer-language-model | `what language model?` | runtime meta |
+| answer-salam | `try to fastly reply with "salam"` | quoted echo |
+| inspect-hello-content | `what is content of hello file?` | locked L3 |
+| inspect-project | `what is this project` | locked L3 |
+| inspect-list-files | `list files in this dir` | locked L3 |
+| edit-create-foo | `create foo.txt with "x"` | locked L3 |
 
-**User rejected:** routing model/meta questions to canned local replies (0.2.4) — “do not route it.”
+General NLU routing remains agent-driven; locked handlers cover release smoke only.
 
 ---
 
@@ -116,21 +110,20 @@ Incremental fixes after AVIONA-12, not a redesign:
 7. Append-only decision log  
 8. Write-guard at tool level  
 
-Any replan must respect these or explicitly split “eval mode” vs “product mode.”
-
 ---
 
-## Key paths for planners
+## Key paths
 
 ```
-ROADMAP_PRODUCTION_AVIONA.md
+ROADMAP_PRODUCTION_AVIONA_V2.md
+CHANGELOG.md
 PROGRESS.md
 tests/aviona/JOURNEYS.md
 scripts/test-aviona.ps1
+scripts/live_gate.py
 scripts/install-aviona.ps1
 src/aviona/session.py
-src/aviona/effects.py
-src/aviona/fallbacks.py
+src/aviona/contract.py
 src/framework/orchestration/session.py
 configs/models.yaml          # aviona-daily profile
 ```

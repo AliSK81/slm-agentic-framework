@@ -1,6 +1,14 @@
 # Active provider when SLM_PROVIDER is unset (must match a key under providers)
 active_provider: deepseek
 
+# Interactive REPL cycle budgets (FI-1 single source of truth)
+interactive:
+  budgets:
+    answer: 1
+    inspect: 4
+    edit: 6
+    build: 15
+
 # OpenAI-compatible endpoints — add any provider here; no code changes required
 providers:
   openrouter:

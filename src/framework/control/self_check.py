@@ -7,6 +7,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from framework.control.interactive import turn_type_from_payload
 from framework.control.models import parse_terminate_payload
 from framework.memory.stores import DecisionEntry, Issue, MemoryStores, SelfCheckRecord
 
@@ -108,6 +109,32 @@ def _rationale_issues(proposal: DecisionEntry) -> list[Issue]:
     return []
 
 
+def _turn_type_required_issues(
+    proposal: DecisionEntry,
+    *,
+    require_turn_type: bool,
+) -> list[Issue]:
+    """Require payload.turn_type on the first interactive cycle-1 proposal."""
+    if not require_turn_type:
+        return []
+    if turn_type_from_payload(proposal.payload) is not None:
+        return []
+    raw = str((proposal.payload or {}).get("turn_type", "")).strip()
+    if not raw:
+        return [
+            Issue(
+                kind="turn_type_required",
+                detail="payload.turn_type is required on cycle 1 (answer|inspect|edit|build)",
+            )
+        ]
+    return [
+        Issue(
+            kind="turn_type_required",
+            detail=f"invalid turn_type: {raw!r} (use answer|inspect|edit|build)",
+        )
+    ]
+
+
 def _terminate_payload_issues(proposal: DecisionEntry) -> list[Issue]:
     """Validate typed terminate payload when kind is terminate."""
     if proposal.kind != "terminate":
@@ -125,6 +152,8 @@ def self_check(
     proposal: DecisionEntry,
     memory: MemoryStores,
     session_id: str,
+    *,
+    require_turn_type: bool = False,
 ) -> SelfCheckRecord:
     """Run schema, contradiction, scope, and rationale checks."""
     _ = session_id  # reserved for session-scoped rules in later phases
@@ -134,6 +163,7 @@ def self_check(
     issues.extend(_contradiction_issues(proposal, recent))
     issues.extend(_scope_issues(proposal))
     issues.extend(_rationale_issues(proposal))
+    issues.extend(_turn_type_required_issues(proposal, require_turn_type=require_turn_type))
     issues.extend(_terminate_payload_issues(proposal))
 
     if issues:

@@ -343,6 +343,9 @@ class ExecutorAgent:
             else:
                 last_error = evaluation.get("error_message") or evaluation.get("error")
 
+        require_turn_type = bool(
+            state.get("interactive_mode") and not state.get("interactive_turn_bound")
+        )
         result = self._cycle.run(
             session_id,
             "executor",
@@ -352,6 +355,7 @@ class ExecutorAgent:
             last_error=last_error,
             session_retry_count=int(state.get("retry_count", 0)),
             decision_floor=int(state.get("decision_floor", 0)),
+            require_turn_type=require_turn_type,
         )
 
         passed = False

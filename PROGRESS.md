@@ -9,7 +9,7 @@
 ## CURRENT STATE
 
 ```yaml
-current_phase: framework-interactive-1
+current_phase: framework-interactive-2
 phase_status: NOT_STARTED
 last_updated: "2026-05-21T18:00Z"
 last_commit: "81a43e7"
@@ -390,7 +390,7 @@ aviona_v2_phases:
 
 ```yaml
 framework_interactive_phases:
-  FI-1: { status: NOT_STARTED, gate: "pytest tests/unit/test_interactive_turn_type_binding.py", notes: "Agent declares turn_type on cycle 1; Python binds budget/permissions; delete Aviona infer_interactive_max_steps." }
+  FI-1: { status: DONE, gate: "pytest tests/unit/test_interactive_turn_type_binding.py", notes: "8/8 unit pass. InteractiveTurnState + models.yaml budgets; cycle-1 turn_type_required self_check; session binds budget/read_only; Aviona no longer passes infer_interactive_max_steps." }
   FI-2: { status: NOT_STARTED, gate: "pytest tests/unit/test_tool_result_channel.py", notes: "Typed ToolResultEntry in working memory; remove reflection_guidance string injection." }
   FI-3: { status: NOT_STARTED, gate: "pytest tests/unit/test_interactive_completion_protocol.py", notes: "ICP sub-state-machine; mandatory terminate after tools; repeat-tool dedup; delete default synthesis." }
   FI-4: { status: NOT_STARTED, gate: "pytest tests/unit/test_interactive_finalizer.py", notes: "Finalizer Decision Cycle (terminate only) or honest unresolvable; fix outcome contract." }

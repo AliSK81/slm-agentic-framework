@@ -21,7 +21,6 @@ from aviona.project import load_project_rules
 from aviona.render import render_status, render_turn_detail
 from aviona.runtime import (
     interactive_turn_contract_hint,
-    infer_interactive_max_steps,
     is_answer_only_goal,
     is_meta_question,
     runtime_anchor_segment,
@@ -187,8 +186,6 @@ class AvionaSession:
         before_files = snapshot_files(self.workspace)
         hard_constraints = self._build_turn_constraints(goal=goal, extra=constraints)
         effective = verifier or self._verifier
-        step_ceiling = infer_interactive_max_steps(goal)
-
         self.snapshots.begin_turn()
         try:
             session_outcome: SessionOutcome = framework_run_turn(
@@ -201,11 +198,9 @@ class AvionaSession:
                 ablation=AblationSettings(memory=True, control=True, error_control=True),
                 probe=False,
                 verifier=effective,
-                max_steps=step_ceiling,
                 permission_check=self._permission_check,
                 write_file_fn=self._write_file_fn,
                 edit_file_fn=self._edit_file_fn,
-                interactive_read_only=True,
                 build_max_steps=BUILD_CYCLE_CEILING,
             )
         finally:

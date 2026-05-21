@@ -10,6 +10,17 @@ from framework.memory.stores import DecisionEntry
 from framework.error_control.quality import QualityGate
 
 TurnType = Literal["answer", "inspect", "edit", "build"]
+InteractivePhase = Literal["declaring", "bound"]
+
+
+class InteractiveTurnState(BaseModel):
+    """Framework-owned interactive turn state (budget/permissions from declared turn_type)."""
+
+    declared_type: TurnType | None = None
+    phase: InteractivePhase = "declaring"
+    max_steps: int = 1
+    read_only: bool = True
+    bound: bool = False
 
 
 class TerminatePayload(BaseModel):

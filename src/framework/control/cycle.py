@@ -49,8 +49,19 @@ _HANDOFF_PAYLOAD_HINT = (
     "read-only inspect, or single-file edits. Use terminate instead."
 )
 
+_TURN_TYPE_DECLARE_HINT = (
+    "On cycle 1 include payload.turn_type (answer|inspect|edit|build) on every "
+    "proposal (terminate, tool_call, or code_edit). Python binds budget and "
+    "permissions from that declaration — never from goal text."
+)
 
-def _json_format_block(agent_role: str, *, include_example: bool = True) -> str:
+
+def _json_format_block(
+    agent_role: str,
+    *,
+    include_example: bool = True,
+    require_turn_type: bool = False,
+) -> str:
     """Append strict JSON instructions so SLMs emit parseable decisions.
 
     The full example block is omitted when ``include_example`` is False (compact
@@ -62,6 +73,8 @@ def _json_format_block(agent_role: str, *, include_example: bool = True) -> str:
         hints.append(_EXECUTOR_PAYLOAD_HINT)
         hints.append(_TERMINATE_PAYLOAD_HINT)
         hints.append(_HANDOFF_PAYLOAD_HINT)
+        if require_turn_type:
+            hints.append(_TURN_TYPE_DECLARE_HINT)
     elif agent_role == "planner":
         hints.append(_TERMINATE_PAYLOAD_HINT)
     hint = "\n" + "\n".join(hints) if hints else ""
@@ -184,6 +197,7 @@ class DecisionCycle:
         last_error: str | None = None,
         session_retry_count: int = 0,
         decision_floor: int = 0,
+        require_turn_type: bool = False,
     ) -> CycleResult:
         """Execute the full decision cycle; never raises on SLM failure."""
         limiter = StepBudgetLimiter(
@@ -211,7 +225,11 @@ class DecisionCycle:
             {
                 "role": "user",
                 "content": wm.to_prompt_prefix()
-                + _json_format_block(agent_role, include_example=True),
+                + _json_format_block(
+                    agent_role,
+                    include_example=True,
+                    require_turn_type=require_turn_type,
+                ),
             }
         ]
 
@@ -295,7 +313,12 @@ class DecisionCycle:
                 (parsed.payload or {}).get("turn_type"),
             )
             if self._ablation.control:
-                check = self_check(draft, self._memory, session_id)
+                check = self_check(
+                    draft,
+                    self._memory,
+                    session_id,
+                    require_turn_type=require_turn_type,
+                )
             else:
                 check = SelfCheckRecord(verdict="pass", issues=[])
             draft = draft.model_copy(update={"self_check": check})

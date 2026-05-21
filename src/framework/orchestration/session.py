@@ -559,10 +559,12 @@ def _interactive_initial_state(
     goal: str,
     constraints: list[str],
     *,
-    max_steps: int,
     max_retries: int,
 ) -> WorkflowState:
     """Build workflow state for a single executor-first interactive turn."""
+    from framework.control.interactive import declaring_interactive_turn_state
+
+    turn_state = declaring_interactive_turn_state()
     return {
         "session_id": session_id,
         "goal": goal,
@@ -572,12 +574,44 @@ def _interactive_initial_state(
         "step_count": 0,
         "retry_count": 0,
         "loop_count": 0,
-        "max_steps": max_steps,
+        "max_steps": turn_state.max_steps,
         "max_retries": max_retries,
         "last_evaluation": None,
         "reflection_guidance": None,
         "planned": True,
+        "interactive_mode": True,
+        "interactive_turn_bound": False,
+        "interactive_turn_state": turn_state.model_dump(),
     }
+
+
+def _apply_interactive_turn_binding(
+    state: WorkflowState,
+    decision: DecisionEntry | None,
+    executor: ExecutorAgent,
+) -> bool:
+    """Bind budget and read-only from cycle-1 declared turn_type; return True when bound."""
+    if state.get("interactive_turn_bound"):
+        return True
+    if decision is None:
+        return False
+    from framework.control.interactive import bind_interactive_turn, turn_type_from_payload
+
+    turn_type = turn_type_from_payload(decision.payload)
+    if turn_type is None:
+        return False
+    bound = bind_interactive_turn(turn_type)
+    state["interactive_turn_bound"] = True
+    state["interactive_turn_state"] = bound.model_dump()
+    state["max_steps"] = bound.max_steps
+    executor.interactive_read_only = bound.read_only
+    logger.debug(
+        "[INTERACTIVE] bound turn_type=%s max_steps=%d read_only=%s",
+        turn_type,
+        bound.max_steps,
+        bound.read_only,
+    )
+    return True
 
 
 def _abandon_open_executor_subtasks(memory: MemoryStores, session_id: str) -> None:
@@ -650,9 +684,7 @@ def _run_interactive_executor_turn(
     executor: ExecutorAgent,
     verifier: Verifier,
     session_id: str,
-    max_steps: int,
     max_retries: int,
-    interactive_read_only: bool = False,
 ) -> SessionOutcome:
     """Run executor cycles until terminate, needs_plan, or cycle budget exhausted."""
     _setup_interactive_dispatch(memory, session_id, goal, constraints)
@@ -660,7 +692,6 @@ def _run_interactive_executor_turn(
         session_id,
         _interactive_goal_text(goal, constraints),
         constraints,
-        max_steps=max_steps,
         max_retries=max_retries,
     )
     state["decision_floor"] = len(memory.decisions.list_for_session(session_id))
@@ -668,7 +699,9 @@ def _run_interactive_executor_turn(
     state["code_edits_done"] = []
     billable_cycles = 0
     attempts = 0
-    max_attempts = max_steps + (1 if interactive_read_only else max_retries)
+    interactive_read_only = bool(executor.interactive_read_only)
+    max_steps = int(state["max_steps"])
+    max_attempts = max_steps + max_retries + 2
     decision: DecisionEntry | None = None
     while billable_cycles < max_steps and attempts < max_attempts:
         attempts += 1
@@ -683,6 +716,10 @@ def _run_interactive_executor_turn(
         executor.execute_node(state)
         after_count = len(memory.decisions.list_for_session(session_id))
         decision = _last_executor_decision(memory, session_id)
+        if _apply_interactive_turn_binding(state, decision, executor):
+            interactive_read_only = bool(executor.interactive_read_only)
+            max_steps = int(state["max_steps"])
+            max_attempts = max(max_steps + max_retries + 2, attempts + 1)
         if after_count == before_count:
             logger.debug(
                 "[INTERACTIVE] no_decision_recorded attempt=%d guidance=terminate",
@@ -693,6 +730,13 @@ def _run_interactive_executor_turn(
                 "respond with a valid JSON terminate decision including "
                 "non-empty user_message and turn_type."
             )
+            if int(state.get("retry_count", 0)) > max_retries:
+                logger.debug(
+                    "[INTERACTIVE] executor_cycle_exhausted attempt=%d retries=%d",
+                    attempts,
+                    max_retries,
+                )
+                break
             continue
 
         if decision is not None and decision.kind == "terminate":
@@ -893,7 +937,7 @@ def run_turn(
     workspace: Path,
     *,
     memory: MemoryStores | None = None,
-    max_steps: int = 6,
+    max_steps: int | None = None,
     max_retries: int = 3,
     session_id: str | None = None,
     checkpoint_dir: Path | None = None,
@@ -905,14 +949,14 @@ def run_turn(
     write_file_fn: WriteFileFn | None = None,
     edit_file_fn: EditFileFn | None = None,
     effect_sink: list[str] | None = None,
-    interactive_read_only: bool = False,
+    interactive_read_only: bool = True,
     build_max_steps: int = 15,
 ) -> SessionOutcome:
     """Run one interactive turn: executor-first, optional planner promotion.
 
-    Defaults to a single executor Decision Cycle. Terminates immediately on
-    ``terminate{user_message}``. Promotes to the full planner graph when the
-    executor emits ``handoff{reason:"needs_plan"}`` (Python transition only).
+    Cycle-1 ``turn_type`` binds ``max_steps`` and read-only mode (FI-1); caller
+    ``max_steps`` is ignored. Terminates on ``terminate{user_message}``. Promotes
+    to the full planner graph when the executor emits ``handoff{reason:"needs_plan"}``.
     """
     if probe:
         validate_slm_api_key()
@@ -962,6 +1006,11 @@ def run_turn(
         )
     )
 
+    if max_steps is not None:
+        logger.debug(
+            "[INTERACTIVE] ignoring caller max_steps=%s; budget bound from turn_type",
+            max_steps,
+        )
     outcome = _run_interactive_executor_turn(
         goal=goal,
         constraints=constraints,
@@ -970,9 +1019,7 @@ def run_turn(
         executor=executor,
         verifier=effective_verifier,
         session_id=session_id,
-        max_steps=max_steps,
         max_retries=max_retries,
-        interactive_read_only=interactive_read_only,
     )
 
     if outcome.final_state == _INTERACTIVE_NEEDS_PLAN:

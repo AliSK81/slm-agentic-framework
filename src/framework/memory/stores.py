@@ -34,6 +34,7 @@ class Issue(BaseModel):
         "scope_violation",
         "empty",
         "loop",
+        "turn_type_required",
     ]
     detail: str
 

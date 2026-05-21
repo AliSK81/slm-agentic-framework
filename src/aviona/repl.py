@@ -8,7 +8,14 @@ from collections.abc import Callable, Iterator, Sequence
 
 from aviona.console import write_line
 from aviona.gitctx import format_git_summary
-from aviona.intent import conversational_reply, is_conversational
+from aviona.intent import (
+    conversational_reply,
+    is_conversational,
+    is_runtime_meta_question,
+    runtime_meta_reply,
+    try_locked_l3_reply,
+    try_quoted_local_reply,
+)
 from aviona.session import AvionaSession, TurnResult
 
 logger = logging.getLogger(__name__)
@@ -130,6 +137,20 @@ def run_repl(
         if line.startswith("/"):
             if _handle_meta(line, writer=write, session=session):
                 return 0
+            continue
+
+        quoted = try_quoted_local_reply(line)
+        if quoted is not None:
+            write(quoted)
+            continue
+
+        locked = try_locked_l3_reply(line, session.workspace)
+        if locked is not None:
+            write(locked)
+            continue
+
+        if is_runtime_meta_question(line):
+            write(runtime_meta_reply(session.workspace))
             continue
 
         if is_conversational(line):

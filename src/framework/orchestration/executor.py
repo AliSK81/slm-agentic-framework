@@ -39,12 +39,26 @@ def _payload_text(payload: dict) -> str:
     return ""
 
 
-def _resolve_file_path(payload: dict, default: str = "solution.py") -> str:
-    """Resolve target path from alternate SLM payload keys."""
-    for key in ("file_path", "filePath", "file", "path"):
+def _resolve_tool_name(payload: dict) -> str:
+    """Resolve tool name from alternate SLM payload keys."""
+    for key in ("tool", "name"):
         value = payload.get(key)
         if isinstance(value, str) and value.strip():
-            return value.strip()
+            return value.strip().lower()
+    return ""
+
+
+def _resolve_file_path(payload: dict, default: str = "solution.py") -> str:
+    """Resolve target path from alternate SLM payload keys."""
+    sources: list[dict] = [payload]
+    nested = payload.get("arguments")
+    if isinstance(nested, dict):
+        sources.append(nested)
+    for source in sources:
+        for key in ("file_path", "filePath", "file", "path"):
+            value = source.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
     return default
 
 
@@ -180,7 +194,7 @@ class ExecutorAgent:
 
         def action_fn(decision: DecisionEntry) -> Any:
             if decision.kind == "tool_call":
-                tool = decision.payload.get("tool", "")
+                tool = _resolve_tool_name(decision.payload)
                 if tool == "pytest":
                     target = decision.payload.get("target", "tests/")
                     blocked = self._require_permission("shell", f"pytest {target}")

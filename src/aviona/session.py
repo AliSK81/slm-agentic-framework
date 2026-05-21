@@ -13,7 +13,7 @@ from aviona.budgets import (
     INTERACTIVE_CYCLE_CEILING,
     verify_turn_budget,
 )
-from aviona.compaction import HistoryBlock, compact, history_to_constraint
+from aviona.compaction import HistoryBlock, anchor_to_constraint, compact, history_to_constraint
 from aviona.contract import TurnFileObs, verify_turn
 from aviona.gitctx import git_anchor_segment, git_status
 from aviona.permissions import Mode, PermissionAction, PermissionGate
@@ -138,7 +138,10 @@ class AvionaSession:
         extra: list[str] | None = None,
     ) -> list[str]:
         """Assemble anchor-first hard constraints for one interactive turn."""
-        hard_constraints = list(self._project_rules)
+        hard_constraints: list[str] = []
+        anchor = anchor_to_constraint(self._history)
+        if anchor:
+            hard_constraints.append(anchor)
         hard_constraints.append(runtime_answer_constraint())
         context_segment = history_to_constraint(self._history)
         if context_segment:

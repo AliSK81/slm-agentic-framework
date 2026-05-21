@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from aviona.compaction import HistoryBlock, compact, history_size, history_to_constraint
+from aviona.compaction import HistoryBlock, anchor_to_constraint, compact, history_size, history_to_constraint
 
 
 def _anchor(text: str = "anchor") -> HistoryBlock:
@@ -64,6 +64,12 @@ def test_compact_is_deterministic() -> None:
     assert [block.model_dump() for block in first] == [
         block.model_dump() for block in second
     ]
+
+
+def test_anchor_to_constraint_returns_anchor_on_first_turn() -> None:
+    """Anchor block is available even when history has only the anchor."""
+    text = anchor_to_constraint([_anchor("runtime: model=mock")])
+    assert text == "runtime: model=mock"
 
 
 def test_history_to_constraint_skips_trivial_history() -> None:

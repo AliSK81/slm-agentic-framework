@@ -34,7 +34,7 @@ def verify_turn_budget(
 ) -> TurnContractResult:
     """Fail when the turn exceeded its declared type cycle cap."""
     cap = max_cycles_for_turn_type(turn_type)
-    calls = outcome.llm_calls if outcome.llm_calls else outcome.step_count
+    calls = outcome.step_count if outcome.step_count else outcome.llm_calls
     if calls > cap:
         return TurnContractResult(
             passed=False,

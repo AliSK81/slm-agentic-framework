@@ -26,7 +26,7 @@ def runtime_anchor_segment(*, cwd: Path | None = None) -> str:
     else:
         models = f"planner={planner.model_id}, executor={executor.model_id}"
     parts = [
-        f"product=aviona",
+        "product=aviona",
         f"version={__version__}",
         f"provider={provider}",
         f"model={models}",
@@ -37,10 +37,9 @@ def runtime_anchor_segment(*, cwd: Path | None = None) -> str:
 
 
 def runtime_answer_constraint() -> str:
-    """Hard constraint instructing meta answers from anchor runtime facts."""
+    """Hard constraint instructing meta answers from the anchor runtime line."""
     return (
-        "[AVIONA] Questions about Aviona itself (version, provider, model, working directory) "
-        "must be answered only from the runtime: facts in [CONSTRAINTS] — do not read repository "
-        "files for self-knowledge. Respond with terminate{user_message, turn_type:answer} in one "
-        "cycle without tools."
+        "[AVIONA] Self/meta questions (model, provider, version, cwd): answer only from "
+        "the runtime: line already in [CONSTRAINTS]. Do not read repository files, "
+        "handoff, or write tools. Use terminate{user_message, turn_type:answer} in one cycle."
     )

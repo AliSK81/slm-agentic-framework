@@ -66,6 +66,14 @@ def compact(history: list[HistoryBlock], ceiling: int) -> list[HistoryBlock]:
     return working
 
 
+def anchor_to_constraint(history: list[HistoryBlock]) -> str | None:
+    """Return the anchor block for hard-constraint injection on every turn."""
+    for block in history:
+        if block.kind == "anchor" and block.text.strip():
+            return block.text.strip()
+    return None
+
+
 def history_to_constraint(history: list[HistoryBlock]) -> str | None:
     """Serialize compacted history for injection as a hard constraint segment."""
     if len(history) <= 1:

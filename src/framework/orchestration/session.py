@@ -36,7 +36,12 @@ from framework.memory.reflection import _reflection_config, write_reflection
 from framework.memory.stores import DecisionEntry, MemoryStores, StateEntry, SubTask
 from framework.memory.working_memory import WorkingMemoryBuilder
 from framework.control.ablation import AblationSettings
-from framework.orchestration.executor import EditFileFn, ExecutorAgent, WriteFileFn
+from framework.orchestration.executor import (
+    EditFileFn,
+    ExecutorAgent,
+    WriteFileFn,
+    _resolve_tool_name,
+)
 from framework.orchestration.planner import PlannerAgent
 from framework.orchestration.verify import Verifier, resolve_verifier
 from framework.slm.client import SLMClient
@@ -396,6 +401,17 @@ def _last_executor_decision(
     return None
 
 
+def _interactive_goal_text(goal: str, constraints: list[str]) -> str:
+    """Augment the executor subtask when Aviona self-knowledge constraints are present."""
+    if any(c.startswith("[AVIONA] Self/meta") for c in constraints):
+        return (
+            f"{goal}\n"
+            "Answer using the runtime facts in [CONSTRAINTS]; "
+            "terminate immediately with turn_type answer."
+        )
+    return goal
+
+
 def _setup_interactive_dispatch(
     memory: MemoryStores,
     session_id: str,
@@ -403,13 +419,14 @@ def _setup_interactive_dispatch(
     constraints: list[str],
 ) -> None:
     """Register a single executor subtask and dispatch for interactive turns."""
-    _ensure_work_subtasks(memory, session_id, goal)
+    effective_goal = _interactive_goal_text(goal, constraints)
+    _ensure_work_subtasks(memory, session_id, effective_goal)
     save_dispatch(
         memory.backend,
         DispatchMessage(
             session_id=session_id,
             task_id="st-main",
-            subtask_description=goal,
+            subtask_description=effective_goal,
             step_budget=20,
             hard_constraints=constraints,
         ),
@@ -456,6 +473,56 @@ def _abandon_open_executor_subtasks(memory: MemoryStores, session_id: str) -> No
             memory.subtasks.set_status(task_id, "abandoned")
 
 
+def _goal_invites_build_promotion(goal: str) -> bool:
+    """True when the user goal is plausibly a multi-file build (Python-only gate)."""
+    lower = goal.strip().lower()
+    hints = (
+        "multi-file",
+        "multifile",
+        "multiple files",
+        "several files",
+        "scaffold",
+        "refactor across",
+        "large refactor",
+        "full project",
+        "build a ",
+        "build the ",
+        "across modules",
+    )
+    return any(h in lower for h in hints)
+
+
+_READ_TOOLS = frozenset(
+    {
+        "read_file",
+        "list_dir",
+        "grep",
+        "glob",
+        "py_compile",
+        "py_compile_check",
+        "pytest",
+        "shell",
+        "run_command",
+    }
+)
+
+
+def _read_only_invalid_decision(decision: DecisionEntry) -> bool:
+    """True when an executor decision must be corrected on read-only interactive turns."""
+    payload = decision.payload or {}
+    turn_type = str(payload.get("turn_type", "")).lower()
+    if decision.kind == "code_edit":
+        return turn_type not in ("edit", "build")
+    if decision.kind == "tool_call":
+        tool = _resolve_tool_name(payload)
+        if tool in ("write_file", "edit_file"):
+            return turn_type not in ("edit", "build")
+        return tool not in _READ_TOOLS
+    if decision.kind == "handoff":
+        return True
+    return False
+
+
 def _run_interactive_executor_turn(
     *,
     goal: str,
@@ -467,28 +534,39 @@ def _run_interactive_executor_turn(
     session_id: str,
     max_steps: int,
     max_retries: int,
+    interactive_read_only: bool = False,
 ) -> SessionOutcome:
     """Run executor cycles until terminate, needs_plan, or cycle budget exhausted."""
     _setup_interactive_dispatch(memory, session_id, goal, constraints)
     state = _interactive_initial_state(
         session_id,
-        goal,
+        _interactive_goal_text(goal, constraints),
         constraints,
         max_steps=max_steps,
         max_retries=max_retries,
     )
-    cycles = 0
+    billable_cycles = 0
+    attempts = 0
+    max_attempts = max_steps + 3
     decision: DecisionEntry | None = None
-
-    while cycles < max_steps:
+    while billable_cycles < max_steps and attempts < max_attempts:
+        attempts += 1
+        before_count = len(memory.decisions.list_for_session(session_id))
         executor.execute_node(state)
-        cycles += 1
+        after_count = len(memory.decisions.list_for_session(session_id))
         decision = _last_executor_decision(memory, session_id)
+        if after_count == before_count:
+            state["retry_count"] = int(state.get("retry_count", 0)) + 1
+            state["reflection_guidance"] = (
+                "respond with a valid JSON terminate decision including "
+                "non-empty user_message and turn_type."
+            )
+            continue
 
         if decision is not None and decision.kind == "terminate":
             parsed = parse_terminate_payload(decision.payload)
             user_msg = parsed.user_message
-            outcome = SessionOutcome(session_id=session_id, step_count=cycles)
+            outcome = SessionOutcome(session_id=session_id, step_count=billable_cycles + 1)
             outcome.user_message = user_msg
             if parsed.turn_type in ("edit", "build"):
                 evaluation = verifier.evaluate(workspace).as_dict()
@@ -499,27 +577,62 @@ def _run_interactive_executor_turn(
             return outcome
 
         if decision is not None and is_needs_plan_handoff(decision):
-            outcome = SessionOutcome(session_id=session_id, step_count=cycles)
+            if not _goal_invites_build_promotion(goal):
+                state["retry_count"] = int(state.get("retry_count", 0)) + 1
+                state["reflection_guidance"] = (
+                    "handoff needs_plan is only for multi-file build tasks. "
+                    "Use terminate{user_message, turn_type:answer|inspect|edit} "
+                    "for this goal."
+                )
+                continue
+            outcome = SessionOutcome(session_id=session_id, step_count=billable_cycles + 1)
             outcome.final_state = _INTERACTIVE_NEEDS_PLAN
             outcome.decision_count = len(memory.decisions.list_for_session(session_id))
             return outcome
+
+        if (
+            interactive_read_only
+            and decision is not None
+            and _read_only_invalid_decision(decision)
+        ):
+            state["retry_count"] = int(state.get("retry_count", 0)) + 1
+            state["reflection_guidance"] = (
+                "read-only turn: answer with terminate{user_message, turn_type:answer|inspect} "
+                "using runtime: facts — do not use handoff, custom tools, or write tools."
+            )
+            continue
+
+        if decision is None:
+            if billable_cycles < max_steps:
+                state["retry_count"] = int(state.get("retry_count", 0)) + 1
+                state["reflection_guidance"] = (
+                    "respond with a valid JSON terminate decision including "
+                    "non-empty user_message and turn_type."
+                )
+                continue
+            break
+
+        billable_cycles += 1
 
         if decision is not None and decision.kind in ("tool_call", "code_edit"):
             continue
 
         break
 
-    outcome = SessionOutcome(session_id=session_id, step_count=cycles)
+    outcome = SessionOutcome(session_id=session_id, step_count=billable_cycles)
     evaluation = verifier.evaluate(workspace).as_dict()
     outcome.test_passed = bool(evaluation.get("passed"))
     outcome.user_message = _session_user_message_from_decisions(memory, session_id)
-    if outcome.test_passed:
+    if outcome.user_message.strip() and outcome.test_passed:
         outcome.outcome = "solved"
         outcome.final_state = STATE_DONE
     else:
         outcome.outcome = "unresolvable"
         outcome.final_state = STATE_EXECUTE
-        outcome.error = evaluation.get("error_message") or evaluation.get("error")
+        if not outcome.user_message.strip():
+            outcome.error = outcome.error or "missing user_message"
+        else:
+            outcome.error = evaluation.get("error_message") or evaluation.get("error")
     outcome.decision_count = len(memory.decisions.list_for_session(session_id))
     return outcome
 
@@ -609,6 +722,7 @@ def run_turn(
         session_id=session_id,
         max_steps=max_steps,
         max_retries=max_retries,
+        interactive_read_only=interactive_read_only,
     )
 
     if outcome.final_state == _INTERACTIVE_NEEDS_PLAN:

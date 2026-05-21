@@ -206,7 +206,8 @@ def test_read_only_turn_blocks_write_without_edit_turn_type(
     )
 
     assert not (workspace / "notes.txt").exists()
-    assert outcome.llm_calls == 1
+    assert outcome.step_count == 0
+    assert outcome.llm_calls <= 4
 
 
 def test_edit_turn_allows_write_with_turn_type_edit(

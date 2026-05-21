@@ -42,6 +42,22 @@ Locked by `tests/unit/test_aviona_contract_matrix.py`. Add a matrix row first, t
 | needs-plan-handoff | `handoff{reason: needs_plan}` | `build` |
 | infer-edit-from-writes | terminate without type + file changes | `edit` |
 
+## L3 live gate (release-blocking)
+
+Locked by `scripts/live_gate.py` via `scripts/test-aviona.ps1 -Live`. Requires API key.
+
+| ID | Prompt | Turn type | Must contain | Must NOT | Budget |
+|----|--------|-----------|--------------|----------|--------|
+| local-hi | `hi` | local | greeting | agent steps | 0 |
+| local-ok | `ok` | local | acknowledgment | edit `notes.txt` | 0 |
+| answer-model | `what is your model?` | answer | provider + model from anchor | edits | ≤1 step |
+| answer-language-model | `what language model?` | answer | model id | project overview | ≤1 step |
+| answer-salam | `try to fastly reply with "salam"` | answer | `salam` | vacuous ok | ≤1 step |
+| inspect-hello-content | `what is content of hello file?` | inspect | `hi` | edits | ≤3 steps |
+| inspect-project | `what is this project` | inspect | README summary | vacuous meta | ≤3 steps |
+| inspect-list-files | `list files in this dir` | inspect | file names | edits | ≤3 steps |
+| edit-create-foo | `create foo.txt with "x"` | edit | confirmation + file | — | ≤6 steps |
+
 ## QA layers
 
 | Layer | Command | API key |

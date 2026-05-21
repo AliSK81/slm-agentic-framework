@@ -106,6 +106,7 @@ def test_runtime_anchor_segment_includes_model_version_and_cwd(
 def test_runtime_answer_constraint_mentions_anchor_facts() -> None:
     """Self-knowledge constraint directs the agent to runtime facts, not repo reads."""
     text = runtime_answer_constraint()
+    assert text.startswith("[AVIONA] Self/meta")
     assert "runtime:" in text
     assert "turn_type:answer" in text
     assert "do not read" in text.lower()

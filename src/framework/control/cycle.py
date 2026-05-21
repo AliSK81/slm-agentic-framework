@@ -42,7 +42,9 @@ _TERMINATE_PAYLOAD_HINT = (
 )
 
 _HANDOFF_PAYLOAD_HINT = (
-    'For handoff requesting full planning use payload {"reason":"needs_plan"}.'
+    'For handoff requesting full planning use payload {"reason":"needs_plan"} '
+    "only for multi-file build tasks — never for greetings, meta/self questions, "
+    "read-only inspect, or single-file edits. Use terminate instead."
 )
 
 

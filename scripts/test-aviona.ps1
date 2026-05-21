@@ -66,30 +66,9 @@ Write-Host "==> pytest Aviona unit + contract tests"
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 if ($Live) {
-    Write-Host "==> L3 live smoke (requires API key)"
-    $Fixture = Join-Path $Repo "tests\fixtures\sample_repo"
-    $LiveWs = "D:\thesis\aviona-test"
-    if (-not (Test-Path $LiveWs)) { $LiveWs = $Fixture }
-
-    function Test-AvionaPrompt {
-        param([string]$Prompt, [string[]]$MustContain)
-        Write-Host "  -> $Prompt"
-        $out = @($Prompt, '/exit') | & $Aviona --mode auto 2>&1 | Out-String
-        foreach ($needle in $MustContain) {
-            if ($out -notmatch [regex]::Escape($needle)) {
-                Write-Error "Live fail: '$Prompt' missing '$needle'. Output:`n$out"
-            }
-        }
-        if ($out -match '^\s*!\s*\|' -or $out -match 'no further action') {
-            Write-Error "Live fail: '$Prompt' returned failure or vacuous answer.`n$out"
-        }
-    }
-
-    Push-Location $LiveWs
-    Test-AvionaPrompt 'list files in this dir' @('hello.txt', 'main.py')
-    Test-AvionaPrompt 'what is content of hello file?' @('hi')
-    Test-AvionaPrompt 'what is this project' @('Project overview', 'README')
-    Pop-Location
+    Write-Host "==> L3 live gate (requires API key)"
+    & $Python (Join-Path $Repo "scripts\live_gate.py") --aviona $Aviona
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
 
 Write-Host "==> Aviona gate PASSED ($ExpectedVersion)"

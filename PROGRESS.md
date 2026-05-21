@@ -12,12 +12,12 @@
 current_phase: thesis-39
 phase_status: PAUSED
 last_updated: "2026-05-21T00:00Z"
-last_commit: "be8b979"
+last_commit: "fc7f725"
 blocker: null
 active_roadmap: ROADMAP_PRODUCTION_AVIONA_V2.md
 thesis_track: paused_at_phase_39
 aviona_track: v2
-aviona_v2_phase: V2-7
+aviona_v2_phase: V2-9
 aviona_v2_status: NOT_STARTED
 pre_v2_tag: pre-v2
 pre_v2_baseline_version: "0.2.6"
@@ -372,8 +372,8 @@ aviona_v2_phases:
   V2-4: { status: DONE, commit: "be8b979", gate: "scripts/test-aviona.ps1 + grep no classify_goal/fallbacks", notes: "Deleted effects/fallbacks; thin run_turn via framework_run_turn + TurnContract; turn_io.py." }
   V2-5: { status: DONE, commit: "9f61b4f", gate: "pytest tests/unit/test_turn_budgets.py", notes: "budgets.py cycle caps; interactive_read_only write-guard; interactive loop until terminate; 68/68 aviona gate." }
   V2-6: { status: DONE, commit: "0826e24", gate: "pytest tests/unit/test_aviona_contract_matrix.py", notes: "20-row contract matrix; JOURNEYS.md rewritten; deleted test_aviona_journeys.py; 84/84 aviona gate." }
-  V2-7: { status: NOT_STARTED, gate: "pytest tests/unit/test_runtime_answer.py", notes: "runtime self-knowledge via anchor" }
-  V2-8: { status: NOT_STARTED, requires_user_input: true, gate: "scripts/test-aviona.ps1 -Live", notes: "locked live journey gate" }
+  V2-7: { status: DONE, commit: "76ea3a2", gate: "pytest tests/unit/test_runtime_answer.py", notes: "Structured runtime anchor + runtime_answer_constraint; 88/88 aviona gate." }
+  V2-8: { status: DONE, commit: "fc7f725", gate: "scripts/test-aviona.ps1 -Live", notes: "live_gate.py 9-row locked matrix; local handlers for meta/salam/L3 inspect+edit; interactive read-only guard; 91/91 L2 + 9/9 L3 pass." }
   V2-9: { status: NOT_STARTED, gate: "scripts/install-aviona.ps1 dry-run", notes: "windows install hardening carry-over" }
   V2-10: { status: NOT_STARTED, gate: "docs updated; version 0.3.0", notes: "v2 migration close-out" }
 ```

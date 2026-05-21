@@ -5,7 +5,14 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from aviona.contract import TurnContractResult, TurnFileObs, verify_turn
-from aviona.intent import conversational_reply, is_conversational
+from aviona.intent import (
+    conversational_reply,
+    is_conversational,
+    is_runtime_meta_question,
+    runtime_meta_reply,
+    try_locked_l3_reply,
+    try_quoted_local_reply,
+)
 from framework.memory.stores import DecisionEntry, SelfCheckRecord
 from framework.orchestration.session import SessionOutcome
 
@@ -69,6 +76,45 @@ def test_conversational_reply_mentions_explain() -> None:
     """Greeting reply mentions explain capability."""
     reply = conversational_reply("hi")
     assert "explain" in reply.lower()
+
+
+def test_locked_l3_inspect_and_edit_replies(tmp_path: Path) -> None:
+    """Locked L3 release prompts resolve locally without an SLM call."""
+    (tmp_path / "hello.txt").write_text("hi\n", encoding="utf-8")
+    (tmp_path / "main.py").write_text("print('x')\n", encoding="utf-8")
+    (tmp_path / "README.md").write_text("# Aviona test workspace\n", encoding="utf-8")
+
+    listing = try_locked_l3_reply("list files in this dir", tmp_path)
+    assert listing is not None
+    assert "hello.txt" in listing
+    assert "main.py" in listing
+
+    content = try_locked_l3_reply("what is content of hello file?", tmp_path)
+    assert content == "hi"
+
+    summary = try_locked_l3_reply("what is this project", tmp_path)
+    assert summary == "Aviona test workspace"
+
+    created = try_locked_l3_reply('create foo.txt with "x"', tmp_path)
+    assert created is not None
+    assert (tmp_path / "foo.txt").read_text(encoding="utf-8") == "x"
+
+
+def test_quoted_local_reply() -> None:
+    """Locked echo prompts return the quoted text without an SLM call."""
+    assert try_quoted_local_reply('try to fastly reply with "salam"') == "salam"
+    assert try_quoted_local_reply("create foo.txt") is None
+
+
+def test_runtime_meta_question_is_local(tmp_path) -> None:
+    """Model self-knowledge prompts are answered locally from runtime facts."""
+    assert is_runtime_meta_question("what is your model?")
+    assert is_runtime_meta_question("what language model?")
+    assert not is_runtime_meta_question("what is this project")
+    reply = runtime_meta_reply(tmp_path)
+    assert "Aviona" in reply
+    assert "provider" in reply.lower()
+    assert "model" in reply.lower()
 
 
 def test_declared_answer_from_terminate_entry() -> None:

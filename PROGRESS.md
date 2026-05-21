@@ -9,10 +9,10 @@
 ## CURRENT STATE
 
 ```yaml
-current_phase: framework-interactive-6
+current_phase: AV3-1
 phase_status: NOT_STARTED
-last_updated: "2026-05-21T24:30Z"
-last_commit: "b9ff3c6"
+last_updated: "2026-05-21T26:00Z"
+last_commit: "d1bcb27"
 blocker: null
 active_roadmap: ROADMAP_FRAMEWORK_INTERACTIVE.md
 thesis_track: paused_at_phase_39
@@ -395,8 +395,8 @@ framework_interactive_phases:
   FI-3: { status: DONE, commit: "7245765", gate: "pytest tests/unit/test_icp_terminate_after_tool.py tests/unit/test_list_dir_repeat_blocked_then_terminate.py", notes: "3/3 ICP unit + 7/7 integration pass. ICP state in interactive.py; repeat_tool/must_terminate self_check; synthesis removed from interactive completion path." }
   FI-4: { status: DONE, commit: "491d60c", gate: "pytest tests/unit/test_finalizer_forces_terminate.py", notes: "4/4 unit pass. finalizer:on terminate-only cycle from [TOOL RESULTS]; finalizer:off honest unresolvable; user_message only from terminate; deleted synthesis." }
   FI-5: { status: DONE, commit: "b9ff3c6", gate: "pytest tests/integration/test_compound_edit_run.py", notes: "3/3 integration pass. Typed handoff phase machine (inspect/edit/run); per-phase budgets; ICP allows needs_edit/needs_run handoffs; needs_run after code_edit for verify." }
-  FI-6: { status: NOT_STARTED, gate: "pytest tests/unit/test_shell_inspect_permission_policy.py tests/unit/test_executor_tool_parity.py", notes: "Inspect-run permission policy; glob/search tool parity." }
-  FI-7: { status: NOT_STARTED, gate: "pytest tests/unit/test_interactive_failure_modes.py", notes: "Mock SLM failure-mode suite mapping PROBLEM_INVENTORY rows; no live API." }
+  FI-6: { status: DONE, commit: "6453ca6", gate: "pytest tests/unit/test_shell_inspect_permission_policy.py tests/unit/test_executor_tool_parity.py", notes: "8/8 unit pass. is_inspect_run_command + executor auto-allow on turn_type inspect; glob tool; hint parity; search_codebase not advertised." }
+  FI-7: { status: DONE, commit: "PENDING", gate: "pytest tests/unit/test_interactive_turn_type_binding.py tests/unit/test_interactive_failure_modes.py tests/integration/test_interactive_turn.py", notes: "7/7 failure-mode unit + 15/15 interactive gate pass. _mock_slm_queue.py; R06-R15 loop patterns; wired into scripts/test-aviona.ps1 L2." }
 ```
 
 ---

@@ -198,6 +198,7 @@ class DecisionCycle:
         session_retry_count: int = 0,
         decision_floor: int = 0,
         require_turn_type: bool = False,
+        interactive_turn_floor: int | None = None,
     ) -> CycleResult:
         """Execute the full decision cycle; never raises on SLM failure."""
         limiter = StepBudgetLimiter(
@@ -217,6 +218,7 @@ class DecisionCycle:
                 subtask_id=subtask_id,
                 last_error=last_error,
                 retry_count=wm_retry,
+                interactive_turn_floor=interactive_turn_floor,
             )
         except WorkingMemoryBudgetError as exc:
             logger.warning("Working memory budget exceeded: %s", exc)
@@ -285,6 +287,7 @@ class DecisionCycle:
                     current_subtask=current_subtask,
                     subtask_id=subtask_id,
                     retry_count=retry_count,
+                    interactive_turn_floor=interactive_turn_floor,
                 )
                 mode = quality.failure_mode or "unparseable"
                 kind: str = "schema_violation" if mode == "unparseable" else "empty"
@@ -353,6 +356,7 @@ class DecisionCycle:
                     current_subtask=current_subtask,
                     subtask_id=subtask_id,
                     retry_count=retry_count,
+                    interactive_turn_floor=interactive_turn_floor,
                 )
                 messages = self._build_corrective_prompt(
                     wm,

@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 
 from framework.memory.retrieval import _cap_tokens, retrieve_top_k
-from framework.memory.stores import MemoryStores, WorkingMemory
+from framework.memory.stores import MemoryStores, ToolResultEntry, WorkingMemory
 from framework.slm.client import ModelProfile
 from framework.slm.skills import select_skill_card
 
@@ -61,6 +61,8 @@ class WorkingMemoryBuilder:
         constraints = list(wm.hard_constraints)
         current_subtask = wm.current_subtask
         retrieved = list(wm.retrieved_items)
+        tool_results = list(wm.tool_results)
+        recent_turn_recap = list(wm.recent_turn_recap)
 
         constraints = [
             _shrink_text(c, max(8, ceiling // 6)) if len(c) > ceiling * 2 else c
@@ -78,6 +80,17 @@ class WorkingMemoryBuilder:
                 current_subtask = _shrink_text(current_subtask, max(40, ceiling // 4))
             elif len(goal) > ceiling * 4 or len(goal.split()) > 40:
                 goal = _shrink_text(goal, max(40, ceiling // 4))
+            elif tool_results and len(tool_results[-1].truncated_output) > 80:
+                last = tool_results[-1]
+                tool_results[-1] = last.model_copy(
+                    update={
+                        "truncated_output": _shrink_text(
+                            last.truncated_output, max(20, ceiling // 6)
+                        )
+                    }
+                )
+            elif tool_results:
+                tool_results = tool_results[:-1]
             elif retrieved:
                 retrieved = retrieved[:-1]
             elif constraints:
@@ -97,6 +110,8 @@ class WorkingMemoryBuilder:
                     "hard_constraints": constraints,
                     "current_subtask": current_subtask,
                     "retrieved_items": retrieved,
+                    "tool_results": tool_results,
+                    "recent_turn_recap": recent_turn_recap,
                 }
             )
 
@@ -111,6 +126,8 @@ class WorkingMemoryBuilder:
                         _shrink_text(c, 8) for c in wm.hard_constraints[:2]
                     ],
                     "retrieved_items": [],
+                    "tool_results": tool_results[:1],
+                    "recent_turn_recap": recent_turn_recap[:2],
                     "skill_card": (
                         _cap_tokens(wm.skill_card, 8) if wm.skill_card else None
                     ),
@@ -135,6 +152,8 @@ class WorkingMemoryBuilder:
         subtask_id: str,
         last_error: str | None = None,
         retry_count: int = 0,
+        *,
+        interactive_turn_floor: int | None = None,
     ) -> WorkingMemory:
         """Assemble working memory; truncate if over profile token ceiling."""
         goal, constraints = self._memory.subtasks.get_session_anchor(session_id)
@@ -145,7 +164,27 @@ class WorkingMemoryBuilder:
                 constraints = list(task.hard_constraints)
 
         retrieved: list[str] = []
+        tool_results: list[ToolResultEntry] = []
+        recent_turn_recap: list[str] = []
         skill_card: str | None = None
+        if interactive_turn_floor is not None:
+            from framework.memory.tool_results import recent_turn_recap as build_recap
+
+            tool_results = self._memory.tool_results.list_for_turn(
+                session_id, interactive_turn_floor
+            )
+            recent_turn_recap = build_recap(
+                self._memory,
+                session_id,
+                decision_floor=interactive_turn_floor,
+            )
+            if tool_results:
+                logger.debug(
+                    "[WM] tool_results_in_prompt session=%s count=%d floor=%d",
+                    session_id,
+                    len(tool_results),
+                    interactive_turn_floor,
+                )
         if self._enable_memory:
             index = self._memory.retrieval.list_items()
             top_items = retrieve_top_k(index, current_subtask, k=3)
@@ -170,6 +209,8 @@ class WorkingMemoryBuilder:
             current_subtask=current_subtask,
             subtask_id=subtask_id,
             retrieved_items=retrieved,
+            tool_results=tool_results,
+            recent_turn_recap=recent_turn_recap,
             last_error=last_error,
             retry_count=retry_count,
             skill_card=skill_card,

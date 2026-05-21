@@ -13,6 +13,7 @@ from framework.memory.backend import MemoryBackend
 from framework.memory.stores import (
     STORE_DECISIONS,
     STORE_RESULTS,
+    STORE_TOOL_RESULTS,
     STORE_RETRIEVAL,
     STORE_STATE,
     STORE_SUBTASKS,
@@ -39,6 +40,7 @@ def _snapshot_memory(memory: MemoryStores) -> dict[str, list[dict]]:
         "decisions": backend.query(STORE_DECISIONS, {}),
         "subtasks": backend.query(STORE_SUBTASKS, {}),
         "results": backend.query(STORE_RESULTS, {}),
+        "tool_results": backend.query(STORE_TOOL_RESULTS, {}),
         "retrieval_index": backend.query(STORE_RETRIEVAL, {}),
     }
 
@@ -102,6 +104,11 @@ def restore_checkpoint(memory: MemoryStores, data: dict) -> None:
         elif store_name == STORE_SUBTASKS:
             for row in rows:
                 backend.write(store_name, row["task_id"], row)
-        elif store_name in (STORE_DECISIONS, STORE_RESULTS, STORE_RETRIEVAL):
+        elif store_name in (
+            STORE_DECISIONS,
+            STORE_RESULTS,
+            STORE_TOOL_RESULTS,
+            STORE_RETRIEVAL,
+        ):
             for row in rows:
                 backend.append(store_name, row)

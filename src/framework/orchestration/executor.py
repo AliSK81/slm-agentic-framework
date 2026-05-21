@@ -336,16 +336,26 @@ class ExecutorAgent:
 
         last_error: str | None = None
         if int(state.get("retry_count", 0)) > 0:
-            reflection = state.get("reflection_guidance")
             evaluation = state.get("last_evaluation") or {}
-            if reflection:
-                last_error = str(reflection)
+            if state.get("interactive_mode"):
+                cycle_error = state.get("cycle_last_error")
+                if cycle_error:
+                    last_error = str(cycle_error)
+                else:
+                    last_error = evaluation.get("error_message") or evaluation.get("error")
             else:
-                last_error = evaluation.get("error_message") or evaluation.get("error")
+                reflection = state.get("reflection_guidance")
+                if reflection:
+                    last_error = str(reflection)
+                else:
+                    last_error = evaluation.get("error_message") or evaluation.get("error")
 
         require_turn_type = bool(
             state.get("interactive_mode") and not state.get("interactive_turn_bound")
         )
+        turn_floor: int | None = None
+        if state.get("interactive_mode"):
+            turn_floor = int(state.get("decision_floor", 0))
         result = self._cycle.run(
             session_id,
             "executor",
@@ -356,6 +366,7 @@ class ExecutorAgent:
             session_retry_count=int(state.get("retry_count", 0)),
             decision_floor=int(state.get("decision_floor", 0)),
             require_turn_type=require_turn_type,
+            interactive_turn_floor=turn_floor,
         )
 
         passed = False

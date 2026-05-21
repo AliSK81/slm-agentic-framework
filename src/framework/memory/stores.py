@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any, Callable, Literal
 
 from pydantic import BaseModel, Field
@@ -13,6 +14,7 @@ STORE_STATE = "state"
 STORE_DECISIONS = "decisions"
 STORE_SUBTASKS = "subtasks"
 STORE_RESULTS = "results"
+STORE_TOOL_RESULTS = "tool_results"
 STORE_RETRIEVAL = "retrieval_index"
 
 _VALID_SUBTASK_TRANSITIONS: frozenset[tuple[str, str]] = frozenset(
@@ -107,6 +109,19 @@ class InteractionResult(BaseModel):
     stderr: str = ""
     exit_code: int = 0
     linked_subtask: str = ""
+    timestamp: datetime
+
+
+class ToolResultEntry(BaseModel):
+    """Append-only truncated tool output for interactive prompt channel (FI-2)."""
+
+    entry_id: str
+    session_id: str
+    turn_floor: int
+    tool: str
+    path: str
+    truncated_output: str
+    ok: bool
     timestamp: datetime
 
 
@@ -302,6 +317,25 @@ class SubTaskRegistry:
         return updated
 
 
+class ToolResultLog:
+    """Append-only typed tool outputs for interactive working memory."""
+
+    def __init__(self, backend: MemoryBackend) -> None:
+        self._backend = backend
+
+    def append(self, entry: ToolResultEntry) -> ToolResultEntry:
+        """Persist one truncated tool result."""
+        self._backend.append(STORE_TOOL_RESULTS, _dump(entry))
+        return entry
+
+    def list_for_turn(self, session_id: str, turn_floor: int) -> list[ToolResultEntry]:
+        """Return tool results for a session turn (matching ``turn_floor``)."""
+        rows = self._backend.query(STORE_TOOL_RESULTS, {"session_id": session_id})
+        entries = [ToolResultEntry.model_validate(r) for r in rows]
+        filtered = [e for e in entries if e.turn_floor == turn_floor]
+        return sorted(filtered, key=lambda e: e.timestamp)
+
+
 class ResultStore:
     """Append-only interaction results."""
 
@@ -345,6 +379,8 @@ class WorkingMemory(BaseModel):
     current_subtask: str
     subtask_id: str
     retrieved_items: list[str] = Field(default_factory=list)
+    tool_results: list[ToolResultEntry] = Field(default_factory=list)
+    recent_turn_recap: list[str] = Field(default_factory=list)
     last_error: str | None = None
     retry_count: int = 0
     skill_card: str | None = None
@@ -362,6 +398,17 @@ class WorkingMemory(BaseModel):
         if self.retrieved_items:
             lines.append("[CONTEXT]:")
             lines.extend(f"- {item}" for item in self.retrieved_items)
+        if self.tool_results:
+            lines.append("[TOOL RESULTS] (most recent first):")
+            for entry in reversed(self.tool_results):
+                status = "ok" if entry.ok else "fail"
+                header = f"- {entry.tool}({entry.path}): {status}"
+                lines.append(header)
+                if entry.truncated_output:
+                    lines.append(entry.truncated_output)
+        if self.recent_turn_recap:
+            lines.append("[RECENT TURNS]:")
+            lines.extend(f"- {line}" for line in self.recent_turn_recap)
         if self.last_error:
             lines.append(f"[LAST ERROR]: {self.last_error}")
         if self.retry_count:
@@ -391,6 +438,7 @@ class MemoryStores:
         self.decisions = DecisionLog(backend, self._index_cb, on_append=on_decision)
         self.subtasks = SubTaskRegistry(backend, self._index_cb)
         self.results = ResultStore(backend, self._index_cb)
+        self.tool_results = ToolResultLog(backend)
 
     @classmethod
     def sqlite(

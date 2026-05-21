@@ -35,6 +35,7 @@ from framework.control.workflow import (
 from framework.memory.checkpoint import save_checkpoint
 from framework.memory.reflection import _reflection_config, write_reflection
 from framework.memory.stores import DecisionEntry, MemoryStores, StateEntry, SubTask
+from framework.memory.tool_results import append_tool_result
 from framework.memory.working_memory import WorkingMemoryBuilder
 from framework.control.ablation import AblationSettings
 from framework.orchestration.executor import (
@@ -578,6 +579,7 @@ def _interactive_initial_state(
         "max_retries": max_retries,
         "last_evaluation": None,
         "reflection_guidance": None,
+        "cycle_last_error": None,
         "planned": True,
         "interactive_mode": True,
         "interactive_turn_bound": False,
@@ -726,7 +728,7 @@ def _run_interactive_executor_turn(
                 attempts,
             )
             state["retry_count"] = int(state.get("retry_count", 0)) + 1
-            state["reflection_guidance"] = (
+            state["cycle_last_error"] = (
                 "respond with a valid JSON terminate decision including "
                 "non-empty user_message and turn_type."
             )
@@ -765,7 +767,7 @@ def _run_interactive_executor_turn(
                     attempts,
                 )
                 state["retry_count"] = int(state.get("retry_count", 0)) + 1
-                state["reflection_guidance"] = (
+                state["cycle_last_error"] = (
                     "handoff needs_plan is only for multi-file build tasks. "
                     "Use terminate{user_message, turn_type:answer|inspect|edit} "
                     "for this goal."
@@ -790,17 +792,17 @@ def _run_interactive_executor_turn(
             billable_cycles += 1
             state["retry_count"] = int(state.get("retry_count", 0)) + 1
             if decision.kind == "code_edit":
-                state["reflection_guidance"] = (
+                state["cycle_last_error"] = (
                     "To write files: code_edit must include payload turn_type:edit, "
                     "then terminate{user_message, turn_type:edit}."
                 )
             elif decision.kind == "handoff":
-                state["reflection_guidance"] = (
+                state["cycle_last_error"] = (
                     "handoff needs_plan is only for multi-file build tasks. "
                     "Use code_edit with turn_type:edit for file creation."
                 )
             else:
-                state["reflection_guidance"] = (
+                state["cycle_last_error"] = (
                     "Use read_file/list_dir tools then terminate turn_type:inspect, "
                     "or terminate turn_type:answer for meta/runtime questions only."
                 )
@@ -809,7 +811,7 @@ def _run_interactive_executor_turn(
         if decision is None:
             if billable_cycles < max_steps:
                 state["retry_count"] = int(state.get("retry_count", 0)) + 1
-                state["reflection_guidance"] = (
+                state["cycle_last_error"] = (
                     "respond with a valid JSON terminate decision including "
                     "non-empty user_message and turn_type."
                 )
@@ -824,38 +826,50 @@ def _run_interactive_executor_turn(
             billable_cycles += 1
             if read_key and read_key in read_tools_used:
                 state["retry_count"] = int(state.get("retry_count", 0)) + 1
-                state["reflection_guidance"] = (
+                state["cycle_last_error"] = (
                     f"You already ran {read_key}. terminate{{user_message, turn_type:inspect}} "
-                    "now using the prior tool output."
+                    "now using the prior tool output in [TOOL RESULTS]."
                 )
                 continue
             tool_result = executor.last_tool_result
-            content = getattr(tool_result, "content", None) if tool_result is not None else None
+            turn_floor = int(state.get("decision_floor", 0))
+            result_path = read_key or str(
+                payload.get("file_path") or payload.get("path") or "."
+            )
+            result_text = _tool_result_text(tool_result)
+            if tool_result is not None and not getattr(tool_result, "ok", False):
+                message = str(getattr(tool_result, "message", "") or "tool failed")
+                append_tool_result(
+                    memory,
+                    session_id=session_id,
+                    turn_floor=turn_floor,
+                    tool=tool,
+                    path=result_path,
+                    output=message,
+                    ok=False,
+                )
+                state["retry_count"] = int(state.get("retry_count", 0)) + 1
+                state["cycle_last_error"] = message
+                continue
             if tool_result is not None and getattr(tool_result, "ok", False):
                 if read_key:
                     read_tools_used.append(read_key)
                 state["last_tool_snapshot"] = {
                     "tool": tool,
                     "payload": dict(payload),
-                    "text": _tool_result_text(tool_result),
+                    "text": result_text,
                     "ok": True,
                 }
-                if content:
-                    preview = str(content)[:2000]
-                    state["reflection_guidance"] = (
-                        f"Tool output:\n{preview}\n"
-                        "Summarize for the user. Now terminate{user_message, turn_type:inspect}."
-                    )
-                elif tool == "read_file":
-                    file_path = str(payload.get("file_path") or payload.get("path") or "file")
-                    state["reflection_guidance"] = (
-                        f"{file_path} is empty. "
-                        "terminate{{user_message, turn_type:inspect}} stating the file is empty."
-                    )
-                else:
-                    state["reflection_guidance"] = (
-                        "Tool finished. terminate{user_message, turn_type:inspect} now."
-                    )
+                append_tool_result(
+                    memory,
+                    session_id=session_id,
+                    turn_floor=turn_floor,
+                    tool=tool,
+                    path=result_path,
+                    output=result_text,
+                    ok=True,
+                )
+                state["cycle_last_error"] = None
             continue
 
         if decision.kind == "code_edit":
@@ -866,7 +880,7 @@ def _run_interactive_executor_turn(
             edits_done: list[str] = state.setdefault("code_edits_done", [])
             if file_path and file_path in edits_done:
                 state["retry_count"] = int(state.get("retry_count", 0)) + 1
-                state["reflection_guidance"] = (
+                state["cycle_last_error"] = (
                     f"{file_path} was already updated. "
                     "terminate{user_message, turn_type:edit} now."
                 )
@@ -874,9 +888,17 @@ def _run_interactive_executor_turn(
             if turn_type in ("edit", "build") and not _read_only_invalid_decision(decision):
                 if file_path:
                     edits_done.append(file_path)
-                state["reflection_guidance"] = (
-                    "File change applied. Finish with terminate{user_message, turn_type:edit}."
+                turn_floor = int(state.get("decision_floor", 0))
+                append_tool_result(
+                    memory,
+                    session_id=session_id,
+                    turn_floor=turn_floor,
+                    tool="code_edit",
+                    path=file_path or "file",
+                    output=f"applied edit to {file_path or 'file'}",
+                    ok=True,
                 )
+                state["cycle_last_error"] = None
             continue
 
         billable_cycles += 1

@@ -10,9 +10,9 @@
 
 ```yaml
 current_phase: framework-interactive-2
-phase_status: NOT_STARTED
-last_updated: "2026-05-21T18:00Z"
-last_commit: "81a43e7"
+phase_status: IN_PROGRESS
+last_updated: "2026-05-21T20:00Z"
+last_commit: "a63cdcd"
 blocker: null
 active_roadmap: ROADMAP_FRAMEWORK_INTERACTIVE.md
 thesis_track: paused_at_phase_39
@@ -390,8 +390,8 @@ aviona_v2_phases:
 
 ```yaml
 framework_interactive_phases:
-  FI-1: { status: DONE, gate: "pytest tests/unit/test_interactive_turn_type_binding.py", notes: "8/8 unit pass. InteractiveTurnState + models.yaml budgets; cycle-1 turn_type_required self_check; session binds budget/read_only; Aviona no longer passes infer_interactive_max_steps." }
-  FI-2: { status: NOT_STARTED, gate: "pytest tests/unit/test_tool_result_channel.py", notes: "Typed ToolResultEntry in working memory; remove reflection_guidance string injection." }
+  FI-1: { status: DONE, commit: "a63cdcd", gate: "pytest tests/unit/test_interactive_turn_type_binding.py", notes: "8/8 unit pass. InteractiveTurnState + models.yaml budgets; cycle-1 turn_type_required self_check; session binds budget/read_only; Aviona no longer passes infer_interactive_max_steps." }
+  FI-2: { status: IN_PROGRESS, gate: "pytest tests/unit/test_working_memory_contains_tool_output.py", notes: "Typed ToolResultEntry in working memory; remove reflection_guidance string injection." }
   FI-3: { status: NOT_STARTED, gate: "pytest tests/unit/test_interactive_completion_protocol.py", notes: "ICP sub-state-machine; mandatory terminate after tools; repeat-tool dedup; delete default synthesis." }
   FI-4: { status: NOT_STARTED, gate: "pytest tests/unit/test_interactive_finalizer.py", notes: "Finalizer Decision Cycle (terminate only) or honest unresolvable; fix outcome contract." }
   FI-5: { status: NOT_STARTED, gate: "pytest tests/unit/test_interactive_handoff.py", notes: "Compound turns via typed handoff (needs_edit, needs_run, needs_plan)." }

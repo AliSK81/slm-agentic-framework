@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import sys
 
 import pytest
 
@@ -42,6 +43,25 @@ def test_main_doctor_delegates_to_run_doctor(monkeypatch: pytest.MonkeyPatch) ->
     assert main(["doctor"]) == 0
 
 
+def test_main_yes_flag_sets_auto_mode(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """--yes forces permission mode auto before REPL starts."""
+    captured: dict[str, str] = {}
+
+    class _Session:
+        def set_mode(self, mode: str) -> None:
+            captured["mode"] = mode
+
+    monkeypatch.setattr("aviona.cli.ensure_slm_api_key_configured", lambda: None)
+    monkeypatch.setattr("aviona.cli.load_aviona_env", lambda _cwd=None: None)
+    monkeypatch.setattr("aviona.cli.run_repl", lambda _s, debug=False: 0)
+    monkeypatch.setattr("aviona.cli.AvionaSession", lambda _cwd: _Session())
+    monkeypatch.setattr(sys, "stdin", type("stdin", (), {"isatty": lambda: True})())
+    assert main(["--yes"]) == 0
+    assert captured.get("mode") == "auto"
+
+
 def test_main_bare_invocation_starts_repl(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -51,6 +71,7 @@ def test_main_bare_invocation_starts_repl(
         lambda: None,
     )
     monkeypatch.setattr("aviona.cli.load_aviona_env", lambda _cwd=None: None)
+    monkeypatch.setattr(sys.stdin, "isatty", lambda: True)
     monkeypatch.setattr(
         "aviona.cli.run_repl",
         lambda _session, debug=False: 0,

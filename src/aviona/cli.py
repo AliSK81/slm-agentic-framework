@@ -40,6 +40,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Permission mode: plan (read-only), default (ask shell), auto.",
     )
     parser.add_argument(
+        "--yes",
+        "-y",
+        action="store_true",
+        help="Non-interactive: permission mode auto (no shell confirm prompts).",
+    )
+    parser.add_argument(
         "--continue",
         dest="continue_session",
         action="store_true",
@@ -128,7 +134,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     session = _open_session(cwd, args)
     if session is None:
         return 1
-    if getattr(args, "mode", None):
+    if getattr(args, "yes", False) or not sys.stdin.isatty():
+        session.set_mode("auto")
+    elif getattr(args, "mode", None):
         session.set_mode(args.mode)  # type: ignore[arg-type]
     return run_repl(session, debug=bool(getattr(args, "debug", False)))
 

@@ -15,6 +15,7 @@ from aviona.debug_log import (
 )
 from aviona.console import write_line
 from aviona.gitctx import format_git_summary
+from aviona.permissions import permission_mode_banner
 from aviona.session import AvionaSession, TurnResult
 
 logger = logging.getLogger(__name__)
@@ -79,12 +80,12 @@ def _handle_meta(
     if lowered == "/mode" or lowered.startswith("/mode "):
         parts = line.strip().split(maxsplit=1)
         if len(parts) == 1:
-            writer(f"mode: {session.permission_gate.mode}")
+            writer(permission_mode_banner(session.permission_gate.mode))
             return False
         mode = parts[1].strip().lower()
         if mode in ("plan", "default", "auto"):
             session.set_mode(mode)  # type: ignore[arg-type]
-            writer(f"mode: {mode}")
+            writer(permission_mode_banner(mode))  # type: ignore[arg-type]
         else:
             writer("usage: /mode plan|default|auto")
         return False
@@ -121,7 +122,7 @@ def run_repl(
         write("")
 
     write(f"Aviona - workspace: {session.workspace}")
-    write(f"mode: {session.permission_gate.mode}")
+    write(permission_mode_banner(session.permission_gate.mode))
     if debug:
         write("Debug mode")
     git_line = format_git_summary(session.git_status)

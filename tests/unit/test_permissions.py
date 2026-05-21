@@ -32,23 +32,23 @@ def test_auto_mode_allows_write_file() -> None:
 
 
 def test_default_mode_asks_before_side_effect_shell() -> None:
-    """Default mode asks before pytest/shell side effects."""
-    answers: list[bool] = []
+    """Default mode asks before non-inspect side-effecting shell."""
+    answers: list[str] = []
 
-    def confirm(_prompt: str) -> bool:
-        answers.append(True)
+    def confirm(prompt: str) -> bool:
+        answers.append(prompt)
         return True
 
-    gate = PermissionGate("default", allowlist=["pytest"], confirm=confirm)
-    assert gate.check(PermissionAction(kind="shell", detail="pytest tests/")) == "ask"
-    assert gate.ensure(PermissionAction(kind="shell", detail="pytest tests/"))
-    assert answers
+    gate = PermissionGate("default", allowlist=["python"], confirm=confirm)
+    assert gate.check(PermissionAction(kind="shell", detail="python run.py")) == "ask"
+    assert gate.ensure(PermissionAction(kind="shell", detail="python run.py"))
+    assert len(answers) == 1
 
 
 def test_default_mode_denies_shell_when_user_declines() -> None:
     """Default mode blocks shell when confirmation is rejected."""
-    gate = PermissionGate("default", allowlist=["pytest"], confirm=lambda _p: False)
-    assert not gate.ensure(PermissionAction(kind="shell", detail="pytest tests/"))
+    gate = PermissionGate("default", allowlist=["python"], confirm=lambda _p: False)
+    assert not gate.ensure(PermissionAction(kind="shell", detail="python run.py"))
 
 
 def test_command_not_in_project_allowlist_is_denied() -> None:

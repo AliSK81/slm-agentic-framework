@@ -10,7 +10,11 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from framework.error_control.sandbox import SAFE_COMMANDS, _command_allowed
+from framework.error_control.sandbox import (
+    SAFE_COMMANDS,
+    _command_allowed,
+    is_inspect_run_command,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +23,23 @@ PermissionVerdict = Literal["allow", "ask", "deny"]
 ActionKind = Literal["write_file", "edit_file", "shell"]
 
 READ_ONLY_SHELL: frozenset[str] = frozenset({"cat", "ls", "find", "diff", "echo", "ast"})
+
+_MODE_BANNERS: dict[Mode, str] = {
+    "plan": (
+        "Permission mode: plan — read-only (no file writes; side-effect shell blocked)"
+    ),
+    "default": (
+        "Permission mode: default — writes allowed; confirm side-effect shell [y/N]"
+    ),
+    "auto": (
+        "Permission mode: auto — writes and allowlisted shell without prompts"
+    ),
+}
+
+
+def permission_mode_banner(mode: Mode) -> str:
+    """One-line REPL banner describing the active permission mode."""
+    return _MODE_BANNERS.get(mode, f"Permission mode: {mode}")
 
 
 class PermissionAction(BaseModel):
@@ -65,6 +86,8 @@ class PermissionGate:
                 return "deny"
             if not self._shell_project_allowed(cmd):
                 return "deny"
+            if is_inspect_run_command(cmd):
+                return "allow"
             if self.mode == "plan" and self._shell_is_side_effecting(cmd):
                 return "deny"
             if self.mode == "default" and self._shell_is_side_effecting(cmd):

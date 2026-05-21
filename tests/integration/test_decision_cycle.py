@@ -452,7 +452,7 @@ def test_executor_emits_handback_when_out_of_scope(
             json.dumps(
                 {
                     "kind": "handoff",
-                    "payload": {"blocked_on": "architecture"},
+                    "payload": {"reason": "needs_plan"},
                     "rationale": "Need planner to replan",
                     "references": [],
                 }
@@ -463,7 +463,7 @@ def test_executor_emits_handback_when_out_of_scope(
     executor.execute_node(_workflow_state(session_setup))
     handback = load_handback(memory.backend, session_setup)
     assert handback is not None
-    assert handback.blocked_on == "architecture"
+    assert handback.blocked_on == "scope"
 
 
 def test_planner_receives_report_after_executor_done(

@@ -11,7 +11,7 @@ $Python = Join-Path $Repo ".venv\Scripts\python.exe"
 $Aviona = Join-Path $Repo ".venv\Scripts\aviona.exe"
 
 if (-not (Test-Path $Python)) {
-    Write-Error "Missing venv. Run: D:\thesis\agentic-ai\scripts\install-aviona.ps1"
+    Write-Error "Missing venv. Run: scripts\install-aviona.ps1"
 }
 
 $SitePackages = Join-Path $Repo ".venv\Lib\site-packages"

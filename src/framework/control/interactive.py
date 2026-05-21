@@ -29,6 +29,16 @@ _DEFAULT_BUDGETS: dict[TurnType, int] = {
 def clear_interactive_config_cache() -> None:
     """Drop cached interactive yaml (for tests)."""
     load_interactive_budgets.cache_clear()
+    load_interactive_finalizer_enabled.cache_clear()
+
+
+@lru_cache(maxsize=1)
+def load_interactive_finalizer_enabled() -> bool:
+    """Return whether the interactive finalizer recovery cycle is enabled."""
+    raw = yaml.safe_load(models_config_path().read_text(encoding="utf-8")) or {}
+    section = raw.get("interactive") or {}
+    value = str(section.get("finalizer", "on")).strip().lower()
+    return value in ("on", "true", "1", "yes")
 
 
 @lru_cache(maxsize=1)

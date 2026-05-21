@@ -3,6 +3,7 @@ active_provider: deepseek
 
 # Interactive REPL cycle budgets (FI-1 single source of truth)
 interactive:
+  finalizer: on
   budgets:
     answer: 1
     inspect: 4

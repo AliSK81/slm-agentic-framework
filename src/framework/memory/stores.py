@@ -40,6 +40,7 @@ class Issue(BaseModel):
         "must_terminate_after_tool",
         "repeat_tool",
         "must_terminate_after_edit",
+        "finalizer_terminate_only",
     ]
     detail: str
 

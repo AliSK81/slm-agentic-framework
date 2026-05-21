@@ -56,21 +56,30 @@ _TURN_TYPE_DECLARE_HINT = (
     "permissions from that declaration — never from goal text."
 )
 
+_FINALIZER_HINT = (
+    "[FINALIZER] Respond with kind=terminate only. Summarize for the user using "
+    "[TOOL RESULTS] in working memory. Include non-empty user_message and turn_type."
+)
+
 
 def _json_format_block(
     agent_role: str,
     *,
     include_example: bool = True,
     require_turn_type: bool = False,
+    finalizer_only: bool = False,
 ) -> str:
     """Append strict JSON instructions so SLMs emit parseable decisions.
 
     The full example block is omitted when ``include_example`` is False (compact
     corrective rounds after self-check failure).
     """
-    kinds = _FORMAT_BY_ROLE.get(agent_role, "terminate")
+    kinds = "terminate" if finalizer_only else _FORMAT_BY_ROLE.get(agent_role, "terminate")
     hints: list[str] = []
-    if agent_role == "executor":
+    if finalizer_only:
+        hints.append(_FINALIZER_HINT)
+        hints.append(_TERMINATE_PAYLOAD_HINT)
+    elif agent_role == "executor":
         hints.append(_EXECUTOR_PAYLOAD_HINT)
         hints.append(_TERMINATE_PAYLOAD_HINT)
         hints.append(_HANDOFF_PAYLOAD_HINT)
@@ -88,7 +97,13 @@ def _json_format_block(
     )
     if not include_example:
         return header + hint
-    if agent_role == "executor":
+    if finalizer_only:
+        example = (
+            'Example: {"kind":"terminate","rationale":"because ...",'
+            '"payload":{"user_message":"Summary from tool results.","turn_type":"inspect"},'
+            '"references":[]}'
+        )
+    elif agent_role == "executor":
         example = (
             'Example: {"kind":"terminate","rationale":"because ...",'
             '"payload":{"user_message":"Here is the answer.","turn_type":"answer"},'
@@ -201,6 +216,7 @@ class DecisionCycle:
         require_turn_type: bool = False,
         interactive_turn_floor: int | None = None,
         icp: InteractiveCompletionState | None = None,
+        finalizer_only: bool = False,
     ) -> CycleResult:
         """Execute the full decision cycle; never raises on SLM failure."""
         limiter = StepBudgetLimiter(
@@ -233,6 +249,7 @@ class DecisionCycle:
                     agent_role,
                     include_example=True,
                     require_turn_type=require_turn_type,
+                    finalizer_only=finalizer_only,
                 ),
             }
         ]
@@ -324,6 +341,7 @@ class DecisionCycle:
                     session_id,
                     require_turn_type=require_turn_type,
                     icp=icp,
+                    finalizer_only=finalizer_only,
                 )
             else:
                 check = SelfCheckRecord(verdict="pass", issues=[])

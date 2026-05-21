@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 import os
-import re
 import time
 import uuid
 from datetime import UTC, datetime
@@ -40,6 +39,7 @@ from framework.control.interactive import (
     icp_after_successful_edit,
     icp_after_successful_tool,
     icp_initial_state,
+    load_interactive_finalizer_enabled,
     tool_path_key,
 )
 from framework.memory.tool_results import append_tool_result
@@ -108,25 +108,9 @@ def _session_user_message_from_decisions(
     return ""
 
 
-_INSPECT_FILE_PATTERNS = (
-    re.compile(r"content of\s+([^\s?,]+)", re.I),
-    re.compile(r"read\s+([^\s?,]+)", re.I),
-    re.compile(r"what is in\s+([^\s?,]+)", re.I),
-)
-
-
 def _normalize_goal_file_ref(raw: str) -> str:
     """Strip quotes from a filename token extracted from a user goal."""
     return raw.strip().strip("\"'`")
-
-
-def _file_path_from_inspect_goal(goal: str) -> str | None:
-    """Extract a filename hint from the goal text for reflection guidance only."""
-    for pattern in _INSPECT_FILE_PATTERNS:
-        match = pattern.search(goal)
-        if match:
-            return _normalize_goal_file_ref(match.group(1))
-    return None
 
 
 def _read_tool_key(tool: str, payload: dict) -> str:
@@ -135,14 +119,6 @@ def _read_tool_key(tool: str, payload: dict) -> str:
         str(payload.get("file_path") or payload.get("path") or "")
     )
     return f"{tool}:{path}" if path else tool
-
-
-def _read_file_user_message(file_path: str, content: str | None) -> str:
-    """Format read_file output for direct content inspect turns."""
-    text = (content or "").strip()
-    if text:
-        return text
-    return f"{file_path} is empty."
 
 
 def _tool_result_text(tool_result: object | None) -> str:
@@ -158,59 +134,61 @@ def _tool_result_text(tool_result: object | None) -> str:
     return ""
 
 
-def _synthesize_interactive_user_message(
+def _run_interactive_finalizer(
     *,
+    executor: ExecutorAgent,
     memory: MemoryStores,
     session_id: str,
-    decision_floor: int,
-    executor: ExecutorAgent,
-    workspace: Path,
+    state: WorkflowState,
     goal: str,
-    code_edits_done: list[str],
-    last_tool_snapshot: dict[str, object] | None = None,
 ) -> str:
-    """Build a user-facing message when the agent never emitted terminate.
+    """Run one terminate-only Decision Cycle seeded with [TOOL RESULTS] (FI-4)."""
+    from framework.tools.file_tools import FileResult
 
-    Uses only recorded tool results from this turn — never reads the workspace
-    or runs shell commands from Python based on goal phrase matching.
-    """
-    snapshot = last_tool_snapshot or {}
-    if snapshot.get("ok"):
-        tool = str(snapshot.get("tool") or "")
-        text = str(snapshot.get("text") or "")
-        payload = snapshot.get("payload")
-        payload_dict = payload if isinstance(payload, dict) else {}
-        if tool == "read_file":
-            file_path = str(
-                payload_dict.get("file_path") or payload_dict.get("path") or "file"
-            )
-            return _read_file_user_message(file_path, text)
-        if tool in ("shell", "run_command", "pytest") and text.strip():
-            return text.strip()
+    floor = int(state.get("decision_floor", 0))
+    if not memory.tool_results.list_for_turn(session_id, floor):
+        return ""
 
-    tool_result = executor.last_tool_result
-    tool_ok = tool_result is not None and getattr(tool_result, "ok", False)
-    tool_content = _tool_result_text(tool_result) if tool_ok else ""
+    turn_state = state.get("interactive_turn_state") or {}
+    declared = str(turn_state.get("declared_type") or "inspect")
+    description = (
+        f"[FINALIZER] User goal: {goal}\n"
+        "Summarize for the user using [TOOL RESULTS] only — do not invent file "
+        "contents. Respond with terminate only."
+        f' Include turn_type:{declared}.'
+    )
 
-    entries = memory.decisions.list_for_session(session_id)[decision_floor:]
-    for entry in reversed(entries):
-        if entry.kind != "tool_call":
-            continue
-        payload = entry.payload or {}
-        tool = _resolve_tool_name(payload)
-        if tool == "read_file" and tool_ok:
-            file_path = str(payload.get("file_path") or payload.get("path") or "file")
-            return _read_file_user_message(file_path, tool_content)
-        if tool in ("shell", "run_command", "pytest") and tool_ok:
-            stdout = tool_content.strip()
-            if stdout:
-                return stdout
-        break
+    def action_fn(decision: DecisionEntry) -> Any:
+        if decision.kind != "terminate":
+            return None
+        msg = parse_terminate_payload(decision.payload).user_message.strip()
+        return FileResult(
+            ok=bool(msg),
+            message="ok" if msg else "empty terminate answer",
+            content=msg or None,
+        )
 
-    if code_edits_done:
-        return f"Updated {', '.join(code_edits_done)}."
-
-    return ""
+    logger.debug("[INTERACTIVE] finalizer_start session=%s floor=%d", session_id, floor)
+    result = executor._cycle.run(  # noqa: SLF001
+        session_id,
+        "executor",
+        description,
+        "st-main",
+        action_fn=action_fn,
+        max_retries=1,
+        decision_floor=floor,
+        interactive_turn_floor=floor,
+        icp=None,
+        finalizer_only=True,
+    )
+    if result.exhausted or result.decision is None:
+        logger.debug("[INTERACTIVE] finalizer_failed session=%s", session_id)
+        return ""
+    return _session_user_message_from_decisions(
+        memory,
+        session_id,
+        decision_floor=floor,
+    )
 
 
 def require_slm_api_key() -> str:
@@ -920,6 +898,19 @@ def _run_interactive_executor_turn(
         session_id,
         decision_floor=floor,
     )
+    if not outcome.user_message.strip():
+        has_tool_results = bool(memory.tool_results.list_for_turn(session_id, floor))
+        if has_tool_results and load_interactive_finalizer_enabled():
+            finalized = _run_interactive_finalizer(
+                executor=executor,
+                memory=memory,
+                session_id=session_id,
+                state=state,
+                goal=goal,
+            )
+            if finalized.strip():
+                outcome.user_message = finalized
+                outcome.step_count += 1
     if outcome.user_message.strip() and outcome.test_passed:
         outcome.outcome = "solved"
         outcome.final_state = STATE_DONE
@@ -927,6 +918,7 @@ def _run_interactive_executor_turn(
         outcome.outcome = "unresolvable"
         outcome.final_state = STATE_EXECUTE
         if not outcome.user_message.strip():
+            outcome.user_message = ""
             outcome.error = outcome.error or "missing user_message"
         else:
             outcome.error = evaluation.get("error_message") or evaluation.get("error")

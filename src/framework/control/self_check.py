@@ -139,6 +139,24 @@ def _turn_type_required_issues(
     ]
 
 
+def _finalizer_only_issues(
+    proposal: DecisionEntry,
+    *,
+    finalizer_only: bool,
+) -> list[Issue]:
+    """Finalizer cycle accepts only terminate proposals."""
+    if not finalizer_only:
+        return []
+    if proposal.kind == "terminate":
+        return []
+    return [
+        Issue(
+            kind="finalizer_terminate_only",
+            detail=f"finalizer cycle allows only terminate; got kind={proposal.kind}",
+        )
+    ]
+
+
 def _terminate_payload_issues(proposal: DecisionEntry) -> list[Issue]:
     """Validate typed terminate payload when kind is terminate."""
     if proposal.kind != "terminate":
@@ -159,6 +177,7 @@ def self_check(
     *,
     require_turn_type: bool = False,
     icp: InteractiveCompletionState | None = None,
+    finalizer_only: bool = False,
 ) -> SelfCheckRecord:
     """Run schema, contradiction, scope, and rationale checks."""
     _ = session_id  # reserved for session-scoped rules in later phases
@@ -170,6 +189,7 @@ def self_check(
     issues.extend(_rationale_issues(proposal))
     issues.extend(_turn_type_required_issues(proposal, require_turn_type=require_turn_type))
     issues.extend(icp_issues(proposal, icp))
+    issues.extend(_finalizer_only_issues(proposal, finalizer_only=finalizer_only))
     issues.extend(_terminate_payload_issues(proposal))
 
     if issues:

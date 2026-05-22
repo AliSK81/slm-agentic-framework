@@ -35,17 +35,8 @@ traces/*
 Thumbs.db
 
 # Generated reports and internal docs
-thesis_evaluation_report.md
 reports/
 PROGRESS.md
-THESIS_PROJECT_HANDOFF_REPORT.md
-PROMPT_*.md
-ROADMAP_*.md
-AVIONA_UX_SPEC.md
-docs/AVIONA_ARCHITECTURE_ISSUE.md
-docs/AVIONA_CURRENT_STATE.md
-docs/CLAUDE_PROMPT_FULL.txt
-docs/PROMPT_AVIONA_REPLAN.md
 
 # E2E / eval run logs (framework logging, staged runners, reruns)
 logs/*

@@ -98,9 +98,12 @@ See `configs/models.yaml` for all available model profiles.
 
 ---
 
-## Roadmap
+## Documentation
 
-See [ROADMAP.md](ROADMAP.md) for the phase-by-phase development plan and research milestones.
+| Doc | Purpose |
+|-----|---------|
+| [PROGRESS.md](PROGRESS.md) | Current phase and active work |
+| [ROADMAP.md](ROADMAP.md) | Thesis phase index |
 
 ---
 

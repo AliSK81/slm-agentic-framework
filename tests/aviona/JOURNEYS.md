@@ -80,4 +80,4 @@ Locked by `scripts/live_gate.py` via `scripts/test-aviona.ps1 -Live`. Requires A
 2. Extend `CONTRACT_MATRIX` or `DECLARED_TYPE_CASES` in the test file.
 3. Fix contract / budget / write-guard — not regex intent routing.
 4. Run `scripts/test-aviona.ps1`.
-5. Bump version when releasing (see `ROADMAP_PRODUCTION_AVIONA_V2.md`).
+5. Bump version when releasing (see `CHANGELOG.md`).

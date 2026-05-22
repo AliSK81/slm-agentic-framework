@@ -10,6 +10,7 @@
 ## Testing
 
 - [ ] Unit tests pass (`pytest tests/ -m "not e2e" -v`)
+- [ ] Lint passes (`ruff check src/`)
 - [ ] New tests added for changed behaviour (if applicable)
 - [ ] Manually tested with a local SLM (if applicable)
 

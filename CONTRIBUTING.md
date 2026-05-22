@@ -11,6 +11,7 @@ Thank you for your interest in contributing! Community input is welcome.
    python -m venv .venv
    source .venv/bin/activate   # Windows: .venv\Scripts\activate
    pip install -r requirements.txt
+   pip install -e .
    cp .env.example .env        # fill in your API keys
    ```
 4. Make your changes and add tests where appropriate.

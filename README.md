@@ -14,7 +14,7 @@ An agentic AI programming framework for **small language models (SLMs)**. The fr
 - **Decision Cycle** — per-LLM-call control logic with deterministic error handling and retry policies
 - **Workflow State Machine** — LangGraph-based orchestration for multi-step tasks
 - **Multi-Agent Orchestration** — Planner + Executor agents communicating via typed Pydantic messages
-- **Provider-agnostic** — works with Ollama, DeepSeek, OpenRouter, or any OpenAI-compatible endpoint
+- **Provider-agnostic** — `httpx`-based client for Ollama, DeepSeek, OpenRouter, or any OpenAI-compatible endpoint
 - **Evaluation harness** — HumanEval, MBPP, SWE-bench adapters and A–D ablation runner
 
 ---
@@ -27,8 +27,8 @@ src/
 eval/              # benchmarks and ablation scripts
 tests/             # unit, integration, and e2e test suites
 configs/           # YAML configs (runtime/ and reporting/)
-scripts/           # utility and diagnostic scripts
-var/               # runtime output (traces, logs, checkpoints)
+scripts/           # smoke checks and reporting utilities
+var/               # runtime output (gitignored; traces, logs, checkpoints)
 examples/          # minimal usage examples
 ```
 
@@ -76,6 +76,9 @@ python -m eval.scenarios.ablation --dataset humaneval_hard --n 10 --seeds 42 --d
 
 # Smoke test (requires live SLM)
 python scripts/benchmark/smoke_test.py
+
+# Curated report from trace artifacts
+python scripts/reporting/generate_report.py --traces-dir var/traces
 ```
 
 ---

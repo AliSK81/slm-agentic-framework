@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.5.1 — repo cleanup (2026-05-22)
+
+### Removed
+
+- Unused `framework.slm.provider` backward-compat shim.
+- Orphaned test fixtures, empty integration test module, and thesis-era maintenance scripts.
+- Redundant docs (`CLAUDE.md`, `examples/README.md`) and unused dependencies (`langchain-openai`, `openai`, `tiktoken`).
+
+### Changed
+
+- Agent bootstrap docs (`AGENTS.md`) and script index aligned with the current tree.
+- `requirements.txt` regenerated to latest compatible PyPI pins.
+
 ## 0.5.0 — framework-only (2026-05-22)
 
 ### Removed

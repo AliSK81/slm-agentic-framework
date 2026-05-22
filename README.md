@@ -98,7 +98,11 @@ See `configs/runtime/models.yaml` for all available model profiles.
 
 ## Examples
 
-See [examples/README.md](examples/README.md) for minimal runnable examples.
+Run a minimal session (requires a configured SLM provider in `.env`):
+
+```bash
+python examples/minimal_session.py
+```
 
 ---
 

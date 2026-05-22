@@ -17,7 +17,7 @@ body:
     attributes:
       label: Where did you look?
       description: List docs or files you checked.
-      placeholder: README.md, CONTRIBUTING.md, examples/README.md
+      placeholder: README.md, CONTRIBUTING.md, examples/minimal_session.py
     validations:
       required: true
 

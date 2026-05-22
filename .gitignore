@@ -48,9 +48,5 @@ htmlcov/
 # Local scratch / handoff artifacts (not versioned)
 temp/
 
-# Test fixture artifacts (generated during tests)
-tests/fixtures/sample_repo/hello.txt
-tests/fixtures/sample_repo/tests/
-
 # Egg-info (editable installs)
 src/*.egg-info/

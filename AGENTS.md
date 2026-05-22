@@ -1,6 +1,5 @@
 # Agent bootstrap
 
-1. Read **`PROGRESS.md`** — implement `current_phase` only (FW-5).
-2. Evidence for FW track: `reports/framework_investigation_20260522_qwen25coder3b.md`.
-3. Apply the local iteration skill for implementation protocol.
-4. Use `ROADMAP.md` as the phase index.
+1. Read **`ROADMAP.md`** for phase status and scope.
+2. Implement only the active track described in the roadmap index.
+3. Use **`README.md`** for install, test, and eval commands.

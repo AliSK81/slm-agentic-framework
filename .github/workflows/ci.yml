@@ -34,7 +34,7 @@ jobs:
       - name: Run unit & integration tests
         run: |
           pytest tests/ -m "not e2e" -v --tb=short \
-            --deselect tests/unit/test_interaction_length.py::test_generated_test_code_compiles
+            --deselect tests/unit/eval/test_interaction_length.py::test_generated_test_code_compiles
 
   lint:
     name: Lint

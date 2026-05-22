@@ -27,7 +27,7 @@ Thank you for your interest in contributing! Community input is welcome.
 - Keep module boundaries clear:
   - `src/framework`: runtime framework
   - `eval`: benchmark and ablation harness
-  - `scripts`: maintenance and utility scripts
+  - `scripts`: smoke tests and reporting utilities
 
 ## Local Validation Before PR
 

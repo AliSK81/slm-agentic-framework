@@ -6,7 +6,6 @@ from framework.slm.config import (
     active_provider_name,
     api_key_env_var_for_active_provider,
     api_key_for_active_provider,
-    api_key_required_for_active_provider,
 )
 
 # Legacy names used by older call sites

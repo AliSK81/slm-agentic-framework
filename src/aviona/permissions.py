@@ -8,7 +8,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from framework.error_control.sandbox import (
     SAFE_COMMANDS,

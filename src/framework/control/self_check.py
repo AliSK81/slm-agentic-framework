@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 from pydantic import ValidationError
 
@@ -14,7 +13,6 @@ from framework.control.interactive import (
 )
 from framework.control.models import (
     handoff_reason,
-    parse_handoff_payload,
     parse_terminate_payload,
 )
 from framework.memory.stores import DecisionEntry, Issue, MemoryStores, SelfCheckRecord

@@ -22,10 +22,10 @@ from framework.tools.code_sanitize import sanitize_python_source
 from framework.tools.compile_check import CompileResult, py_compile_check
 from framework.tools.file_tools import FileResult, edit_file, read_file, write_file
 from framework.error_control.sandbox import is_inspect_run_command, safe_execute
+from framework.tools.test_runner import run_tests
 
 WriteFileFn = Callable[[str, str, Path], FileResult]
 EditFileFn = Callable[[str, str, str, Path], FileResult]
-from framework.tools.test_runner import run_tests
 
 logger = logging.getLogger(__name__)
 

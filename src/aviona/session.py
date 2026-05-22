@@ -22,7 +22,6 @@ from aviona.render import render_status, render_turn_detail
 from aviona.runtime import (
     interactive_turn_contract_hint,
     is_answer_only_goal,
-    is_meta_question,
     runtime_anchor_segment,
     runtime_answer_constraint,
 )

@@ -3,15 +3,12 @@
 from __future__ import annotations
 
 import logging
-import os
 import time
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 from collections.abc import Callable
 from typing import Any, Literal
-
-EngineName = Literal["loop", "graph"]
 
 from pydantic import BaseModel
 
@@ -73,6 +70,8 @@ from framework.slm.config import (
 )
 from framework.slm.registry import client_for_role, probe_client
 from framework.tools.test_runner import run_tests
+
+EngineName = Literal["loop", "graph"]
 
 load_project_env()
 logger = logging.getLogger(__name__)

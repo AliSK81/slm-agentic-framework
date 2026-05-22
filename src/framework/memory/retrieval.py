@@ -17,7 +17,7 @@ from framework.memory.stores import RetrievalItem
 logger = logging.getLogger(__name__)
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]
-_MEMORY_CONFIG = _PROJECT_ROOT / "configs" / "memory.yaml"
+_MEMORY_CONFIG = _PROJECT_ROOT / "configs" / "runtime" / "memory.yaml"
 
 _TOKEN_RE = re.compile(r"[a-z0-9]+")
 
@@ -40,7 +40,7 @@ def _load_retrieval_config() -> dict[str, Any]:
 
 
 def get_retrieval_mode() -> str:
-    """Resolve retrieval mode from env (``MEMORY_RETRIEVAL_MODE``) or memory.yaml."""
+    """Resolve retrieval mode from env (``MEMORY_RETRIEVAL_MODE``) or configs/runtime/memory.yaml."""
     env = os.getenv("MEMORY_RETRIEVAL_MODE", "").strip().lower()
     if env in ("keyword", "semantic"):
         return env
@@ -217,7 +217,7 @@ def retrieve_top_k(
     """Score all items and return top-k (text_summary capped per config).
 
     Dispatches to keyword (Generative Agents) or semantic (Chroma) based on
-    ``mode``, ``MEMORY_RETRIEVAL_MODE``, or ``memory.yaml`` ``retrieval.mode``.
+    ``mode``, ``MEMORY_RETRIEVAL_MODE``, or ``configs/runtime/memory.yaml`` ``retrieval.mode``.
     """
     cfg = _load_retrieval_config()
     k = k if k is not None else cfg["top_k"]

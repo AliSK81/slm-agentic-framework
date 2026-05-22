@@ -37,7 +37,7 @@ class ProfileResolutionError(ValueError):
         else:
             message = (
                 f"No profile configured for role {role!r}. "
-                "Set defaults in configs/models.yaml or {ROLE}_PROFILE in .env. "
+                "Set defaults in configs/runtime/models.yaml or {ROLE}_PROFILE in .env. "
                 f"Known profiles: {', '.join(profile_names) or '(none)'}; "
                 f"known bundles: {', '.join(bundle_names) or '(none)'}."
             )

@@ -46,7 +46,7 @@ def load_interactive_finalizer_enabled() -> bool:
 
 @lru_cache(maxsize=1)
 def load_interactive_budgets() -> dict[str, int]:
-    """Load per-phase cycle budgets from ``configs/models.yaml`` interactive section."""
+    """Load per-phase cycle budgets from ``configs/runtime/models.yaml`` interactive section."""
     raw = yaml.safe_load(models_config_path().read_text(encoding="utf-8")) or {}
     section = raw.get("interactive") or {}
     budgets = section.get("budgets") or {}

@@ -19,8 +19,8 @@ from eval.curated import (
 from eval.manifest import write_manifest
 from eval.metrics import RunResult
 from eval.metrics.ci import mean_ci_95
-from scripts.generate_report import generate_report
-from scripts.make_repro_bundle import make_repro_bundle
+from scripts.reporting.generate_report import generate_report
+from scripts.reporting.make_repro_bundle import make_repro_bundle
 
 
 def _write_run(

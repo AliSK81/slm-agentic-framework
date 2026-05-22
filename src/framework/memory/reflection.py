@@ -16,7 +16,7 @@ from framework.slm.client import SLMClient
 logger = logging.getLogger(__name__)
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]
-_MEMORY_CONFIG = _PROJECT_ROOT / "configs" / "memory.yaml"
+_MEMORY_CONFIG = _PROJECT_ROOT / "configs" / "runtime" / "memory.yaml"
 
 REFLECTION_PROMPT = """Task: {original_goal}
 Current subtask: {current_subtask}

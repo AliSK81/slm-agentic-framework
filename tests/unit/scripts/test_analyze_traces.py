@@ -11,7 +11,7 @@ from framework.memory.stores import DecisionEntry, Issue, SelfCheckRecord
 from eval.decision_log import DecisionLogWriter
 from eval.manifest import write_manifest
 from framework.memory.stores import DecisionEntry, SelfCheckRecord
-from scripts.analyze_traces import (
+from scripts.reporting.analyze_traces import (
     check_behavioral_interpretability,
     count_contradictions,
     count_self_check_failures,

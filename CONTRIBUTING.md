@@ -44,7 +44,11 @@ If your change affects live-provider flows, also run:
 pytest tests/ -m e2e -v
 ```
 
-See [`docs/testing.md`](docs/testing.md) for test tier guidance.
+Test tiers:
+
+- `tests/unit/`: fast tests with fixtures and mocks
+- `tests/integration/`: integration behavior without live external APIs
+- `tests/e2e/`: end-to-end tests that require a live SLM provider (run with `pytest tests/ -m e2e -v`)
 
 ## Code Style
 

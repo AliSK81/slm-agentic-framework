@@ -14,6 +14,7 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 from framework.env import load_project_env
+from framework.runtime_dirs import logs_dir
 
 _E2E_LOGGING_READY = False
 _E2E_LOG_PATH: Path | None = None
@@ -25,7 +26,7 @@ def _configure_e2e_logging() -> Path:
     if _E2E_LOGGING_READY and _E2E_LOG_PATH is not None:
         return _E2E_LOG_PATH
 
-    log_dir = _ROOT / "logs"
+    log_dir = logs_dir()
     log_dir.mkdir(parents=True, exist_ok=True)
     _E2E_LOG_PATH = log_dir / f"e2e_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}.log"
 

@@ -1,8 +1,8 @@
 """Diagnose e2e test timing — per-task wall time, per-model latency, unique errors.
 
 Usage:
-  python scripts/diagnose_e2e.py <log_path>
-  python scripts/diagnose_e2e.py logs/e2e_20260521T170814Z.log
+  python scripts/reporting/diagnose_e2e.py <log_path>
+  python scripts/reporting/diagnose_e2e.py var/logs/e2e_20260521T170814Z.log
 
 Reads the e2e framework log, per_task/*.json results, manifest files, and session
 SQLite DBs to build a timing breakdown table and error summary.
@@ -19,6 +19,11 @@ from glob import glob
 from pathlib import Path
 
 _PROJECT = Path(__file__).resolve().parents[2]
+_SRC = _PROJECT / "src"
+if str(_SRC) not in sys.path:
+    sys.path.insert(0, str(_SRC))
+
+from framework.runtime_dirs import traces_dir as default_traces_dir
 
 
 def _parse_events(log_path: str) -> list[dict]:
@@ -55,7 +60,7 @@ def _load_manifest(config: str, dataset: str, traces_dir: Path) -> dict | None:
 
 def _per_task_results(config: str, dataset: str) -> dict[str, dict]:
     results: dict[str, dict] = {}
-    pat = str(_PROJECT / "traces" / "per_task" / config / dataset / "HumanEval_*.json")
+    pat = str(default_traces_dir() / "per_task" / config / dataset / "HumanEval_*.json")
     for f in sorted(glob(pat)):
         try:
             d = json.load(open(f, encoding="utf-8"))
@@ -106,7 +111,7 @@ def _db_timings(session_id: str, data_dir: Path) -> dict | None:
 
 def diagnose(log_path: str) -> None:
     events = _parse_events(log_path)
-    traces_dir = _PROJECT / "traces"
+    traces_dir = default_traces_dir()
 
     # Discover all (config, dataset) runs from "Ablation config X on Y" or "Eval complete" lines
     runs: list[dict] = []  # {config, dataset, tasks: {id: {wall, session_id}}}

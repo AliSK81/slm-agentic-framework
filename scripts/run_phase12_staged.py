@@ -8,7 +8,13 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parents[1]
-_LOG_DIR = _ROOT / "logs"
+_SRC = _ROOT / "src"
+if str(_SRC) not in sys.path:
+    sys.path.insert(0, str(_SRC))
+
+from framework.runtime_dirs import logs_dir
+
+_LOG_DIR = logs_dir()
 _PY = _ROOT / ".venv" / "Scripts" / "python.exe"
 
 

@@ -18,13 +18,8 @@ logger = logging.getLogger(__name__)
 
 _ENTRY_POINT_RE = re.compile(r"def\s+([a-zA-Z_][\w]*)\s*\(")
 
-_CONFIGS_DIR = Path(__file__).resolve().parents[2] / "configs"
-_REPORTING_CONFIGS_DIR = _CONFIGS_DIR / "reporting"
-_CURATED_HARD_IDS_PATH = (
-    _REPORTING_CONFIGS_DIR / "humaneval_hard_ids.txt"
-    if (_REPORTING_CONFIGS_DIR / "humaneval_hard_ids.txt").is_file()
-    else _CONFIGS_DIR / "humaneval_hard_ids.txt"
-)
+_REPORTING_CONFIGS_DIR = Path(__file__).resolve().parents[2] / "configs" / "reporting"
+_CURATED_HARD_IDS_PATH = _REPORTING_CONFIGS_DIR / "humaneval_hard_ids.txt"
 
 
 class HumanEvalTask(BaseModel):
@@ -45,7 +40,7 @@ def _curated_hard_ids() -> frozenset[str]:
 def difficulty_of(task: HumanEvalTask) -> DifficultyLabel:
     """Assign a deterministic difficulty label from prompt/test heuristics.
 
-    Curated ids in ``configs/humaneval_hard_ids.txt`` always return ``hard``.
+    Curated ids in ``configs/reporting/humaneval_hard_ids.txt`` always return ``hard``.
     """
     return _difficulty_of(task, curated_ids=_curated_hard_ids())
 

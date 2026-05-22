@@ -121,7 +121,7 @@ def _apply_profile_bundle(bundle_name: str | None) -> None:
     else:
         raise ValueError(
             f"Unknown profile bundle or provider {bundle_name!r}. "
-            "Use a bundle from configs/models.yaml (e.g. slm_small) or a provider key (e.g. deepseek)."
+            "Use a bundle from configs/runtime/models.yaml (e.g. slm_small) or a provider key (e.g. deepseek)."
         )
     clear_config_cache()
 

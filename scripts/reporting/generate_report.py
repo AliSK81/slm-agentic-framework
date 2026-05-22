@@ -24,6 +24,7 @@ from eval.curated import (
 )
 from eval.metrics.ci import format_mean_pm_ci
 from eval.metrics.efficiency import format_efficiency_table, load_efficiency_from_project
+from framework.runtime_dirs import traces_dir as default_traces_dir
 from scripts.reporting.analyze_traces import summarize_trace
 
 
@@ -59,7 +60,7 @@ def _curated_report_lines(
     lines = [
         "## Curated results (allowlist)",
         "",
-        f"Allowlist: `{allowlist_path or _PROJECT_ROOT / 'configs' / 'cite_allowlist.yaml'}`",
+        f"Allowlist: `{allowlist_path or _PROJECT_ROOT / 'configs' / 'reporting' / 'cite_allowlist.yaml'}`",
         "",
         "| Config | Dataset | Seeds | SR (mean ± 95% CI) | CER (mean ± 95% CI) | Included runs |",
         "|--------|---------|-------|--------------------|---------------------|------------|",
@@ -101,7 +102,7 @@ def generate_report(
     include_all_traces: bool = False,
 ) -> Path:
     """Write markdown report with SR/CER, failures, and retry stats."""
-    traces_dir = traces_dir or (_PROJECT_ROOT / "traces")
+    resolved_traces = traces_dir or default_traces_dir()
     output_path = output_path or (_PROJECT_ROOT / "evaluation_report.md")
     ckpt = str(checkpoint_dir) if checkpoint_dir else None
 
@@ -113,12 +114,12 @@ def generate_report(
     ]
 
     if curated:
-        lines.extend(_curated_report_lines(traces_dir=traces_dir, allowlist_path=allowlist_path))
+        lines.extend(_curated_report_lines(traces_dir=resolved_traces, allowlist_path=allowlist_path))
         lines.append("")
 
     trace_files: list[Path] = []
     if include_all_traces or not curated:
-        trace_files = discover_trace_files(traces_dir)
+        trace_files = discover_trace_files(resolved_traces)
         summaries: list[dict] = []
         for path in trace_files:
             try:
@@ -201,7 +202,7 @@ def main(argv: list[str] | None = None) -> int:
         "--traces-dir",
         type=Path,
         default=None,
-        help="Directory containing JSONL traces (default: ./traces)",
+        help="Directory containing JSONL traces (default: var/traces)",
     )
     parser.add_argument(
         "--output",
@@ -244,7 +245,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    traces_dir = args.traces_dir or (_PROJECT_ROOT / "traces")
+    traces_dir = args.traces_dir or default_traces_dir()
 
     if args.curated or args.dry_run:
         try:

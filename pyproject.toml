@@ -21,7 +21,7 @@ requires-python = ">=3.12"
 [project.urls]
 "Homepage" = "https://github.com/AliSK81/slm-agentic-framework"
 "Bug Tracker" = "https://github.com/AliSK81/slm-agentic-framework/issues"
-"Documentation" = "https://github.com/AliSK81/slm-agentic-framework/blob/master/docs/index.md"
+"Documentation" = "https://github.com/AliSK81/slm-agentic-framework/blob/master/README.md"
 "Changelog" = "https://github.com/AliSK81/slm-agentic-framework/blob/master/CHANGELOG.md"
 
 [project.optional-dependencies]

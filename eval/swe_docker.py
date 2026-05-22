@@ -41,7 +41,7 @@ def require_docker(docker_required: bool) -> None:
     """Raise :class:`DockerNotAvailableError` when Docker is required but absent."""
     if docker_required and not docker_available():
         raise DockerNotAvailableError(
-            "SWE-bench evaluation requires Docker on the host (configs/eval.yaml "
+            "SWE-bench evaluation requires Docker on the host (configs/runtime/eval.yaml "
             "swebench.docker_required=true). Install/start Docker or set docker_required: false."
         )
 

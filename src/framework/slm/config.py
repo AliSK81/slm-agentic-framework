@@ -11,11 +11,7 @@ import yaml
 from pydantic import AliasChoices, BaseModel, Field
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]
-_RUNTIME_MODELS_CONFIG = _PROJECT_ROOT / "configs" / "runtime" / "models.yaml"
-_LEGACY_MODELS_CONFIG = _PROJECT_ROOT / "configs" / "models.yaml"
-_MODELS_CONFIG = (
-    _RUNTIME_MODELS_CONFIG if _RUNTIME_MODELS_CONFIG.is_file() else _LEGACY_MODELS_CONFIG
-)
+_MODELS_CONFIG = _PROJECT_ROOT / "configs" / "runtime" / "models.yaml"
 _PLACEHOLDER_KEYS = frozenset({"", "your_key_here", "changeme"})
 
 
@@ -40,7 +36,7 @@ class EndpointConfig(BaseModel):
 
 
 class ModelProfile(BaseModel):
-    """Model capabilities and limits from configs/models.yaml."""
+    """Model capabilities and limits from configs/runtime/models.yaml."""
 
     model_id: str = Field(validation_alias=AliasChoices("model_id", "openrouter_id"))
     provider: str | None = None
@@ -59,7 +55,7 @@ class ModelProfile(BaseModel):
 
 
 def models_config_path() -> Path:
-    """Path to ``configs/models.yaml``."""
+    """Path to ``configs/runtime/models.yaml``."""
     return _MODELS_CONFIG
 
 
@@ -142,7 +138,7 @@ def resolve_endpoint(profile_name: str) -> EndpointConfig:
 
 
 def list_profile_names() -> list[str]:
-    """Profile keys defined in ``configs/models.yaml``."""
+    """Profile keys defined in ``configs/runtime/models.yaml``."""
     return list(_load_raw().get("profiles", {}).keys())
 
 

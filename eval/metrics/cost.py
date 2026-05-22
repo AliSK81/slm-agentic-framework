@@ -11,7 +11,7 @@ import yaml
 from eval.metrics.sr import RunResult
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
-_DEFAULT_MODELS = _PROJECT_ROOT / "configs" / "models.yaml"
+_DEFAULT_MODELS = _PROJECT_ROOT / "configs" / "runtime" / "models.yaml"
 
 
 def load_price_table(models_path: Path | None = None) -> dict[str, dict[str, float]]:

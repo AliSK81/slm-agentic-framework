@@ -1,4 +1,4 @@
-"""Load evaluation configuration from configs/eval.yaml."""
+"""Load evaluation configuration from configs/runtime/eval.yaml."""
 
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ class AblationFlags(BaseModel):
 
 
 class EvalConfig(BaseModel):
-    """Parsed configs/eval.yaml."""
+    """Parsed configs/runtime/eval.yaml."""
 
     humaneval: dict[str, Any] = Field(default_factory=dict)
     humaneval_hard: dict[str, Any] = Field(default_factory=dict)
@@ -44,9 +44,7 @@ def _project_root() -> Path:
 
 def load_eval_config(path: Path | None = None) -> EvalConfig:
     """Load and validate evaluation YAML."""
-    runtime_path = _project_root() / "configs" / "runtime" / "eval.yaml"
-    legacy_path = _project_root() / "configs" / "eval.yaml"
-    config_path = path or (runtime_path if runtime_path.is_file() else legacy_path)
+    config_path = path or (_project_root() / "configs" / "runtime" / "eval.yaml")
     raw = yaml.safe_load(config_path.read_text(encoding="utf-8"))
     budgets: dict[str, StepBudget] = {}
     for name, values in (raw.get("step_budgets") or {}).items():

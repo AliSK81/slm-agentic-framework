@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -138,7 +139,14 @@ def load_efficiency_from_project(
 ) -> list[EfficiencyRow]:
     """Load allowlist and aggregate efficiency for reports."""
     root = Path(__file__).resolve().parents[2]
+    if traces_dir is None:
+        src = str(root / "src")
+        if src not in sys.path:
+            sys.path.insert(0, src)
+        from framework.runtime_dirs import traces_dir as default_traces_dir
+
+        traces_dir = default_traces_dir()
     return aggregate_efficiency(
         load_cite_allowlist(allowlist_path),
-        traces_dir=traces_dir or (root / "traces"),
+        traces_dir=traces_dir,
     )

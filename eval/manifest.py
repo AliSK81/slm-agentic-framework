@@ -79,11 +79,11 @@ def write_manifest(
     traces_dir: Path | None = None,
     **kwargs: Any,
 ) -> Path:
-    """Write ``traces/{run_id}.manifest.json`` and return its path.
+    """Write ``var/traces/{run_id}.manifest.json`` and return its path.
 
     Inputs:
         run_id: Stem of the aggregate JSONL file (e.g. ``D_humaneval_20260520T120000Z``).
-        traces_dir: Directory for trace artifacts (default ``./traces``).
+        traces_dir: Directory for trace artifacts (default ``var/traces``).
         **kwargs: Fields for :class:`RunManifest` (except ``run_id``).
 
     Outputs:
@@ -92,7 +92,14 @@ def write_manifest(
     Side effects:
         Creates ``traces_dir`` if needed; writes JSON to disk.
     """
-    root = traces_dir or (_PROJECT_ROOT / "traces")
+    root = traces_dir
+    if root is None:
+        src = str(_PROJECT_ROOT / "src")
+        if src not in sys.path:
+            sys.path.insert(0, src)
+        from framework.runtime_dirs import traces_dir as default_traces_dir
+
+        root = default_traces_dir()
     root.mkdir(parents=True, exist_ok=True)
     manifest = RunManifest(run_id=run_id, **kwargs)
     path = root / f"{run_id}.manifest.json"

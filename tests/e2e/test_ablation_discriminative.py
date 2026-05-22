@@ -23,7 +23,7 @@ SR_MARGIN_PP = 5.0
 def test_ablation_d_geq_a_discriminative(require_api_key: str) -> None:
     """Pass when cited D beats A by margin; else skip with observed means (never fake a win)."""
     _ = require_api_key
-    traces_root = Path(__file__).resolve().parents[2] / "traces"
+    traces_root = Path(__file__).resolve().parents[2] / "var" / "traces"
     allowlist = load_cite_allowlist()
     entries = entries_for_section(allowlist, DEEPSEEK_DISCRIMINATIVE_SECTION)
     if len(entries) < EXPECTED_RUNS:

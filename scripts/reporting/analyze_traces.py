@@ -55,13 +55,11 @@ def resolve_session_id(trace_path: str, task_or_session_id: str) -> str:
 
 
 def _default_checkpoint_dir(trace_path: Path) -> Path:
-    """Prefer ``traces/checkpoints`` adjacent to aggregate JSONL under ``traces/``."""
-    if trace_path.parent.name == "traces" or trace_path.parent.parent.name == "traces":
-        candidate = trace_path.parent / "checkpoints"
-        if candidate.is_dir():
-            return candidate
-    root = _PROJECT_ROOT / "traces" / "checkpoints"
-    return root
+    """Return the shared session checkpoint directory under ``var/checkpoints``."""
+    from framework.runtime_dirs import checkpoints_dir
+
+    _ = trace_path
+    return checkpoints_dir()
 
 
 def load_jsonl_rows(trace_path: str) -> list[RunResult]:
@@ -318,12 +316,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--trace",
         required=True,
-        help="Path to aggregate JSONL (e.g. traces/D_humaneval_*.jsonl)",
+        help="Path to aggregate JSONL (e.g. var/traces/D_humaneval_*.jsonl)",
     )
     parser.add_argument(
         "--checkpoint-dir",
         default=None,
-        help="Directory of session checkpoints (default: traces/checkpoints)",
+        help="Directory of session checkpoints (default: var/checkpoints)",
     )
     parser.add_argument(
         "--session",

@@ -11,9 +11,7 @@ from typing import Any, Protocol, runtime_checkable
 import yaml
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]
-_RUNTIME_MEMORY_CONFIG = _PROJECT_ROOT / "configs" / "runtime" / "memory.yaml"
-_LEGACY_MEMORY_CONFIG = _PROJECT_ROOT / "configs" / "memory.yaml"
-_MEMORY_CONFIG = _RUNTIME_MEMORY_CONFIG if _RUNTIME_MEMORY_CONFIG.is_file() else _LEGACY_MEMORY_CONFIG
+_MEMORY_CONFIG = _PROJECT_ROOT / "configs" / "runtime" / "memory.yaml"
 
 
 @runtime_checkable
@@ -148,7 +146,7 @@ class RedisBackend:
         *,
         ttl_seconds: int | None = None,
     ) -> None:
-        """Connect to Redis; uses configs/memory.yaml when args omitted."""
+        """Connect to Redis; uses configs/runtime/memory.yaml when args omitted."""
         import redis
 
         default_url, default_ttl = _redis_defaults()

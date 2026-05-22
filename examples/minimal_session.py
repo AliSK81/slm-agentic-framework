@@ -8,6 +8,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
+from framework.runtime_dirs import checkpoints_dir  # noqa: E402
 from framework.env import load_project_env  # noqa: E402
 from framework.orchestration.session import run_full_session  # noqa: E402
 
@@ -24,7 +25,7 @@ def main() -> int:
         "assert add(1, 2) == 3\nassert add(1.5, 2.5) == 4.0",
         workspace,
         max_steps=12,
-        checkpoint_dir=PROJECT_ROOT / "checkpoints",
+        checkpoint_dir=checkpoints_dir(),
     )
     print(f"Outcome: {result.outcome}")
     print(f"Test passed: {result.test_passed}")

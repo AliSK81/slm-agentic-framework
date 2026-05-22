@@ -26,9 +26,9 @@ src/
   framework/       # core library (memory, control, orchestration, error handling)
 eval/              # benchmarks and ablation scripts
 tests/             # unit, integration, and e2e test suites
-configs/           # YAML configs for models, memory, and eval
+configs/           # YAML configs (runtime/ and reporting/)
 scripts/           # utility and diagnostic scripts
-docs/              # contributor and architecture documentation
+var/               # runtime output (traces, logs, checkpoints)
 examples/          # minimal usage examples
 ```
 
@@ -75,7 +75,7 @@ pytest tests/ -m e2e -v
 python -m eval.scenarios.ablation --dataset humaneval_hard --n 10 --seeds 42 --dry-run
 
 # Smoke test (requires live SLM)
-python scripts/smoke_test.py
+python scripts/benchmark/smoke_test.py
 ```
 
 ---
@@ -96,16 +96,9 @@ See `configs/runtime/models.yaml` for all available model profiles.
 
 ---
 
-## Documentation
+## Examples
 
-| Doc | Purpose |
-|-----|---------|
-| [docs/index.md](docs/index.md) | Documentation hub for contributors and users |
-| [docs/development.md](docs/development.md) | Local setup and developer workflow |
-| [docs/testing.md](docs/testing.md) | Test tiers and common commands |
-| [docs/architecture.md](docs/architecture.md) | Module boundaries and architecture overview |
-| [docs/evaluation.md](docs/evaluation.md) | Benchmark and ablation workflows |
-| [examples/README.md](examples/README.md) | Minimal runnable examples |
+See [examples/README.md](examples/README.md) for minimal runnable examples.
 
 ---
 

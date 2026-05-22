@@ -60,7 +60,7 @@ def run_interaction_length(
         Dict keyed by level string with SR, CER, mean_interactions, and trace paths.
 
     Side effects:
-        Writes aggregate JSONL and manifest under ``traces/`` per level.
+        Writes aggregate JSONL and manifest under ``var/traces/`` per level.
     """
     config_name: ConfigName = config  # type: ignore[assignment]
     eval_config = load_eval_config()

@@ -12,12 +12,15 @@ import yaml
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
+if str(_PROJECT_ROOT / "src") not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT / "src"))
 
 from eval.curated import DEEPSEEK_DISCRIMINATIVE_SECTION, EXPECTED_DEEPSEEK_DISCRIMINATIVE_RUNS
 from eval.run_quality import assess_run
+from framework.runtime_dirs import traces_dir
 
-TRACES = _PROJECT_ROOT / "traces"
-ALLOWLIST = _PROJECT_ROOT / "configs" / "cite_allowlist.yaml"
+TRACES = traces_dir()
+ALLOWLIST = _PROJECT_ROOT / "configs" / "reporting" / "cite_allowlist.yaml"
 CONFIGS = ("A", "B", "C", "D")
 SEEDS = (41, 42, 43)
 

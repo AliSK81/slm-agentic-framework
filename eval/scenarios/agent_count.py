@@ -80,7 +80,7 @@ def _mean_interactions_from_trace(trace_file: str) -> float:
 
 def _contradiction_count_from_trace(trace_file: str) -> int:
     """Count contradictions via decision JSONL when manifest is present."""
-    from scripts.analyze_traces import count_contradictions
+    from scripts.reporting.analyze_traces import count_contradictions
 
     return count_contradictions(trace_file)
 

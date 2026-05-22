@@ -127,7 +127,7 @@ def test_llm_call_count_recorded_per_session() -> None:
 
 
 def test_load_price_table_reads_models_yaml() -> None:
-    """configs/models.yaml profiles with price fields appear in the table."""
+    """configs/runtime/models.yaml profiles with price fields appear in the table."""
     table = load_price_table()
     assert "qwen/qwen2.5-coder-7b-instruct" in table
     assert table["qwen/qwen2.5-coder-7b-instruct"]["price_per_1k_in"] > 0

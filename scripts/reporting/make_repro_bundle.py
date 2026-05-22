@@ -11,12 +11,15 @@ from pathlib import Path
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
+if str(_PROJECT_ROOT / "src") not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT / "src"))
 
 from eval.curated import (
     assert_text_has_no_secrets,
     collect_cited_artifacts,
     load_cite_allowlist,
 )
+from framework.runtime_dirs import traces_dir as default_traces_dir
 
 
 def make_repro_bundle(
@@ -29,7 +32,7 @@ def make_repro_bundle(
 
     Inputs:
         allowlist_path: Path to cite_allowlist.yaml.
-        traces_dir: Source traces directory (default ./traces).
+        traces_dir: Source traces directory (default var/traces).
         output_dir: Bundle root (default ./artifacts/repro_bundle).
 
     Outputs:
@@ -38,7 +41,7 @@ def make_repro_bundle(
     Side effects:
         Creates output_dir; writes MANIFEST_INDEX.md; copies allowlisted files only.
     """
-    traces_dir = traces_dir or (_PROJECT_ROOT / "traces")
+    traces_dir = traces_dir or default_traces_dir()
     output_dir = output_dir or (_PROJECT_ROOT / "artifacts" / "repro_bundle")
     allowlist = load_cite_allowlist(allowlist_path)
 
@@ -78,13 +81,13 @@ def main(argv: list[str] | None = None) -> int:
         "--allowlist",
         type=Path,
         default=None,
-        help="Path to cite_allowlist.yaml (default: configs/cite_allowlist.yaml)",
+        help="Path to cite_allowlist.yaml (default: configs/reporting/cite_allowlist.yaml)",
     )
     parser.add_argument(
         "--traces-dir",
         type=Path,
         default=None,
-        help="Traces directory (default: ./traces)",
+        help="Traces directory (default: var/traces)",
     )
     parser.add_argument(
         "--output",

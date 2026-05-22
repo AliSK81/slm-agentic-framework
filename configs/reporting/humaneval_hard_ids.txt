@@ -1,5 +1,5 @@
 # Canonical HumanEval hard slice (version-controlled; always labeled "hard").
-# Used by dataset alias humaneval_hard — sample_size/seed in configs/eval.yaml.
+# Used by dataset alias humaneval_hard — sample_size/seed in configs/runtime/eval.yaml.
 HumanEval/2
 HumanEval/10
 HumanEval/17

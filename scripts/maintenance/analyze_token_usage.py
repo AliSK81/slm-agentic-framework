@@ -15,6 +15,7 @@ sys.path.insert(0, str(_ROOT / "src"))
 from framework.control.cycle import _json_format_block
 from framework.memory.stores import MemoryStores
 from framework.memory.working_memory import WorkingMemoryBuilder
+from framework.runtime_dirs import traces_dir
 from framework.slm.registry import client_for_role
 
 
@@ -100,7 +101,7 @@ def analyze_db(db_path: Path) -> dict:
 
 
 def main() -> int:
-    data_dir = _ROOT / "traces" / "workspaces" / "D" / "humaneval" / "data"
+    data_dir = traces_dir() / "workspaces" / "D" / "humaneval" / "data"
     dbs = sorted(data_dir.glob("sess-*.db"), key=lambda p: p.stat().st_mtime, reverse=True)
     n = int(sys.argv[1]) if len(sys.argv) > 1 else 10
     dbs = dbs[:n]

@@ -16,6 +16,7 @@ if _src not in sys.path:
     sys.path.insert(0, _src)
 
 from eval.config import AblationFlags, EvalConfig, load_eval_config
+from framework.runtime_dirs import checkpoints_dir, traces_dir
 from eval.datasets.humaneval_adapter import (
     load_humaneval,
     load_humaneval_by_ids,
@@ -64,9 +65,7 @@ def _ensure_import_paths() -> None:
 
 
 def _traces_dir() -> Path:
-    path = _PROJECT_ROOT / "traces"
-    path.mkdir(parents=True, exist_ok=True)
-    return path
+    return traces_dir()
 
 
 def _load_tasks(
@@ -220,7 +219,7 @@ def _run_single_task(
         workspace,
         max_steps=max_steps,
         max_retries=max_retries,
-        checkpoint_dir=traces_root / "checkpoints",
+        checkpoint_dir=checkpoints_dir(),
         ablation=ablation,
         planner_enabled=planner_enabled,
         on_decision_append=on_decision,
@@ -276,7 +275,7 @@ def run_eval(
 ) -> dict[str, Any]:
     """Run evaluation for one ablation config on one dataset.
 
-    Writes aggregate JSONL to ``traces/{config}_{dataset}_{timestamp}.jsonl``.
+    Writes aggregate JSONL to ``var/traces/{config}_{dataset}_{timestamp}.jsonl``.
     Returns summary dict with SR, CER, and task count.
     """
     eval_config: EvalConfig = load_eval_config()

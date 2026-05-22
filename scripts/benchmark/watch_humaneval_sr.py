@@ -6,13 +6,18 @@ import json
 import re
 import sys
 from datetime import datetime
+from glob import glob
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parents[2]
+_SRC = _ROOT / "src"
+if str(_SRC) not in sys.path:
+    sys.path.insert(0, str(_SRC))
 
+from framework.runtime_dirs import logs_dir, traces_dir
 
 def _latest_e2e_log() -> Path | None:
-    logs = sorted((_ROOT / "logs").glob("e2e_*.log"), key=lambda p: p.stat().st_mtime)
+    logs = sorted(logs_dir().glob("e2e_*.log"), key=lambda p: p.stat().st_mtime)
     return logs[-1] if logs else None
 
 
@@ -30,7 +35,7 @@ def _run_cutoff_from_log(log: Path) -> float:
 def report(log: Path | None = None) -> int:
     log = log or _latest_e2e_log()
     if log is None or not log.is_file():
-        print("No logs/e2e_*.log found.")
+        print("No var/logs/e2e_*.log found.")
         return 1
 
     cutoff = _run_cutoff_from_log(log)
@@ -41,7 +46,7 @@ def report(log: Path | None = None) -> int:
     begun_ids = list(dict.fromkeys(started))
     finished_ids = set(begun_ids[:-1]) if len(begun_ids) > 1 else set()
 
-    per_task = _ROOT / "traces" / "per_task" / "D" / "humaneval"
+    per_task = traces_dir() / "per_task" / "D" / "humaneval"
     by_id: dict[str, dict] = {}
     if per_task.is_dir():
         for task_id in finished_ids:

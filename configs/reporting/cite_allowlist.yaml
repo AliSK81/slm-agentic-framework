@@ -1,5 +1,5 @@
 # Canonical evaluation runs to include in project reports.
-# Excluded ids are blocked even if present under traces/ (invalid runs).
+# Excluded ids are blocked even if present under var/traces/ (invalid runs).
 # Live benchmark sections stay empty until API budget runs; structural/dry-run gates still pass.
 version: 1
 

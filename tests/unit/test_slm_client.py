@@ -35,7 +35,7 @@ def _make_client(
 
 
 def test_client_loads_profile() -> None:
-    """Client reads model profile from configs/models.yaml correctly."""
+    """Client reads model profile from configs/runtime/models.yaml correctly."""
     client = _make_client()
     profile = client.profile
     assert profile.model_id == "qwen/qwen2.5-coder-7b-instruct"

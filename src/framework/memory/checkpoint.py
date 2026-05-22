@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -24,13 +23,11 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 
+from framework.runtime_dirs import checkpoints_dir as _runtime_checkpoints_dir
+
+
 def _checkpoint_dir(override: Path | None = None) -> Path:
-    if override is not None:
-        path = override
-    else:
-        path = Path(os.getenv("CHECKPOINT_DIR", "./checkpoints"))
-    path.mkdir(parents=True, exist_ok=True)
-    return path
+    return _runtime_checkpoints_dir(override)
 
 
 def _snapshot_memory(memory: MemoryStores) -> dict[str, list[dict]]:

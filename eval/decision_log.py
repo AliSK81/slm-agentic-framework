@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class StreamedDecisionLine(BaseModel):
-    """One decision row in ``traces/decisions/{run_id}.jsonl``."""
+    """One decision row in ``var/traces/decisions/{run_id}.jsonl``."""
 
     task_id: str
     session_id: str
@@ -81,5 +81,5 @@ def load_streamed_decisions(path: str | Path) -> list[StreamedDecisionLine]:
 
 
 def decisions_path_for_run(traces_dir: Path, run_id: str) -> Path:
-    """Standard path: ``traces/decisions/{run_id}.jsonl``."""
+    """Standard path: ``var/traces/decisions/{run_id}.jsonl``."""
     return traces_dir / "decisions" / f"{run_id}.jsonl"

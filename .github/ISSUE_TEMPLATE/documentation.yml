@@ -17,7 +17,7 @@ body:
     attributes:
       label: Where did you look?
       description: List docs or files you checked.
-      placeholder: README.md, docs/development.md, CONTRIBUTING.md
+      placeholder: README.md, CONTRIBUTING.md, examples/README.md
     validations:
       required: true
 
@@ -26,4 +26,4 @@ body:
     attributes:
       label: Suggested improvement
       description: If you have a concrete suggestion, include it here.
-      placeholder: Add a new section in docs/testing.md about ...
+      placeholder: Add a new section in README.md about ...

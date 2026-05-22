@@ -12,13 +12,7 @@ import yaml
 logger = logging.getLogger(__name__)
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]
-_RUNTIME_TRUNCATION_CONFIG = _PROJECT_ROOT / "configs" / "runtime" / "truncation.yaml"
-_LEGACY_TRUNCATION_CONFIG = _PROJECT_ROOT / "configs" / "truncation.yaml"
-_TRUNCATION_CONFIG = (
-    _RUNTIME_TRUNCATION_CONFIG
-    if _RUNTIME_TRUNCATION_CONFIG.is_file()
-    else _LEGACY_TRUNCATION_CONFIG
-)
+_TRUNCATION_CONFIG = _PROJECT_ROOT / "configs" / "runtime" / "truncation.yaml"
 
 _BUILTIN_DEFAULTS: dict[str, int] = {
     "pytest_run": 4000,
@@ -30,13 +24,13 @@ _BUILTIN_DEFAULTS: dict[str, int] = {
 
 _active_profile = "default"
 
-# Mutable view used by legacy imports and tests.
+# Mutable view synced when profile changes; used by tests.
 CAPS: dict[str, int] = dict(_BUILTIN_DEFAULTS)
 
 
 @lru_cache(maxsize=1)
 def _load_truncation_raw() -> dict[str, Any]:
-    """Load ``configs/truncation.yaml`` once."""
+    """Load ``configs/runtime/truncation.yaml`` once."""
     if not _TRUNCATION_CONFIG.is_file():
         return {}
     try:

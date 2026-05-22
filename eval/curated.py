@@ -16,9 +16,7 @@ from eval.metrics.ci import MeanCI95, format_mean_pm_ci, mean_ci_95
 from eval.run_quality import assess_run
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
-_RUNTIME_ALLOWLIST = _PROJECT_ROOT / "configs" / "reporting" / "cite_allowlist.yaml"
-_LEGACY_ALLOWLIST = _PROJECT_ROOT / "configs" / "cite_allowlist.yaml"
-_DEFAULT_ALLOWLIST = _RUNTIME_ALLOWLIST if _RUNTIME_ALLOWLIST.is_file() else _LEGACY_ALLOWLIST
+_DEFAULT_ALLOWLIST = _PROJECT_ROOT / "configs" / "reporting" / "cite_allowlist.yaml"
 
 DEEPSEEK_DISCRIMINATIVE_SECTION = "humaneval_discriminative_deepseek"
 SLM_SMALL_DISCRIMINATIVE_SECTION = "humaneval_discriminative_slm_small"
@@ -98,7 +96,7 @@ class CuratedGroupSummary(BaseModel):
 
 
 def load_cite_allowlist(path: Path | None = None) -> CiteAllowlist:
-    """Load ``configs/cite_allowlist.yaml``."""
+    """Load ``configs/reporting/cite_allowlist.yaml``."""
     target = path or _DEFAULT_ALLOWLIST
     raw = yaml.safe_load(target.read_text(encoding="utf-8")) or {}
     return CiteAllowlist.model_validate(raw)

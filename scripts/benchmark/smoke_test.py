@@ -11,7 +11,7 @@ from pathlib import Path
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(_PROJECT_ROOT / "src"))
 
-from framework.env import load_project_env  # noqa: E402
+from framework.runtime_dirs import checkpoints_dir  # noqa: E402
 from framework.orchestration.session import run_full_session  # noqa: E402
 from framework.slm.config import resolve_bundle  # noqa: E402
 
@@ -42,7 +42,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--bundle",
         default=None,
-        help="Named profile bundle from configs/models.yaml (e.g. slm_small)",
+        help="Named profile bundle from configs/runtime/models.yaml (e.g. slm_small)",
     )
     args = parser.parse_args(argv)
 
@@ -52,7 +52,7 @@ def main(argv: list[str] | None = None) -> int:
 
     workspace = _PROJECT_ROOT / "workspace" / "smoke"
     workspace.mkdir(parents=True, exist_ok=True)
-    checkpoint_dir = _PROJECT_ROOT / "checkpoints"
+    checkpoint_dir = checkpoints_dir()
 
     try:
         result = run_full_session(

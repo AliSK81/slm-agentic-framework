@@ -63,11 +63,10 @@ def test_manifest_records_ablation_flags_for_config_D(tmp_path: Path) -> None:
         created_at=datetime.now(UTC),
     )
 
-    assert manifest.ablation_flags == {
-        "memory": True,
-        "control": True,
-        "error_control": True,
-    }
+    assert manifest.ablation_flags["memory"] is True
+    assert manifest.ablation_flags["control"] is True
+    assert manifest.ablation_flags["error_control"] is True
+    assert manifest.ablation_flags.get("wm_ceiling_override") is None
 
 
 def test_run_eval_task_id_runs_only_named_task(

@@ -36,7 +36,7 @@ class RunManifest(BaseModel):
     task_ids: list[str]
     task_to_session_map: dict[str, str] = Field(default_factory=dict)
     decisions_file: str = ""
-    ablation_flags: dict[str, bool] = Field(default_factory=dict)
+    ablation_flags: dict[str, bool | int | None] = Field(default_factory=dict)
     created_at: datetime
 
 

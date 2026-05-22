@@ -229,19 +229,33 @@ class SLMClient:
         )
 
     def _call_with_retry(self, payload: dict[str, Any], timeout_s: int) -> tuple[dict[str, Any], int]:
-        """POST chat/completions with retries on 429/503."""
+        """POST chat/completions with retries on 429/503 and transient connection errors."""
         url = f"{self._endpoint.base_url}/chat/completions"
         headers = dict(self._endpoint.headers)
         last_status = 0
         last_body: dict[str, Any] = {}
 
         for attempt in range(_MAX_RETRIES):
-            response = self._http.post(
-                url,
-                json=payload,
-                headers=headers,
-                timeout=timeout_s,
-            )
+            try:
+                response = self._http.post(
+                    url,
+                    json=payload,
+                    headers=headers,
+                    timeout=timeout_s,
+                )
+            except (httpx.ConnectError, httpx.ReadError, httpx.RemoteProtocolError) as exc:
+                if attempt < _MAX_RETRIES - 1:
+                    delay = _BACKOFF_BASE_S * (2**attempt)
+                    logger.warning(
+                        "SLM connection error (attempt %s/%s): %s",
+                        attempt + 1,
+                        _MAX_RETRIES,
+                        exc,
+                    )
+                    time.sleep(delay)
+                    continue
+                raise httpx.HTTPError(f"connection_failed:{exc}") from exc
+
             last_status = response.status_code
             if response.status_code in (429, 503):
                 last_body = response.json() if response.content else {}

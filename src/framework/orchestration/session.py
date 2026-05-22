@@ -109,12 +109,12 @@ def _session_user_message_from_decisions(
     decision_floor: int = 0,
 ) -> str:
     """Return typed user_message from the last terminate decision in this turn."""
-    from framework.control.models import parse_terminate_payload
+    from framework.control.models import user_message_from_payload
 
     entries = memory.decisions.list_for_session(session_id)
     for entry in reversed(entries[decision_floor:]):
         if entry.kind == "terminate":
-            return parse_terminate_payload(entry.payload).user_message
+            return user_message_from_payload(entry.payload)
     return ""
 
 

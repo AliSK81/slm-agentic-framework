@@ -49,9 +49,15 @@ def user_message_from_payload(
     fallback_rationale: str = "",
 ) -> str:
     """Return ``user_message`` from a terminate payload; optional legacy rationale fallback."""
+    if not payload:
+        return fallback_rationale.strip()
     try:
         parsed = parse_terminate_payload(payload)
     except ValidationError:
+        # Extract user_message from raw payload even if turn_type is invalid
+        raw_msg = str(payload.get("user_message") or payload.get("answer") or "")
+        if raw_msg.strip():
+            return raw_msg.strip()
         return fallback_rationale.strip()
     msg = parsed.user_message.strip()
     if msg:

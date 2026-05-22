@@ -138,6 +138,28 @@ def test_session_user_message_ignores_rationale_without_payload(tmp_path) -> Non
     assert _session_user_message_from_decisions(memory, session_id) == ""
 
 
+def test_session_user_message_survives_invalid_turn_type(tmp_path) -> None:
+    """Invalid turn_type (e.g. 'terminate', 'handoff') must not crash the session."""
+    memory = MemoryStores(SQLiteBackend(tmp_path / "badtype.db"))
+    session_id = "sess-badtype"
+    memory.decisions.append(
+        DecisionEntry(
+            session_id=session_id,
+            decision_id="d-1",
+            step_index=0,
+            by_agent="executor",
+            kind="terminate",
+            payload={"user_message": "done", "turn_type": "terminate"},
+            rationale="r",
+            references=[],
+            self_check=SelfCheckRecord(verdict="pass", issues=[]),
+            timestamp=datetime.now(UTC),
+        )
+    )
+    # Must not raise — returns the user_message despite invalid turn_type
+    assert _session_user_message_from_decisions(memory, session_id) == "done"
+
+
 def test_self_check_rejects_invalid_terminate_turn_type(tmp_path) -> None:
     """Self-check fails terminate proposals with invalid turn_type."""
     memory = MemoryStores(SQLiteBackend(tmp_path / "sc.db"))

@@ -63,7 +63,8 @@ def py_compile_check(code_or_path: str) -> CompileResult:
             finally:
                 Path(tmp_path).unlink(missing_ok=True)
     except py_compile.PyCompileError as exc:
-        syntax_exc = exc.exc_type
+        # PyCompileError wraps the original exception; find it in args
+        syntax_exc = next((a for a in exc.args if isinstance(a, Exception)), None)
         if isinstance(syntax_exc, SyntaxError):
             return CompileResult(
                 ok=False,

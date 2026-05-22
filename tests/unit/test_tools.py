@@ -31,6 +31,21 @@ def test_compile_check_returns_line_number() -> None:
     assert any("line" in err for err in result.errors)
 
 
+def test_compile_check_handles_return_outside_function() -> None:
+    """PyCompileError wrapping a SyntaxError must not crash with AttributeError."""
+    # 'return' outside a function triggers the exact PyCompileError path from Python 3.14
+    result = py_compile_check("x = 1\nreturn False\n")
+    assert not result.ok
+    assert result.errors
+
+
+def test_compile_check_handles_indentation_error() -> None:
+    """IndentationError wrapped in PyCompileError must also not crash."""
+    result = py_compile_check("def f():\npass\n")
+    assert not result.ok
+    assert result.errors
+
+
 def test_run_tests_passes_correct_code(tmp_path: Path) -> None:
     tests_dir = tmp_path / "tests"
     tests_dir.mkdir()

@@ -52,6 +52,7 @@ from framework.control.interactive import (
 from framework.memory.tool_results import append_tool_result
 from framework.memory.working_memory import WorkingMemoryBuilder
 from framework.control.ablation import AblationSettings
+from framework.slm.config import ModelProfile
 from framework.orchestration.executor import (
     EditFileFn,
     ExecutorAgent,
@@ -346,6 +347,15 @@ def _apply_session_usage(outcome: SessionOutcome, usage: SLMUsageAccumulator, mo
     outcome.model_id = model_id
 
 
+def effective_wm_profile(profile: ModelProfile, ablation: AblationSettings) -> ModelProfile:
+    """Return profile with ablation WM ceiling override applied when set."""
+    if ablation.wm_ceiling_override is None:
+        return profile
+    return profile.model_copy(
+        update={"max_working_memory_tokens": ablation.wm_ceiling_override}
+    )
+
+
 def _build_agents(
     memory: MemoryStores,
     workspace: Path,
@@ -363,13 +373,15 @@ def _build_agents(
     primary_model_id = planner_inner.profile.model_id
     planner_slm = TrackingSLMClient(planner_inner, usage)
     executor_slm = TrackingSLMClient(executor_inner, usage)
+    planner_wm_profile = effective_wm_profile(planner_slm.profile, ablation)
+    executor_wm_profile = effective_wm_profile(executor_slm.profile, ablation)
     bundle = ErrorControlBundle()
     planner = PlannerAgent(
         DecisionCycle(
             planner_slm,
             memory,
             WorkingMemoryBuilder(
-                memory, planner_slm.profile, enable_memory=ablation.memory
+                memory, planner_wm_profile, enable_memory=ablation.memory
             ),
             bundle,
             planner_slm.profile,
@@ -382,7 +394,7 @@ def _build_agents(
             executor_slm,
             memory,
             WorkingMemoryBuilder(
-                memory, executor_slm.profile, enable_memory=ablation.memory
+                memory, executor_wm_profile, enable_memory=ablation.memory
             ),
             bundle,
             executor_slm.profile,

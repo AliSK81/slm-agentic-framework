@@ -11,3 +11,4 @@ class AblationSettings(BaseModel):
     memory: bool = True
     control: bool = True
     error_control: bool = True
+    wm_ceiling_override: int | None = None

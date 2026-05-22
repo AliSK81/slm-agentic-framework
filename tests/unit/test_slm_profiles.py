@@ -52,3 +52,24 @@ def test_resolve_bundle_rejects_unknown_profile() -> None:
     """Bundle resolution fails clearly when a profile key is missing."""
     with pytest.raises(ValueError, match="Unknown SLM bundle"):
         resolve_bundle("not-a-bundle")
+
+
+def test_qwen_3b_profile_has_tuned_wm_settings() -> None:
+    """Small-model profile raises WM ceiling and disables reflection by default."""
+    from framework.slm.config import clear_config_cache
+
+    clear_config_cache()
+    profile = load_profile("ollama-qwen2.5-coder-3b")
+    assert profile.max_working_memory_tokens == 750
+    assert profile.retrieval_top_k == 2
+    assert profile.reflection_enabled is False
+
+
+def test_model_profile_optional_fields_default_safely() -> None:
+    """Profiles without new optional fields keep backward-compatible defaults."""
+    from framework.slm.config import clear_config_cache
+
+    clear_config_cache()
+    profile = load_profile("qwen2.5-coder-7b-instruct")
+    assert profile.retrieval_top_k is None
+    assert profile.reflection_enabled is True

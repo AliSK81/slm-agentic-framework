@@ -41,6 +41,6 @@ step_budgets:
 
 ablation_configs:
   A: {memory: false, control: false, error_control: false}
-  B: {memory: true,  control: false, error_control: false}
+  B: {memory: true,  control: false, error_control: false, wm_ceiling_override: 500}
   C: {memory: false, control: true,  error_control: false}
-  D: {memory: true,  control: true,  error_control: true}
+  D: {memory: true,  control: true,  error_control: true, wm_ceiling_override: 800}

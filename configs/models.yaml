@@ -248,7 +248,9 @@ profiles:
     effective_context: 8000
     thinking_budget: null
     api_thinking: false
-    max_working_memory_tokens: 400
+    max_working_memory_tokens: 750
+    retrieval_top_k: 2
+    reflection_enabled: false
     tool_output_caps:
       pytest_run: 3000
       py_compile: 1200

@@ -50,6 +50,8 @@ class ModelProfile(BaseModel):
     skill_budget_tokens: int
     timeout_by_role: dict[str, int]
     tool_call_format: str = "json"
+    retrieval_top_k: int | None = None
+    reflection_enabled: bool = True
 
 
 def models_config_path() -> Path:

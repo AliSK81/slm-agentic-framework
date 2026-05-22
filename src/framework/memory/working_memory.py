@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from framework.memory.retrieval import _cap_tokens, estimate_tokens, retrieve_top_k
+from framework.memory.retrieval import _load_retrieval_config, _cap_tokens, estimate_tokens, retrieve_top_k
 from framework.memory.stores import MemoryStores, ToolResultEntry, WorkingMemory
 from framework.slm.client import ModelProfile
 from framework.slm.skills import select_skill_card
@@ -256,7 +256,8 @@ class WorkingMemoryBuilder:
                 )
         if self._enable_memory:
             index = self._memory.retrieval.list_items()
-            top_items = retrieve_top_k(index, current_subtask, k=3)
+            top_k = self._profile.retrieval_top_k or _load_retrieval_config()["top_k"]
+            top_items = retrieve_top_k(index, current_subtask, k=top_k)
             retrieved_budget = max(1, self._profile.max_working_memory_tokens // 4)
             retrieved = _cap_retrieved_items(
                 [item.text_summary for item in top_items],

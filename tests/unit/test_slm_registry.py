@@ -59,3 +59,32 @@ def test_error_lists_valid_profile_names(monkeypatch: pytest.MonkeyPatch) -> Non
     message = str(exc_info.value)
     assert "deepseek-v4-flash" in message
     assert "qwen2.5-coder-7b-instruct" in message
+
+
+def test_ablation_wm_ceiling_override_from_eval_yaml() -> None:
+    """Ablation config B/D expose optional wm_ceiling_override from eval.yaml."""
+    from eval.config import load_eval_config
+    from framework.control.ablation import AblationSettings
+
+    cfg = load_eval_config()
+    b = AblationSettings(**cfg.ablation_configs["B"].model_dump())
+    d = AblationSettings(**cfg.ablation_configs["D"].model_dump())
+    assert b.wm_ceiling_override == 500
+    assert d.wm_ceiling_override == 800
+    assert AblationSettings(**cfg.ablation_configs["A"].model_dump()).wm_ceiling_override is None
+
+
+def test_effective_wm_profile_applies_override() -> None:
+    """Session WM builder uses ablation ceiling override when configured."""
+    from framework.control.ablation import AblationSettings
+    from framework.orchestration.session import effective_wm_profile
+    from framework.slm.config import clear_config_cache, load_profile
+
+    clear_config_cache()
+    profile = load_profile("ollama-qwen2.5-coder-3b")
+    effective = effective_wm_profile(
+        profile,
+        AblationSettings(memory=True, wm_ceiling_override=500),
+    )
+    assert effective.max_working_memory_tokens == 500
+    assert profile.max_working_memory_tokens == 750

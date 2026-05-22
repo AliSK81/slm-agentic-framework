@@ -22,6 +22,7 @@ class AblationFlags(BaseModel):
     memory: bool = False
     control: bool = False
     error_control: bool = False
+    wm_ceiling_override: int | None = None
 
 
 class EvalConfig(BaseModel):

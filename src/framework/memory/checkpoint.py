@@ -18,12 +18,10 @@ from framework.memory.stores import (
     STORE_SUBTASKS,
     MemoryStores,
 )
+from framework.runtime_dirs import checkpoints_dir as _runtime_checkpoints_dir
 
 load_dotenv()
 logger = logging.getLogger(__name__)
-
-
-from framework.runtime_dirs import checkpoints_dir as _runtime_checkpoints_dir
 
 
 def _checkpoint_dir(override: Path | None = None) -> Path:

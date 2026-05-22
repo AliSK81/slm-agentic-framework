@@ -11,7 +11,9 @@ from typing import Any, Protocol, runtime_checkable
 import yaml
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]
-_MEMORY_CONFIG = _PROJECT_ROOT / "configs" / "memory.yaml"
+_RUNTIME_MEMORY_CONFIG = _PROJECT_ROOT / "configs" / "runtime" / "memory.yaml"
+_LEGACY_MEMORY_CONFIG = _PROJECT_ROOT / "configs" / "memory.yaml"
+_MEMORY_CONFIG = _RUNTIME_MEMORY_CONFIG if _RUNTIME_MEMORY_CONFIG.is_file() else _LEGACY_MEMORY_CONFIG
 
 
 @runtime_checkable

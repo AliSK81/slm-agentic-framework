@@ -1,4 +1,4 @@
-# ROADMAP — Thesis phases (index)
+# ROADMAP — Project phases (index)
 
 > Phases **0–38 DONE**. **39–41 PAUSED.** Active work: **FW-5** in `PROGRESS.md`.  
 > Full phase specs (tasks, tests, commits) are in git history before 2026-05-22 if needed.

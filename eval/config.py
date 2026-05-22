@@ -44,7 +44,9 @@ def _project_root() -> Path:
 
 def load_eval_config(path: Path | None = None) -> EvalConfig:
     """Load and validate evaluation YAML."""
-    config_path = path or (_project_root() / "configs" / "eval.yaml")
+    runtime_path = _project_root() / "configs" / "runtime" / "eval.yaml"
+    legacy_path = _project_root() / "configs" / "eval.yaml"
+    config_path = path or (runtime_path if runtime_path.is_file() else legacy_path)
     raw = yaml.safe_load(config_path.read_text(encoding="utf-8"))
     budgets: dict[str, StepBudget] = {}
     for name, values in (raw.get("step_budgets") or {}).items():

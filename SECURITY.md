@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-This project is an MSc thesis research implementation. Only the latest version on the `master` branch receives security attention.
+This project is actively maintained. Only the latest version on the `master` branch receives security attention.
 
 | Version | Supported |
 |---------|-----------|

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "slm-agentic-framework"
 version = "0.5.0"
-description = "SLM-based multi-agent programming framework (MSc thesis)"
+description = "SLM-based multi-agent programming framework"
 readme = "README.md"
 license = { file = "LICENSE" }
 authors = [{ name = "Ali Ebrahimi", email = "aliebrahimi6739@gmail.com" }]
@@ -21,6 +21,16 @@ requires-python = ">=3.12"
 [project.urls]
 "Homepage" = "https://github.com/AliSK81/slm-agentic-framework"
 "Bug Tracker" = "https://github.com/AliSK81/slm-agentic-framework/issues"
+"Documentation" = "https://github.com/AliSK81/slm-agentic-framework/blob/master/docs/index.md"
+"Changelog" = "https://github.com/AliSK81/slm-agentic-framework/blob/master/CHANGELOG.md"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=9",
+    "pytest-asyncio>=1.0",
+    "pytest-cov>=7.0",
+    "ruff>=0.11",
+]
 [tool.setuptools]
 package-dir = { "" = "src" }
 
@@ -39,3 +49,7 @@ markers = [
 [tool.coverage.run]
 source = ["src/framework"]
 omit = ["tests/*"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100

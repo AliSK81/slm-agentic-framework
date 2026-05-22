@@ -1,0 +1,46 @@
+humaneval:
+  sample_size: 50
+  seed: 42
+  difficulty_split: {easy: 20, medium: 20, hard: 10}
+
+humaneval_hard:
+  difficulty: hard
+  sample_size: 30
+  seed: 42
+  curated_only: true
+
+discriminative:
+  dataset: humaneval
+  ids_file: humaneval_hard_ids.txt
+  sample_size: 30
+  seed: 42
+  curated_only: true
+
+mbpp:
+  sample_size: 50
+  seed: 42
+
+swebench:
+  variant: "lite"   # lite=300 tasks; we use subset
+  sample_size: 30
+  seed: 42
+  docker_required: true
+
+multistep:
+  per_level: 5
+  seed: 42
+  levels: [2, 4, 6, 8]
+
+step_budgets:
+  humaneval: {max_steps: 10, max_retries: 3}
+  humaneval_hard: {max_steps: 10, max_retries: 3}
+  discriminative: {max_steps: 10, max_retries: 3}
+  multistep: {max_steps: 15, max_retries: 3}
+  mbpp:      {max_steps: 15, max_retries: 3}
+  swebench:  {max_steps: 25, max_retries: 3}
+
+ablation_configs:
+  A: {memory: false, control: false, error_control: false}
+  B: {memory: true,  control: false, error_control: false, wm_ceiling_override: 500}
+  C: {memory: false, control: true,  error_control: false}
+  D: {memory: true,  control: true,  error_control: true, wm_ceiling_override: 800}

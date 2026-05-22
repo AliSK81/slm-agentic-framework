@@ -1,0 +1,29 @@
+name: Documentation
+description: Report missing, unclear, or incorrect documentation
+title: "[Docs]: "
+labels: ["documentation"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is unclear or missing?
+      description: Describe what you were trying to do and what docs were lacking.
+      placeholder: I could not find setup instructions for ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: location
+    attributes:
+      label: Where did you look?
+      description: List docs or files you checked.
+      placeholder: README.md, docs/development.md, CONTRIBUTING.md
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed
+    attributes:
+      label: Suggested improvement
+      description: If you have a concrete suggestion, include it here.
+      placeholder: Add a new section in docs/testing.md about ...

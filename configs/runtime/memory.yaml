@@ -1,0 +1,21 @@
+backend: sqlite   # override with env MEMORY_BACKEND
+sqlite:
+  path: "./data/framework.db"
+redis:
+  url: "redis://localhost:6379"
+  ttl_seconds: 86400   # 24h TTL on session data
+
+retrieval:
+  mode: keyword   # keyword | semantic — override with MEMORY_RETRIEVAL_MODE
+  top_k: 3
+  max_item_tokens: 150
+  min_relevance: 0.05   # omit index rows with keyword_overlap below this (0..k items)
+  alpha_recency: 0.2
+  alpha_importance: 0.5
+  alpha_relevance: 0.3
+  decay_factor: 0.995   # per hour, from Generative Agents paper
+
+reflection:
+  trigger_retry_threshold: 1   # reflect after this many retries on same subtask
+  max_reflections_per_subtask: 3
+  max_output_tokens: 120

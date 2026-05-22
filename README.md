@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 
-An agentic AI programming framework for **small language models (SLMs)**, developed as an MSc thesis project. The framework provides structured memory mechanisms, decision-cycle control logic, and a multi-agent orchestration layer optimised for resource-constrained models (3B–20B parameters).
+An agentic AI programming framework for **small language models (SLMs)**. The framework provides structured memory mechanisms, decision-cycle control logic, and a multi-agent orchestration layer optimized for resource-constrained models (3B–20B parameters).
 
 ---
 
@@ -28,6 +28,8 @@ eval/              # benchmarks and ablation scripts
 tests/             # unit, integration, and e2e test suites
 configs/           # YAML configs for models, memory, and eval
 scripts/           # utility and diagnostic scripts
+docs/              # contributor and architecture documentation
+examples/          # minimal usage examples
 ```
 
 ---
@@ -85,12 +87,12 @@ Copy `.env.example` to `.env` and set your preferred provider:
 | Variable | Description |
 |---|---|
 | `SLM_PROVIDER` | Provider key: `ollama`, `deepseek`, `openrouter`, `mohaymen` |
-| `PLANNER_PROFILE` | Model profile for the Planner agent (see `configs/models.yaml`) |
+| `PLANNER_PROFILE` | Model profile for the Planner agent (see `configs/runtime/models.yaml`) |
 | `EXECUTOR_PROFILE` | Model profile for the Executor agent |
 | `MEMORY_BACKEND` | `sqlite` (default) or `redis` |
 | `DEFAULT_MAX_STEPS` | Maximum steps per task (default: 20) |
 
-See `configs/models.yaml` for all available model profiles.
+See `configs/runtime/models.yaml` for all available model profiles.
 
 ---
 
@@ -98,8 +100,12 @@ See `configs/models.yaml` for all available model profiles.
 
 | Doc | Purpose |
 |-----|---------|
-| [PROGRESS.md](PROGRESS.md) | Current phase and active work |
-| [ROADMAP.md](ROADMAP.md) | Thesis phase index |
+| [docs/index.md](docs/index.md) | Documentation hub for contributors and users |
+| [docs/development.md](docs/development.md) | Local setup and developer workflow |
+| [docs/testing.md](docs/testing.md) | Test tiers and common commands |
+| [docs/architecture.md](docs/architecture.md) | Module boundaries and architecture overview |
+| [docs/evaluation.md](docs/evaluation.md) | Benchmark and ablation workflows |
+| [examples/README.md](examples/README.md) | Minimal runnable examples |
 
 ---
 
@@ -115,15 +121,3 @@ This project is licensed under the [MIT License](LICENSE).
 
 ---
 
-## Citation
-
-If you use this framework in your research, please cite:
-
-```bibtex
-@misc{ebrahimi2026slm,
-  author  = {Ali Ebrahimi},
-  title   = {SLM Agentic Framework},
-  year    = {2026},
-  url     = {https://github.com/AliSK81/slm-agentic-framework}
-}
-```

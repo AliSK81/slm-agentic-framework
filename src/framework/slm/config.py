@@ -11,7 +11,11 @@ import yaml
 from pydantic import AliasChoices, BaseModel, Field
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]
-_MODELS_CONFIG = _PROJECT_ROOT / "configs" / "models.yaml"
+_RUNTIME_MODELS_CONFIG = _PROJECT_ROOT / "configs" / "runtime" / "models.yaml"
+_LEGACY_MODELS_CONFIG = _PROJECT_ROOT / "configs" / "models.yaml"
+_MODELS_CONFIG = (
+    _RUNTIME_MODELS_CONFIG if _RUNTIME_MODELS_CONFIG.is_file() else _LEGACY_MODELS_CONFIG
+)
 _PLACEHOLDER_KEYS = frozenset({"", "your_key_here", "changeme"})
 
 

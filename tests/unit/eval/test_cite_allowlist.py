@@ -158,7 +158,8 @@ def test_deepseek_discriminative_section_complete_and_valid(
     tmp_path: Path,
 ) -> None:
     """Evidence gate: all 12 DeepSeek discriminative runs exist and pass quality."""
-    traces_root = Path(__file__).resolve().parents[2] / "traces"
+    root = next(p for p in Path(__file__).resolve().parents if (p / "pyproject.toml").is_file())
+    traces_root = root / "traces"
     allowlist = load_cite_allowlist()
     entries = entries_for_section(allowlist, DEEPSEEK_DISCRIMINATIVE_SECTION)
     if len(entries) < EXPECTED_DEEPSEEK_DISCRIMINATIVE_RUNS:

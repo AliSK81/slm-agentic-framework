@@ -204,66 +204,73 @@ def run_ablation(
         Writes JSONL + manifest per (config, seed). Raises AblationRunInvalidError
         when any non-dry run fails the quality gate.
     """
-    _apply_profile_bundle(profile_bundle)
-    _apply_retrieval_mode(retrieval_mode)
-    dataset_name: AblationDatasetName = dataset  # type: ignore[assignment]
-    eval_config = load_eval_config()
-    flags_map = eval_config.ablation_configs
-    timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-    seed_list = seeds if seeds is not None else [seed]
-    config_results: dict[str, ConfigResult] = {}
+    previous_retrieval_mode = os.environ.get("MEMORY_RETRIEVAL_MODE")
+    try:
+        _apply_profile_bundle(profile_bundle)
+        _apply_retrieval_mode(retrieval_mode)
+        dataset_name: AblationDatasetName = dataset  # type: ignore[assignment]
+        eval_config = load_eval_config()
+        flags_map = eval_config.ablation_configs
+        timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+        seed_list = seeds if seeds is not None else [seed]
+        config_results: dict[str, ConfigResult] = {}
 
-    for config_name in CONFIG_ORDER:
-        per_seed: list[SeedRunResult] = []
-        for run_seed in seed_list:
-            logger.info(
-                "Ablation config %s on %s (n=%s, seed=%s)",
-                config_name,
-                dataset,
-                n,
-                run_seed,
-            )
-            summary = run_eval(
-                config_name,
-                dataset_name,
-                n=n,
-                seed=run_seed,
-                dry_run=dry_run,
-            )
-            run_valid = bool(summary.get("run_valid", True))
-            if not dry_run and not run_valid:
-                reason = summary.get("run_invalid_reason", "unknown")
-                raise AblationRunInvalidError(
-                    f"Run invalid for config {config_name} seed {run_seed} "
-                    f"on {dataset}: {reason}"
+        for config_name in CONFIG_ORDER:
+            per_seed: list[SeedRunResult] = []
+            for run_seed in seed_list:
+                logger.info(
+                    "Ablation config %s on %s (n=%s, seed=%s)",
+                    config_name,
+                    dataset,
+                    n,
+                    run_seed,
                 )
-
-            per_seed.append(
-                SeedRunResult(
+                summary = run_eval(
+                    config_name,
+                    dataset_name,
+                    n=n,
                     seed=run_seed,
-                    sr=float(summary["sr"]),
-                    cer=float(summary["cer"]),
-                    n=int(summary["n"]),
-                    n_valid_tasks=int(summary.get("n_valid_tasks", summary["n"])),
-                    trace_file=str(summary.get("trace_file", "")),
-                    manifest_file=str(summary.get("manifest_file", "")),
-                    run_valid=run_valid,
-                    run_invalid_reason=summary.get("run_invalid_reason"),
+                    dry_run=dry_run,
                 )
-            )
+                run_valid = bool(summary.get("run_valid", True))
+                if not dry_run and not run_valid:
+                    reason = summary.get("run_invalid_reason", "unknown")
+                    raise AblationRunInvalidError(
+                        f"Run invalid for config {config_name} seed {run_seed} "
+                        f"on {dataset}: {reason}"
+                    )
 
-        config_results[config_name] = _aggregate_seed_rows(per_seed)
+                per_seed.append(
+                    SeedRunResult(
+                        seed=run_seed,
+                        sr=float(summary["sr"]),
+                        cer=float(summary["cer"]),
+                        n=int(summary["n"]),
+                        n_valid_tasks=int(summary.get("n_valid_tasks", summary["n"])),
+                        trace_file=str(summary.get("trace_file", "")),
+                        manifest_file=str(summary.get("manifest_file", "")),
+                        run_valid=run_valid,
+                        run_invalid_reason=summary.get("run_invalid_reason"),
+                    )
+                )
 
-    result = AblationResult(
-        dataset=dataset,
-        n_tasks=n,
-        seed=seed_list[0],
-        seeds=seed_list,
-        configs=config_results,
-        timestamp=timestamp,
-    )
-    print_comparison_table(result, flags_map)
-    return result
+            config_results[config_name] = _aggregate_seed_rows(per_seed)
+
+        result = AblationResult(
+            dataset=dataset,
+            n_tasks=n,
+            seed=seed_list[0],
+            seeds=seed_list,
+            configs=config_results,
+            timestamp=timestamp,
+        )
+        print_comparison_table(result, flags_map)
+        return result
+    finally:
+        if previous_retrieval_mode is None:
+            os.environ.pop("MEMORY_RETRIEVAL_MODE", None)
+        else:
+            os.environ["MEMORY_RETRIEVAL_MODE"] = previous_retrieval_mode
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -1,4 +1,4 @@
-"""Curated cite allowlist loading and validation for thesis reporting."""
+"""Curated allowlist loading and validation for reporting."""
 
 from __future__ import annotations
 
@@ -16,7 +16,9 @@ from eval.metrics.ci import MeanCI95, format_mean_pm_ci, mean_ci_95
 from eval.run_quality import assess_run
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
-_DEFAULT_ALLOWLIST = _PROJECT_ROOT / "configs" / "cite_allowlist.yaml"
+_RUNTIME_ALLOWLIST = _PROJECT_ROOT / "configs" / "reporting" / "cite_allowlist.yaml"
+_LEGACY_ALLOWLIST = _PROJECT_ROOT / "configs" / "cite_allowlist.yaml"
+_DEFAULT_ALLOWLIST = _RUNTIME_ALLOWLIST if _RUNTIME_ALLOWLIST.is_file() else _LEGACY_ALLOWLIST
 
 DEEPSEEK_DISCRIMINATIVE_SECTION = "humaneval_discriminative_deepseek"
 SLM_SMALL_DISCRIMINATIVE_SECTION = "humaneval_discriminative_slm_small"
@@ -33,11 +35,11 @@ _FORBIDDEN_VALUE_MARKERS = ("api_key", "bearer ", "password", "secret_key")
 
 
 class CuratedReportError(RuntimeError):
-    """Raised when a cited run fails manifest or quality validation."""
+    """Raised when an allowlisted run fails manifest or quality validation."""
 
 
 class CiteEntry(BaseModel):
-    """One allowlisted run to cite in the thesis."""
+    """One allowlisted run to cite in reports."""
 
     run_id: str
     seed: int | None = None
@@ -69,7 +71,7 @@ def entries_for_section(allowlist: CiteAllowlist, section: str) -> list[CiteEntr
 
 
 class CitedRunSummary(BaseModel):
-    """Validated metrics for one cited run."""
+    """Validated metrics for one allowlisted run."""
 
     run_id: str
     trace_path: str
@@ -186,7 +188,7 @@ def build_curated_summaries(
     *,
     traces_dir: Path,
 ) -> list[CuratedGroupSummary]:
-    """Validate all cited runs and aggregate SR/CER with 95% CIs per config/dataset."""
+    """Validate all allowlisted runs and aggregate SR/CER with 95% CIs per config/dataset."""
     excluded = set(allowlist.excluded_run_ids)
     cited: list[CitedRunSummary] = []
     for entry in iter_cite_entries(allowlist):
@@ -232,7 +234,7 @@ def collect_cited_artifacts(
     *,
     traces_dir: Path,
 ) -> list[tuple[Path, str]]:
-    """Return ``(source_path, bundle_relative_name)`` pairs for cited runs."""
+    """Return ``(source_path, bundle_relative_name)`` pairs for allowlisted runs."""
     summaries = build_curated_summaries(allowlist, traces_dir=traces_dir)
     artifacts: list[tuple[Path, str]] = []
     seen: set[str] = set()

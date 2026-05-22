@@ -86,7 +86,7 @@ def resolve_verifier(
     """Pick the effective verifier for a session or turn.
 
     Args:
-        test_code: Hidden test assertions (thesis eval path).
+        test_code: Hidden test assertions (evaluation path).
         verifier: Explicit verifier override (custom).
 
     Returns:

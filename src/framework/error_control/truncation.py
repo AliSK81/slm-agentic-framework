@@ -12,7 +12,13 @@ import yaml
 logger = logging.getLogger(__name__)
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]
-_TRUNCATION_CONFIG = _PROJECT_ROOT / "configs" / "truncation.yaml"
+_RUNTIME_TRUNCATION_CONFIG = _PROJECT_ROOT / "configs" / "runtime" / "truncation.yaml"
+_LEGACY_TRUNCATION_CONFIG = _PROJECT_ROOT / "configs" / "truncation.yaml"
+_TRUNCATION_CONFIG = (
+    _RUNTIME_TRUNCATION_CONFIG
+    if _RUNTIME_TRUNCATION_CONFIG.is_file()
+    else _LEGACY_TRUNCATION_CONFIG
+)
 
 _BUILTIN_DEFAULTS: dict[str, int] = {
     "pytest_run": 4000,

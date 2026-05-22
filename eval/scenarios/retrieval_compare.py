@@ -62,53 +62,60 @@ def run_retrieval_compare(
     Side effects:
         Sets ``MEMORY_RETRIEVAL_MODE`` per mode; writes traces via :func:`run_eval`.
     """
-    _apply_profile_bundle(profile_bundle)
-    seed_list = seeds if seeds is not None else [seed]
-    modes_out: dict[str, dict[str, ModeConfigResult]] = {}
-    timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    previous_retrieval_mode = os.environ.get("MEMORY_RETRIEVAL_MODE")
+    try:
+        _apply_profile_bundle(profile_bundle)
+        seed_list = seeds if seeds is not None else [seed]
+        modes_out: dict[str, dict[str, ModeConfigResult]] = {}
+        timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
 
-    for mode in RETRIEVAL_MODES:
-        _apply_retrieval_mode(mode)
-        modes_out[mode] = {}
-        for config_name in MEMORY_CONFIGS:
-            srs: list[float] = []
-            cers: list[float] = []
-            last_trace = ""
-            last_n = n
-            for run_seed in seed_list:
-                logger.info(
-                    "Retrieval %s config %s dataset %s seed %s",
-                    mode,
-                    config_name,
-                    dataset,
-                    run_seed,
+        for mode in RETRIEVAL_MODES:
+            _apply_retrieval_mode(mode)
+            modes_out[mode] = {}
+            for config_name in MEMORY_CONFIGS:
+                srs: list[float] = []
+                cers: list[float] = []
+                last_trace = ""
+                last_n = n
+                for run_seed in seed_list:
+                    logger.info(
+                        "Retrieval %s config %s dataset %s seed %s",
+                        mode,
+                        config_name,
+                        dataset,
+                        run_seed,
+                    )
+                    summary = run_eval(
+                        config_name,  # type: ignore[arg-type]
+                        dataset,  # type: ignore[arg-type]
+                        n=n,
+                        seed=run_seed,
+                        dry_run=dry_run,
+                    )
+                    srs.append(float(summary["sr"]))
+                    cers.append(float(summary["cer"]))
+                    last_n = int(summary["n"])
+                    last_trace = str(summary.get("trace_file", ""))
+                modes_out[mode][config_name] = ModeConfigResult(
+                    config=config_name,
+                    sr=sum(srs) / len(srs) if srs else 0.0,
+                    cer=sum(cers) / len(cers) if cers else 0.0,
+                    n=last_n,
+                    trace_file=last_trace,
                 )
-                summary = run_eval(
-                    config_name,  # type: ignore[arg-type]
-                    dataset,  # type: ignore[arg-type]
-                    n=n,
-                    seed=run_seed,
-                    dry_run=dry_run,
-                )
-                srs.append(float(summary["sr"]))
-                cers.append(float(summary["cer"]))
-                last_n = int(summary["n"])
-                last_trace = str(summary.get("trace_file", ""))
-            modes_out[mode][config_name] = ModeConfigResult(
-                config=config_name,
-                sr=sum(srs) / len(srs) if srs else 0.0,
-                cer=sum(cers) / len(cers) if cers else 0.0,
-                n=last_n,
-                trace_file=last_trace,
-            )
 
-    return RetrievalCompareResult(
-        dataset=dataset,
-        n_tasks=n,
-        seeds=seed_list,
-        modes=modes_out,
-        timestamp=timestamp,
-    )
+        return RetrievalCompareResult(
+            dataset=dataset,
+            n_tasks=n,
+            seeds=seed_list,
+            modes=modes_out,
+            timestamp=timestamp,
+        )
+    finally:
+        if previous_retrieval_mode is None:
+            os.environ.pop("MEMORY_RETRIEVAL_MODE", None)
+        else:
+            os.environ["MEMORY_RETRIEVAL_MODE"] = previous_retrieval_mode
 
 
 def print_retrieval_table(result: RetrievalCompareResult) -> None:

@@ -1,6 +1,6 @@
 # Contributing to SLM Agentic Framework
 
-Thank you for your interest in contributing! This project is an MSc thesis implementation, and community input is welcome.
+Thank you for your interest in contributing! Community input is welcome.
 
 ## Getting Started
 
@@ -18,9 +18,37 @@ Thank you for your interest in contributing! This project is an MSc thesis imple
 6. Commit using clear, descriptive messages.
 7. Open a **Pull Request** against `master`.
 
+## Development Standards
+
+- Python version: **3.12+**.
+- Keep type hints on public functions and data models.
+- Prefer typed Pydantic models for cross-module data contracts.
+- Avoid broad exception handling; catch specific exceptions.
+- Keep module boundaries clear:
+  - `src/framework`: runtime framework
+  - `eval`: benchmark and ablation harness
+  - `scripts`: maintenance and utility scripts
+
+## Local Validation Before PR
+
+Run these checks locally:
+
+```bash
+ruff check src/
+pytest tests/ -m "not e2e" -v
+```
+
+If your change affects live-provider flows, also run:
+
+```bash
+pytest tests/ -m e2e -v
+```
+
+See [`docs/testing.md`](docs/testing.md) for test tier guidance.
+
 ## Code Style
 
-- Follow existing code conventions (Python 3.11+, type hints, Pydantic models).
+- Follow existing code conventions (Python 3.12+, type hints, Pydantic models).
 - Keep functions focused and well-documented.
 - Add or update tests for any changed behaviour.
 

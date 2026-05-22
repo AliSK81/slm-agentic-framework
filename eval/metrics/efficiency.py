@@ -45,7 +45,7 @@ def aggregate_efficiency(
     traces_dir: Path,
     models_path: Path | None = None,
 ) -> list[EfficiencyRow]:
-    """Aggregate usage and estimated cost for cited runs grouped by provider × config."""
+    """Aggregate usage and estimated cost for allowlisted runs grouped by provider × config."""
     price_table = load_price_table(models_path)
     buckets: dict[tuple[str, str, str], dict[str, Any]] = {}
 
@@ -127,7 +127,7 @@ def format_efficiency_table(rows: list[EfficiencyRow]) -> str:
             f"{row.llm_calls_per_task:.2f} | {usd} | {known} |"
         )
     if not rows:
-        lines.append("| (no cited runs with usage) | | | | | | | | |")
+        lines.append("| (no allowlisted runs with usage) | | | | | | | | |")
     return "\n".join(lines) + "\n"
 
 
@@ -136,7 +136,7 @@ def load_efficiency_from_project(
     traces_dir: Path | None = None,
     allowlist_path: Path | None = None,
 ) -> list[EfficiencyRow]:
-    """Load allowlist and aggregate efficiency for the thesis report."""
+    """Load allowlist and aggregate efficiency for reports."""
     root = Path(__file__).resolve().parents[2]
     return aggregate_efficiency(
         load_cite_allowlist(allowlist_path),

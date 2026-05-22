@@ -19,7 +19,12 @@ logger = logging.getLogger(__name__)
 _ENTRY_POINT_RE = re.compile(r"def\s+([a-zA-Z_][\w]*)\s*\(")
 
 _CONFIGS_DIR = Path(__file__).resolve().parents[2] / "configs"
-_CURATED_HARD_IDS_PATH = _CONFIGS_DIR / "humaneval_hard_ids.txt"
+_REPORTING_CONFIGS_DIR = _CONFIGS_DIR / "reporting"
+_CURATED_HARD_IDS_PATH = (
+    _REPORTING_CONFIGS_DIR / "humaneval_hard_ids.txt"
+    if (_REPORTING_CONFIGS_DIR / "humaneval_hard_ids.txt").is_file()
+    else _CONFIGS_DIR / "humaneval_hard_ids.txt"
+)
 
 
 class HumanEvalTask(BaseModel):

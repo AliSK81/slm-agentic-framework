@@ -1,0 +1,20 @@
+# Tool-output truncation caps (chars). Used by framework.tools and sandbox.
+# Interactive sessions select the ``interactive`` profile at session start.
+
+profiles:
+  default:
+    pytest_run: 4000
+    py_compile: 2000
+    read_file: 8000
+    syntax_check: 1500
+    search_codebase: 2000
+
+  interactive:
+    pytest_run: 3000
+    read_file: 6000
+    py_compile: 1500
+    syntax_check: 1200
+    search_codebase: 1500
+
+compaction:
+  context_ceiling_chars: 12000

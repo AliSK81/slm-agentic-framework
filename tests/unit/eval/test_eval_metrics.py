@@ -68,7 +68,7 @@ def test_run_result_schema_valid() -> None:
 
 def test_eval_config_loads_from_yaml() -> None:
     """configs/eval.yaml parses into EvalConfig with ablation flags."""
-    root = Path(__file__).resolve().parents[2]
+    root = next(p for p in Path(__file__).resolve().parents if (p / "pyproject.toml").is_file())
     config = load_eval_config(root / "configs" / "eval.yaml")
     assert isinstance(config, EvalConfig)
     assert config.humaneval.get("sample_size") == 50

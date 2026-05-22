@@ -65,7 +65,7 @@ def mean_ci_95(values: list[float]) -> MeanCI95:
 
 
 def format_mean_pm_ci(ci: MeanCI95, *, digits: int = 1) -> str:
-    """Format as ``mean ± margin`` for thesis tables."""
+    """Format as ``mean ± margin`` for report tables."""
     if ci["n"] < 2:
         return f"{ci['mean']:.{digits}f}"
     return f"{ci['mean']:.{digits}f} ± {ci['margin']:.{digits}f}"

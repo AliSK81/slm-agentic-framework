@@ -9,6 +9,7 @@ from pathlib import Path
 
 import yaml
 
+from framework.memory.retrieval import _cap_tokens
 from framework.memory.stores import DecisionEntry, MemoryStores, SelfCheckRecord
 from framework.slm.client import SLMClient
 
@@ -76,6 +77,8 @@ def write_reflection(
     text = response.content.strip() if not response.error else ""
     if not text:
         text = f"Retry {retry_count}: adjust approach for {current_subtask}."
+    max_output_tokens = int(cfg.get("max_output_tokens", 120))
+    text = _cap_tokens(text, max_output_tokens)
 
     entry = DecisionEntry(
         session_id=session_id,

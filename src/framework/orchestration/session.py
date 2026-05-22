@@ -436,6 +436,9 @@ def _run_revise_reflection(
     if not settings.error_control:
         return {**state, "reflection_guidance": None}
 
+    if not planner_slm.profile.reflection_enabled:
+        return {**state, "reflection_guidance": None}
+
     retry_count = int(state.get("retry_count", 0))
     threshold = int(_reflection_config().get("trigger_retry_threshold", 1))
     if retry_count < threshold:

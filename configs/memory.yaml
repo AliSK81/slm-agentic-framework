@@ -18,3 +18,4 @@ retrieval:
 reflection:
   trigger_retry_threshold: 1   # reflect after this many retries on same subtask
   max_reflections_per_subtask: 3
+  max_output_tokens: 120

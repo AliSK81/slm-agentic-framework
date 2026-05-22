@@ -145,6 +145,26 @@ def test_reflection_not_called_when_error_control_off(
     assert mock_slm.calls == []
 
 
+def test_reflection_skipped_when_profile_reflection_disabled(
+    mock_slm: MockSLMClient,
+    memory: MemoryStores,
+) -> None:
+    """error_control on but reflection_enabled false → no reflection decision."""
+    mock_slm.profile = mock_slm.profile.model_copy(update={"reflection_enabled": False})
+    before = len(memory.decisions.list_for_session("sess-reflect"))
+    state = _run_revise_reflection(
+        _revise_state(),
+        memory,
+        "Fix multiply",
+        mock_slm,
+        AblationSettings(error_control=True),
+    )
+
+    assert state.get("reflection_guidance") is None
+    assert len(memory.decisions.list_for_session("sess-reflect")) == before
+    assert mock_slm.calls == []
+
+
 def test_reflection_capped_per_subtask(mock_slm: MockSLMClient, memory: MemoryStores) -> None:
     """Reflection entries stop at max_reflections_per_subtask from memory.yaml."""
     settings = AblationSettings(error_control=True)

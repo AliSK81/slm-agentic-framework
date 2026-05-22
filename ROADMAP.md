@@ -50,4 +50,4 @@ Memory (4 stores + WM) · Control (Decision Cycle + LangGraph FSM) · Error cont
 
 ## Satellite tracks (all DONE)
 
-Aviona v1 (1–12) · Aviona v2 (V2-0..10, 0.3.0) · Framework ICP (FI-1..7) · Aviona v3 (AV3-1..5, 0.4.0) · Ablation fix FW-1..4.
+Framework ICP (FI-1..7) · Ablation fix FW-1..4.

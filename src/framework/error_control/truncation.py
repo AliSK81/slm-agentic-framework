@@ -63,7 +63,7 @@ def set_caps_profile(profile: str) -> None:
 
 
 def get_compaction_ceiling() -> int:
-    """Character ceiling for Aviona rolling context compaction."""
+    """Character ceiling for rolling context compaction."""
     raw = _load_truncation_raw()
     compaction = raw.get("compaction") or {}
     ceiling = compaction.get("context_ceiling_chars", 12000)

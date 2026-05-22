@@ -15,7 +15,7 @@ from framework.tools.test_runner import run_tests
 
 
 def test_interactive_profile_lowers_pytest_and_read_file_caps() -> None:
-    """Interactive Aviona profile uses smaller caps than default."""
+    """Interactive profile uses smaller caps than default."""
     default = get_caps("default")
     interactive = get_caps("interactive")
     assert interactive["pytest_run"] < default["pytest_run"]

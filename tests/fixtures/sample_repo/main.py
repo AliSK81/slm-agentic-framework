@@ -1,4 +1,4 @@
-"""Tiny sample module for the Aviona fixture repo."""
+"""Tiny sample module for test fixtures."""
 
 
 def greet(name: str) -> str:

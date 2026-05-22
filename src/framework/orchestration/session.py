@@ -217,7 +217,7 @@ def require_slm_api_key() -> str:
 def ensure_slm_api_key_configured() -> None:
     """Verify the API key env var is present locally (no network probe).
 
-    Use :func:`validate_slm_api_key` for connectivity checks (``aviona doctor``).
+    Use :func:`validate_slm_api_key` for connectivity checks.
     """
     if not api_key_required_for_active_provider():
         return

@@ -1,5 +1,5 @@
 # Tool-output truncation caps (chars). Used by framework.tools and sandbox.
-# Aviona selects the ``interactive`` profile at session start.
+# Interactive sessions select the ``interactive`` profile at session start.
 
 profiles:
   default:

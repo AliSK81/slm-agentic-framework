@@ -15,7 +15,7 @@ An agentic AI programming framework for **small language models (SLMs)**, develo
 - **Workflow State Machine** — LangGraph-based orchestration for multi-step tasks
 - **Multi-Agent Orchestration** — Planner + Executor agents communicating via typed Pydantic messages
 - **Provider-agnostic** — works with Ollama, DeepSeek, OpenRouter, or any OpenAI-compatible endpoint
-- **Aviona CLI** — terminal coding agent built on top of the framework
+- **Evaluation harness** — HumanEval, MBPP, SWE-bench adapters and A–D ablation runner
 
 ---
 
@@ -24,8 +24,7 @@ An agentic AI programming framework for **small language models (SLMs)**, develo
 ```
 src/
   framework/       # core library (memory, control, orchestration, error handling)
-  aviona/          # Aviona terminal agent built on the framework
-eval/              # benchmarks and ablation scripts (HumanEval, MBPP, SWE-bench)
+eval/              # benchmarks and ablation scripts
 tests/             # unit, integration, and e2e test suites
 configs/           # YAML configs for models, memory, and eval
 scripts/           # utility and diagnostic scripts
@@ -54,6 +53,7 @@ source .venv/bin/activate
 
 pip install -r requirements.txt
 cp .env.example .env   # then edit .env with your provider settings
+pip install -e .
 ```
 
 ### Running Tests
@@ -66,19 +66,15 @@ pytest tests/ -m "not e2e" -v
 pytest tests/ -m e2e -v
 ```
 
-### Aviona — Terminal Coding Agent
+### Evaluation
 
 ```bash
-pip install -e .
-cd tests/fixtures/sample_repo   # or any project directory
-aviona
-> create hello.txt with "hi"
-```
+# Dry-run ablation wiring
+python -m eval.scenarios.ablation --dataset humaneval_hard --n 10 --seeds 42 --dry-run
 
-Useful Aviona commands:
-- `aviona doctor` — probe the configured SLM
-- `aviona undo` — restore last snapshotted edits
-- `aviona --continue` / `--resume <id>` / `--fork-session`
+# Smoke test (requires live SLM)
+python scripts/smoke_test.py
+```
 
 ---
 

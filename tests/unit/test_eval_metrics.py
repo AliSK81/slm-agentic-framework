@@ -77,7 +77,9 @@ def test_eval_config_loads_from_yaml() -> None:
         memory=True,
         control=True,
         error_control=True,
+        wm_ceiling_override=800,
     )
+    assert config.ablation_configs["B"].wm_ceiling_override == 500
 
 
 def test_humaneval_stratified_sample_respects_split() -> None:

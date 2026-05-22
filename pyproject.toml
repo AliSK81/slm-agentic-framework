@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "slm-agentic-framework"
-version = "0.4.0"
+version = "0.5.0"
 description = "SLM-based multi-agent programming framework (MSc thesis)"
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -21,10 +21,6 @@ requires-python = ">=3.12"
 [project.urls]
 "Homepage" = "https://github.com/AliSK81/slm-agentic-framework"
 "Bug Tracker" = "https://github.com/AliSK81/slm-agentic-framework/issues"
-
-[project.scripts]
-aviona = "aviona.cli:main"
-
 [tool.setuptools]
 package-dir = { "" = "src" }
 

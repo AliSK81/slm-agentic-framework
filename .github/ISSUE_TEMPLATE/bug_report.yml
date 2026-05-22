@@ -22,9 +22,8 @@ body:
       description: Steps to reproduce the behaviour.
       placeholder: |
         1. Configure SLM_PROVIDER=...
-        2. Run `aviona`
-        3. Enter prompt `...`
-        4. See error
+        2. Run `python -m eval.run_eval --config D --dataset humaneval_hard --n 1 --dry-run`
+        3. See error
     validations:
       required: true
 

@@ -1,4 +1,4 @@
-"""Pluggable workspace verification for sessions and Aviona turns."""
+"""Pluggable workspace verification for sessions."""
 
 from __future__ import annotations
 
@@ -87,7 +87,7 @@ def resolve_verifier(
 
     Args:
         test_code: Hidden test assertions (thesis eval path).
-        verifier: Explicit verifier override (Aviona / custom).
+        verifier: Explicit verifier override (custom).
 
     Returns:
         ``TestCodeVerifier`` when ``test_code`` is non-empty and no override;

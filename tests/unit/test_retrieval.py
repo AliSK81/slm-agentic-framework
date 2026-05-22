@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from framework.memory.backend import SQLiteBackend
-from framework.memory.retrieval import keyword_overlap, retrieve_top_k, score
+from framework.memory.retrieval import estimate_tokens, keyword_overlap, retrieve_top_k, score
 from framework.memory.stores import MemoryStores, RetrievalItem, SubTask, WorkingMemory
 from framework.memory.working_memory import WorkingMemoryBuilder
 from framework.slm.client import ModelProfile
@@ -132,7 +132,7 @@ def test_retrieved_item_text_capped_at_150_tokens(memory: MemoryStores) -> None:
         subtask_id="root:sess-cap",
     )
     assert len(wm.retrieved_items) == 1
-    assert len(wm.retrieved_items[0].split()) <= 150
+    assert estimate_tokens(wm.retrieved_items[0]) <= 150
 
 
 def test_skill_card_selected_by_error_signal() -> None:
@@ -245,3 +245,49 @@ def test_retrieved_total_capped_at_quarter_wm_ceiling(memory: MemoryStores) -> N
     )
     total_words = sum(len(item.split()) for item in wm.retrieved_items)
     assert total_words <= ceiling // 4
+
+
+def test_fit_to_budget_drops_retrieval_before_goal(memory: MemoryStores) -> None:
+    """Under budget pressure, retrieved context is dropped before shrinking the goal."""
+    goal = "PRESERVE_THIS_GOAL " + ("implement solution " * 300)
+    _register_session(memory, "sess-goal", goal=goal, constraints=["keep constraints"])
+    now = datetime.now(UTC)
+    for i in range(3):
+        memory.retrieval.append(
+            RetrievalItem(
+                item_ref=f"ctx-{i}",
+                text_summary="implement solution " * 200,
+                importance=0.5,
+                written_at=now,
+                last_accessed=now,
+            )
+        )
+    wm = WorkingMemoryBuilder(memory, _profile(max_wm=220)).build(
+        session_id="sess-goal",
+        agent_role="executor",
+        current_subtask="implement solution for task",
+        subtask_id="root:sess-goal",
+    )
+    assert wm.original_goal.startswith("PRESERVE_THIS_GOAL")
+    assert len(wm.retrieved_items) < 3
+    assert wm.token_count() <= 220
+
+
+def test_goal_anchor_preserved_when_over_budget(memory: MemoryStores) -> None:
+    """Goal marker remains in prompt after WM budget truncation."""
+    marker = "ANCHOR_GOAL_MARKER"
+    _register_session(
+        memory,
+        "sess-anchor-budget",
+        goal=f"{marker} " + ("x" * 4000),
+        constraints=["y" * 1000],
+    )
+    wm = WorkingMemoryBuilder(memory, _profile(max_wm=150)).build(
+        session_id="sess-anchor-budget",
+        agent_role="executor",
+        current_subtask="do work " * 200,
+        subtask_id="root:sess-anchor-budget",
+    )
+    assert marker in wm.original_goal
+    assert marker in wm.to_prompt_prefix()
+    assert wm.token_count() <= 150

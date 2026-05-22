@@ -8,6 +8,7 @@ import pytest
 
 from framework.memory.retrieval import (
     SemanticRetriever,
+    estimate_tokens,
     get_retrieval_mode,
     retrieve_top_k,
 )
@@ -52,7 +53,7 @@ def test_semantic_retriever_returns_typed_items_capped_150_tokens() -> None:
     assert all(isinstance(row, RetrievalItem) for row in results)
     assert results[0].item_ref in {"b", "c"}
     for row in results:
-        assert len(row.text_summary.split()) <= 150
+        assert estimate_tokens(row.text_summary) <= 150
 
 
 def test_retrieval_mode_flag_switches_backend(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -101,11 +101,18 @@ def score(item: RetrievalItem, query: str, now: datetime | None = None) -> float
     )
 
 
+def estimate_tokens(text: str) -> int:
+    """Rough token estimate shared by WM budget, shrink, and cap helpers."""
+    if not text:
+        return 0
+    return max(1, len(text) // 4)
+
+
 def _cap_tokens(text: str, max_tokens: int) -> str:
-    words = text.split()
-    if len(words) <= max_tokens:
+    if estimate_tokens(text) <= max_tokens:
         return text
-    return " ".join(words[:max_tokens])
+    target_chars = max(max_tokens, 1) * 4
+    return text[:target_chars]
 
 
 def _cap_item(item: RetrievalItem, max_tokens: int) -> RetrievalItem:

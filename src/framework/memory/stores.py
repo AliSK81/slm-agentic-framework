@@ -423,8 +423,10 @@ class WorkingMemory(BaseModel):
         return "\n".join(lines)
 
     def token_count(self) -> int:
-        """Rough token estimate: len(text) // 4."""
-        return len(self.to_prompt_prefix()) // 4
+        """Rough token estimate using the shared char/4 heuristic."""
+        from framework.memory.retrieval import estimate_tokens
+
+        return estimate_tokens(self.to_prompt_prefix())
 
 
 class MemoryStores:

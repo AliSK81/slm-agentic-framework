@@ -1,8 +1,8 @@
 # SLM Agentic Framework
 
+[![CI](https://github.com/AliSK81/slm-agentic-framework/actions/workflows/ci.yml/badge.svg)](https://github.com/AliSK81/slm-agentic-framework/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![Tests](https://img.shields.io/badge/tests-pytest-green.svg)](tests/)
 
 An agentic AI programming framework for **small language models (SLMs)**, developed as an MSc thesis project. The framework provides structured memory mechanisms, decision-cycle control logic, and a multi-agent orchestration layer optimised for resource-constrained models (3B–20B parameters).
 

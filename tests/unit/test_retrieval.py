@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from framework.memory.backend import SQLiteBackend
+from framework.memory.retrieval import keyword_overlap, retrieve_top_k, score
 from framework.memory.stores import MemoryStores, RetrievalItem, SubTask, WorkingMemory
 from framework.memory.working_memory import WorkingMemoryBuilder
 from framework.slm.client import ModelProfile
@@ -127,12 +128,11 @@ def test_retrieved_item_text_capped_at_150_tokens(memory: MemoryStores) -> None:
     wm = WorkingMemoryBuilder(memory, _profile()).build(
         session_id="sess-cap",
         agent_role="executor",
-        current_subtask="uniquecapquery uniquecapquery",
+        current_subtask="token token uniquecapquery",
         subtask_id="root:sess-cap",
     )
-    long_items = [item for item in wm.retrieved_items if item.startswith("token ")]
-    assert len(long_items) == 1
-    assert len(long_items[0].split()) <= 150
+    assert len(wm.retrieved_items) == 1
+    assert len(wm.retrieved_items[0].split()) <= 150
 
 
 def test_skill_card_selected_by_error_signal() -> None:
@@ -167,3 +167,81 @@ def test_skill_card_none_when_no_match() -> None:
         skill_card=card,
     )
     assert wm.skill_card is None
+
+
+def test_retrieve_empty_when_no_relevance() -> None:
+    """Zero keyword overlap returns empty top-k instead of noise."""
+    now = datetime.now(UTC)
+    index = [
+        RetrievalItem(
+            item_ref=f"noise-{i}",
+            text_summary="unrelated database migration kubernetes",
+            importance=1.0,
+            written_at=now,
+            last_accessed=now,
+        )
+        for i in range(5)
+    ]
+    assert retrieve_top_k(index, "implement binary search tree", k=3) == []
+
+
+def test_zero_relevance_items_do_not_rank_from_importance() -> None:
+    """Importance alone must not produce a non-zero score when overlap is zero."""
+    now = datetime.now(UTC)
+    item = RetrievalItem(
+        item_ref="noise",
+        text_summary="kubernetes pod scheduling unrelated",
+        importance=1.0,
+        written_at=now,
+        last_accessed=now,
+    )
+    assert keyword_overlap(item, "fix multiply function") == 0.0
+    assert score(item, "fix multiply function", now) == 0.0
+
+
+def test_reflection_decision_not_indexed_for_retrieval(memory: MemoryStores) -> None:
+    """Reflection and quality_failure stay in decision log only, not retrieval index."""
+    from framework.memory.stores import DecisionEntry, SelfCheckRecord
+
+    before = memory.retrieval.count()
+    for kind in ("reflection", "quality_failure"):
+        memory.decisions.append(
+            DecisionEntry(
+                session_id="sess-skip",
+                decision_id=f"d-{kind}",
+                step_index=0,
+                by_agent="executor",
+                kind=kind,
+                payload={"text": "meta"},
+                rationale=f"{kind} rationale",
+                references=[],
+                self_check=SelfCheckRecord(verdict="pass", issues=[]),
+                timestamp=datetime.now(UTC),
+            )
+        )
+    assert memory.retrieval.count() == before
+
+
+def test_retrieved_total_capped_at_quarter_wm_ceiling(memory: MemoryStores) -> None:
+    """Total retrieved text in WM is capped at ~25% of profile max_working_memory_tokens."""
+    _register_session(memory, "sess-quota", goal="g", constraints=[])
+    now = datetime.now(UTC)
+    for i in range(3):
+        memory.retrieval.append(
+            RetrievalItem(
+                item_ref=f"chunk-{i}",
+                text_summary=" ".join(["sharedkeyword"] * 120),
+                importance=0.5,
+                written_at=now,
+                last_accessed=now,
+            )
+        )
+    ceiling = 400
+    wm = WorkingMemoryBuilder(memory, _profile(max_wm=ceiling)).build(
+        session_id="sess-quota",
+        agent_role="executor",
+        current_subtask="sharedkeyword task",
+        subtask_id="root:sess-quota",
+    )
+    total_words = sum(len(item.split()) for item in wm.retrieved_items)
+    assert total_words <= ceiling // 4

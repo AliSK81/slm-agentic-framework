@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from framework.memory.backend import SQLiteBackend
-from framework.memory.retrieval import retrieve_top_k, score
+from framework.memory.retrieval import keyword_overlap, retrieve_top_k, score
 from framework.memory.stores import (
     DecisionEntry,
     DecisionLog,
@@ -144,7 +144,7 @@ def test_retrieval_item_appended_on_every_write(memory: MemoryStores) -> None:
 def test_retrieval_scoring_ranks_recent_higher() -> None:
     """Two items same importance/relevance; newer one scores higher."""
     now = datetime.now(UTC)
-    query = "unrelated query terms"
+    query = "same summary text"
     older = RetrievalItem(
         item_ref="a",
         text_summary="same summary text",
@@ -165,7 +165,7 @@ def test_retrieval_scoring_ranks_recent_higher() -> None:
 def test_retrieval_scoring_ranks_important_higher() -> None:
     """Two items same recency/relevance; importance=1.0 scores higher than 0.5."""
     now = datetime.now(UTC)
-    query = "other words"
+    query = "identical"
     low = RetrievalItem(
         item_ref="a",
         text_summary="identical",
@@ -184,7 +184,7 @@ def test_retrieval_scoring_ranks_important_higher() -> None:
 
 
 def test_retrieve_top_k_returns_k_items() -> None:
-    """10 items in index, k=3 → 3 items returned."""
+    """10 items in index, k=3 → 3 items returned when query overlaps."""
     now = datetime.now(UTC)
     index = [
         RetrievalItem(
@@ -198,6 +198,37 @@ def test_retrieve_top_k_returns_k_items() -> None:
     ]
     top = retrieve_top_k(index, "item", k=3)
     assert len(top) == 3
+
+
+def test_retrieve_empty_when_no_relevance() -> None:
+    """Unrelated index rows with zero overlap return no items."""
+    now = datetime.now(UTC)
+    index = [
+        RetrievalItem(
+            item_ref=f"noise-{i}",
+            text_summary="unrelated database migration kubernetes",
+            importance=1.0,
+            written_at=now,
+            last_accessed=now,
+        )
+        for i in range(5)
+    ]
+    top = retrieve_top_k(index, "implement binary search tree", k=3)
+    assert top == []
+
+
+def test_zero_relevance_items_do_not_rank_from_importance() -> None:
+    """High-importance rows with zero overlap score below min relevance gate."""
+    now = datetime.now(UTC)
+    item = RetrievalItem(
+        item_ref="noise",
+        text_summary="kubernetes pod scheduling unrelated",
+        importance=1.0,
+        written_at=now,
+        last_accessed=now,
+    )
+    assert keyword_overlap(item, "fix multiply function") == 0.0
+    assert score(item, "fix multiply function", now) == 0.0
 
 
 def test_sqlite_backend_persists_across_instances(tmp_path: Path) -> None:

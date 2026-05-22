@@ -35,6 +35,7 @@ def _load_retrieval_config() -> dict[str, Any]:
         "decay_factor": float(retrieval.get("decay_factor", 0.995)),
         "top_k": int(retrieval.get("top_k", 3)),
         "max_item_tokens": int(retrieval.get("max_item_tokens", 150)),
+        "min_relevance": float(retrieval.get("min_relevance", 0.05)),
     }
 
 
@@ -90,9 +91,11 @@ def score(item: RetrievalItem, query: str, now: datetime | None = None) -> float
     now = now or datetime.now(UTC)
     rel = keyword_overlap(item, query)
     rec = recency(item, now)
-    imp = item.importance
+    # Zero-relevance items must not rank from importance/recency alone (~0.45 floor).
+    imp = item.importance if rel >= cfg["min_relevance"] else 0.0
+    rec_weight = rec if rel >= cfg["min_relevance"] else 0.0
     return (
-        cfg["alpha_recency"] * rec
+        cfg["alpha_recency"] * rec_weight
         + cfg["alpha_importance"] * imp
         + cfg["alpha_relevance"] * rel
     )
@@ -121,8 +124,14 @@ def _keyword_retrieve_top_k(
 ) -> list[RetrievalItem]:
     cfg = _load_retrieval_config()
     max_tokens = cfg["max_item_tokens"]
+    min_relevance = cfg["min_relevance"]
     now = now or datetime.now(UTC)
-    ranked = sorted(index, key=lambda item: score(item, query, now), reverse=True)
+    relevant = [
+        item
+        for item in index
+        if keyword_overlap(item, query) >= min_relevance
+    ]
+    ranked = sorted(relevant, key=lambda item: score(item, query, now), reverse=True)
     return [_cap_item(item, max_tokens) for item in ranked[:k]]
 
 

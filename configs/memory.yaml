@@ -9,6 +9,7 @@ retrieval:
   mode: keyword   # keyword | semantic — override with MEMORY_RETRIEVAL_MODE
   top_k: 3
   max_item_tokens: 150
+  min_relevance: 0.05   # omit index rows with keyword_overlap below this (0..k items)
   alpha_recency: 0.2
   alpha_importance: 0.5
   alpha_relevance: 0.3

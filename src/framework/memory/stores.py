@@ -227,15 +227,16 @@ class DecisionLog:
     def append(self, entry: DecisionEntry) -> DecisionEntry:
         self._backend.append(STORE_DECISIONS, _dump(entry))
         now = _utc_now()
-        self._on_index(
-            RetrievalItem(
-                item_ref=f"decision:{entry.decision_id}",
-                text_summary=f"{entry.kind}: {entry.rationale}",
-                importance=_importance_for_kind(entry.kind),
-                written_at=now,
-                last_accessed=now,
+        if entry.kind not in ("reflection", "quality_failure"):
+            self._on_index(
+                RetrievalItem(
+                    item_ref=f"decision:{entry.decision_id}",
+                    text_summary=f"{entry.kind}: {entry.rationale}",
+                    importance=_importance_for_kind(entry.kind),
+                    written_at=now,
+                    last_accessed=now,
+                )
             )
-        )
         if self._on_append is not None:
             self._on_append(entry)
         return entry

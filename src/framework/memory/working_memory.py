@@ -12,6 +12,26 @@ from framework.slm.skills import select_skill_card
 logger = logging.getLogger(__name__)
 
 
+def _cap_retrieved_items(summaries: list[str], max_tokens: int) -> list[str]:
+    """Cap total retrieved text to ``max_tokens`` words across all items."""
+    if max_tokens <= 0:
+        return []
+    total = 0
+    capped: list[str] = []
+    for text in summaries:
+        words = text.split()
+        remaining = max_tokens - total
+        if remaining <= 0:
+            break
+        if len(words) <= remaining:
+            capped.append(text)
+            total += len(words)
+        else:
+            capped.append(" ".join(words[:remaining]))
+            break
+    return capped
+
+
 def _shrink_text(text: str, max_tokens: int) -> str:
     """Cap by word count and by character length (handles single long tokens)."""
     capped = _cap_tokens(text, max_tokens)
@@ -188,7 +208,11 @@ class WorkingMemoryBuilder:
         if self._enable_memory:
             index = self._memory.retrieval.list_items()
             top_items = retrieve_top_k(index, current_subtask, k=3)
-            retrieved = [item.text_summary for item in top_items]
+            retrieved_budget = max(1, self._profile.max_working_memory_tokens // 4)
+            retrieved = _cap_retrieved_items(
+                [item.text_summary for item in top_items],
+                retrieved_budget,
+            )
 
             skill_raw = select_skill_card(
                 agent_role=agent_role,

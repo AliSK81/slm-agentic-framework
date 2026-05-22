@@ -89,7 +89,7 @@ Copy `.env.example` to `.env` and set your preferred provider:
 
 | Variable | Description |
 |---|---|
-| `SLM_PROVIDER` | Provider key: `ollama`, `deepseek`, `openrouter`, `mohaymen` |
+| `SLM_PROVIDER` | Provider key: `ollama`, `deepseek`, `openrouter` |
 | `PLANNER_PROFILE` | Model profile for the Planner agent (see `configs/runtime/models.yaml`) |
 | `EXECUTOR_PROFILE` | Model profile for the Executor agent |
 | `MEMORY_BACKEND` | `sqlite` (default) or `redis` |
